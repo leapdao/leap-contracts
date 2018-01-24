@@ -1,28 +1,25 @@
 @title[Introduction]
 
-# Git<span class="gold">Pitch</span>
-
 # TrueBit: Scalable Computation
-<br>
 <br>
 <span class="byline">[ Johann Barbie  ]</span>
 
 --- 
 
 
-### what is scalability?
+### What is scalability?
 
 - x scales if it performs equally well as it grows
-- blockchains: every full node has to process every block
+- *blockchains:* every full node has to process every block
 - adding nodes does not help
 
 ---
 
-### Scalability in ethereum
+### Scalability in Ethereum
 
-- Casper: scale state space and trnsaction via sharding
-- raiden: scale transactions via state channels
-- truebit: scale computation via interactive verification
+*Casper:* scale state space and trnsaction via sharding
+*raiden:* scale transactions via state channels
+*Truebit:* scale computation via interactive verification
 
 only sharding requires fork
 
@@ -43,8 +40,6 @@ Ethereum smart contracts
 
 ### TrueBit has Unanimous Consensus
 
-Computation Task -> someone runs the task -> puts the result on chain
-
 - single honest virifier can outrule anyone ("99.9% attack")
 - presence of honest verifier ensured by economic incentives
 
@@ -62,47 +57,47 @@ Difference to Golem / iExec / Sonm:
 
 ---
 
-### Verificatio Game 1
+### Verification Game 1
 
 Parties compute Merkle-trees of full state (memory) at every single computation step and submit roots at certain steps
 
 ```
-step: 1						1 000 000
+step: 		1				1 000 000
 Proposer: 	input			output_1
 Challenger: input 			output_2
 ```
 
 ---
 
-### Verificatio Game 2
+### Verification Game 2
 
 judge asks for merkle root in middle of exkecution
 ```
-step 		500 000
-Proposer: 	0x1234
-Challenger 	0x1234
+step 		1			500 000		1 000 000
+Proposer: 	input		0x1234		output_1
+Challenger 	input 		0x1234 		output_2
 ```
 
 ---
 
-### Verificatio Game 2
+### Verification Game 3
 
 binary search continues:
 ```
-step 		750 000		625 000
-Proposer: 	0x7328		0x8256
-Challenger 	0x1862		0x8256
+step 		..	750 000		625 000	..
+Proposer: 	..	0x7328		0x8256	..
+Challenger 	..	0x1862		0x8256	..
 ```
 
 ---
 
-### Verificatio Game 2
+### Verification Game 4
 
 => step in agreement, next step not in agreement
 ```
-step 		638 225		638 226
-Proposer: 	0x4321		0x8922
-Challenger 	0x4321		0x8923
+step 		..	638 225		638 226	..
+Proposer: 	..	0x4321		0x8922	..
+Challenger 	..	0x4321		0x8923	..
 ```
 
 after 20 rounds: agreement -> disagremment in one step 
