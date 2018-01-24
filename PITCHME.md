@@ -17,11 +17,11 @@
 
 ### Scalability in Ethereum
 
-*Casper:* scale state space and trnsaction via sharding
+**Casper:** scale state space and trnsaction via sharding
 
-*raiden:* scale transactions via state channels
+**Raiden:** scale transactions via state channels
 
-*Truebit:* scale computation via interactive verification
+**Truebit:** scale computation via interactive verification
 
 only sharding requires fork
 
