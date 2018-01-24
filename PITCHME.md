@@ -18,7 +18,9 @@
 ### Scalability in Ethereum
 
 *Casper:* scale state space and trnsaction via sharding
+
 *raiden:* scale transactions via state channels
+
 *Truebit:* scale computation via interactive verification
 
 only sharding requires fork
@@ -101,6 +103,7 @@ Challenger 	..	0x4321		0x8923	..
 ```
 
 after 20 rounds: agreement -> disagremment in one step 
+
 both submit merkre proofs, smart contract verifies with no effort and finds cheater
 
 ---
