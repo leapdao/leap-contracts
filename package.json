@@ -4,24 +4,12 @@
   "author": "Parsec Labs",
   "license": "MIT",
   "main": "truffle.js",
-  "scripts": {
-    "clean": "rm -rf ./build && rm -rf /tmp/compiled_test_contracts/",
-    "test": "scripts/test.sh",
-    "coverage": "./node_modules/.bin/solidity-coverage"
-  },
   "keywords": [
     "plasma",
     "ethereum"
   ],
   "devDependencies": {
-    "babel-polyfill": "^6.23.0",
-    "babel-preset-es2015": "^6.18.0",
-    "babel-preset-stage-2": "^6.18.0",
-    "babel-preset-stage-3": "^6.17.0",
-    "babel-register": "^6.23.0",
-    "coveralls": "^2.13.1",
-    "truffle": "^4.0.6",
-    "solidity-coverage": "^0.2.1"
+    "truffle": "^4.0.6"
   },
   "dependencies": {
     "assert": "^1.4.1",
