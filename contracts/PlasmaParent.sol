@@ -9,11 +9,11 @@ contract PlasmaParent {
     address public owner = msg.sender;
     mapping(address => bool) public operators;
     uint32 public blockHeaderLength = 137;
-    
+
     uint256 public lastBlockNumber = 0;
     uint256 public lastEthBlockNumber = block.number;
     uint256 public depositCounterInBlock = 0;
-    
+
     struct Header {
         uint32 blockNumber;
         uint32 numTransactions;
@@ -23,7 +23,7 @@ contract PlasmaParent {
         bytes32 r;
         bytes32 s;
     }
-    
+
     struct TransactionInput {
         uint32 blockNumber;
         uint32 txNumberInBlock;
@@ -31,7 +31,7 @@ contract PlasmaParent {
         uint256 amount;
     }
 
-    
+
     struct TransactionOutput {
         address recipient;
         uint8 outputNumberInTX;
@@ -67,14 +67,14 @@ contract PlasmaParent {
     uint256 constant MerkleRootHashLength = 32;
     uint256 constant TxAmountLength = 32;
     bytes constant PersonalMessagePrefixBytes = "\x19Ethereum Signed Message:\n";
-    uint256 constant PreviousBlockPersonalHashLength = BlockNumberLength + 
-                                                    TxNumberLength + 
-                                                    PreviousHashLength + 
-                                                    MerkleRootHashLength + 
+    uint256 constant PreviousBlockPersonalHashLength = BlockNumberLength +
+                                                    TxNumberLength +
+                                                    PreviousHashLength +
+                                                    MerkleRootHashLength +
                                                     SignatureLength;
-    uint256 constant NewBlockPersonalHashLength = BlockNumberLength + 
-                                                    TxNumberLength + 
-                                                    PreviousHashLength + 
+    uint256 constant NewBlockPersonalHashLength = BlockNumberLength +
+                                                    TxNumberLength +
+                                                    PreviousHashLength +
                                                     MerkleRootHashLength;
 
     uint256 TransactionOutputLength = 20 + TxOutputNumberLength + TxAmountLength;
@@ -94,40 +94,40 @@ contract PlasmaParent {
     event DebugUint(uint256 indexed _1, uint256 indexed _2, uint256 indexed _3);
     event SigEvent(address indexed _signer, bytes32 indexed _r, bytes32 indexed _s);
 
-    function extract32(bytes data, uint pos) pure internal returns (bytes32 result) { 
+    function extract32(bytes data, uint pos) pure internal returns (bytes32 result) {
         for (uint256 i = 0; i < 32; i++) {
             result ^= (bytes32(0xff00000000000000000000000000000000000000000000000000000000000000)&data[i+pos])>>(i*8);
-        }   
+        }
     }
-    
-    function extract20(bytes data, uint pos) pure internal returns (bytes20 result) { 
+
+    function extract20(bytes data, uint pos) pure internal returns (bytes20 result) {
         for (uint256 i = 0; i < 20; i++) {
             result ^= (bytes20(0xff00000000000000000000000000000000000000)&data[i+pos])>>(i*8);
         }
     }
-    
-   function extract4(bytes data, uint pos) pure internal returns (bytes4 result) { 
+
+   function extract4(bytes data, uint pos) pure internal returns (bytes4 result) {
         for (uint256 i = 0; i < 4; i++) {
             result ^= (bytes4(0xff000000)&data[i+pos])>>(i*8);
         }
     }
 
-    function extract2(bytes data, uint pos) pure internal returns (bytes2  result) { 
+    function extract2(bytes data, uint pos) pure internal returns (bytes2  result) {
         for (uint256 i = 0; i < 2; i++) {
             result ^= (bytes2(0xff00)&data[i+pos])>>(i*8);
         }
     }
 
-    function extract1(bytes data, uint pos) pure internal returns (bytes1  result) { 
+    function extract1(bytes data, uint pos) pure internal returns (bytes1  result) {
         for (uint256 i = 0; i < 1; i++) {
             result ^= (bytes1(0xff)&data[i+pos])>>(i*8);
         }
-    }    
-    
+    }
+
     function PlasmaParent() public {
         operators[msg.sender] = true;
     }
-    
+
     function setOperator(address _op, bool _status) public returns (bool success) {
         require(msg.sender == owner);
         operators[_op] = _status;
@@ -147,7 +147,7 @@ contract PlasmaParent {
         bytes32 r = extract32(header, BlockNumberLength + TxNumberLength + PreviousHashLength + MerkleRootHashLength + 1);
         bytes32 s = extract32(header, BlockNumberLength + TxNumberLength + PreviousHashLength + MerkleRootHashLength + 33);
         uint256 newBlockNumber = uint256(uint32(blockNumber));
- 
+
         require(newBlockNumber == lastBlockNumber+1);
         if (lastBlockNumber != 0) {
             Header storage previousHeader = headers[lastBlockNumber];
@@ -157,7 +157,7 @@ contract PlasmaParent {
         }
         bytes32 newBlockHash = keccak256(blockNumber, numTransactions, previousBlockHash, merkleRootHash);
         if (v < 27) {
-            v = v+27; 
+            v = v+27;
         }
 
         address signer = ecrecover(newBlockHash, v, r, s);
@@ -190,18 +190,18 @@ contract PlasmaParent {
     }
 
     struct DepositRecord {
-        address from; 
+        address from;
         DepositStatus status;
-        uint256 amount; 
+        uint256 amount;
         uint256 index;
         uint256 withdrawStartedTime;
-    } 
+    }
 
     event DepositEvent(address indexed _from, uint256 indexed _amount, uint256 indexed _depositIndex);
     event DepositWithdrawStartedEvent(uint256 indexed _depositIndex);
     event DepositWithdrawChallengedEvent(uint256 indexed _depositIndex);
     event DepositWithdrawCompletedEvent(uint256 indexed _depositIndex);
-    
+
     mapping (address => uint256[]) userDepositRecords;
     mapping (uint256 => mapping(uint256 => DepositRecord)) public depositRecords;
 
@@ -254,8 +254,8 @@ contract PlasmaParent {
     // }
 
     // function challengeDepositWithdraw(uint256 depositIndex,
-    //                         uint32 _plasmaBlockNumber, 
-    //                         bytes _plasmaTransaction, 
+    //                         uint32 _plasmaBlockNumber,
+    //                         bytes _plasmaTransaction,
     //                         bytes _merkleProof) public returns (bool success) {
     //     DepositRecord storage record = depositRecords[0][depositIndex];
     //     require(record.index == depositIndex);
@@ -279,7 +279,7 @@ contract PlasmaParent {
     //     DepositWithdrawChallengedEvent(depositIndex);
     //     return true;
     // }
-    
+
 // ----------------------------------
 // Withdrawrelated functions
 
@@ -311,7 +311,7 @@ contract PlasmaParent {
                                 uint256 indexed _withdrawIndex);
     event WithdrawFinalizedEvent(uint32 indexed _blockNumber,
                                 uint32 indexed _txNumberInBlock,
-                                uint8 indexed _outputNumberInTX);  
+                                uint8 indexed _outputNumberInTX);
     event ExpressWithdrawMadeEvent(uint32 indexed _withdrawTxBlockNumber,
                                 uint32 indexed _withdrawTxNumberInBlock,
                                 address indexed _from);
@@ -325,10 +325,10 @@ contract PlasmaParent {
     }
 
     // function startWithdraw(uint32 _plasmaBlockNumber, //references and proves ownership on output of original transaction
-    //                         uint32 _plasmaTxNumInBlock, 
+    //                         uint32 _plasmaTxNumInBlock,
     //                         uint8 _outputNumber,
-    //                         bytes _plasmaTransaction, 
-    //                         bytes _merkleProof) 
+    //                         bytes _plasmaTransaction,
+    //                         bytes _merkleProof)
     // public returns(bool success, uint256 withdrawIndex) {
     //     Header storage header = headers[uint256(_plasmaBlockNumber)];
     //     require(uint32(header.blockNumber) > 0);
@@ -348,13 +348,13 @@ contract PlasmaParent {
     //     WithdrawStartedEvent(_plasmaBlockNumber, _plasmaTxNumInBlock, _outputNumber);
     //     userWithdrawRecords[msg.sender].push(record.index);
     //     return (true, withdrawIndex);
-    // } 
+    // }
 
 
     function makeWithdrawExpress(uint32 _plasmaBlockNumber, //references and proves ownership on withdraw transaction
-                            uint32 _plasmaTxNumInBlock, 
-                            bytes _plasmaTransaction, 
-                            bytes _merkleProof) 
+                            uint32 _plasmaTxNumInBlock,
+                            bytes _plasmaTransaction,
+                            bytes _merkleProof)
     public returns(bool success, uint256 withdrawIndex) {
         Header storage header = headers[uint256(_plasmaBlockNumber)];
         require(uint32(header.blockNumber) > 0);
@@ -379,7 +379,7 @@ contract PlasmaParent {
         userWithdrawRecords[msg.sender].push(record.index);
         signer.transfer(record.amount);
         return (true, withdrawIndex);
-    } 
+    }
 
     // function getWithdrawRecordForInput(TransactionInput memory _input) internal view returns (WithdrawRecord storage record) {
     //     uint256 withdrawIndex = makeTransactionIndex(_input.blockNumber, _input.txNumberInBlock, _input.outputNumberInTX);
@@ -433,7 +433,7 @@ contract PlasmaParent {
     //     WithdrawFinalizedEvent(record.blockNumber, record.txNumberInBlock, record.outputNumberInTX);
     //     to.transfer(record.amount);
     //     return true;
-    // } 
+    // }
 
 // ----------------------------------
 // Double-spend related functions
@@ -455,14 +455,14 @@ contract PlasmaParent {
 
 // two transactions spend the same output
     function proveDoubleSpend(uint32 _plasmaBlockNumber1, //references and proves transaction number 1
-                            uint32 _plasmaTxNumInBlock1, 
+                            uint32 _plasmaTxNumInBlock1,
                             uint8 _inputNumber1,
-                            bytes _plasmaTransaction1, 
+                            bytes _plasmaTransaction1,
                             bytes _merkleProof1,
                             uint32 _plasmaBlockNumber2, //references and proves transaction number 2
-                            uint32 _plasmaTxNumInBlock2, 
+                            uint32 _plasmaTxNumInBlock2,
                             uint8 _inputNumber2,
-                            bytes _plasmaTransaction2, 
+                            bytes _plasmaTransaction2,
                             bytes _merkleProof2) public returns (bool success) {
         uint256 index1 = makeTransactionIndex(_plasmaBlockNumber1, _plasmaTxNumInBlock1, _inputNumber1);
         uint256 index2 = makeTransactionIndex(_plasmaBlockNumber2, _plasmaTxNumInBlock2, _inputNumber2);
@@ -470,14 +470,14 @@ contract PlasmaParent {
         require(!doubleSpendRecords[index1][index2].prooved);
         require(!doubleSpendRecords[index2][index1].prooved);
         require(checkActualDoubleSpendProof(_plasmaBlockNumber1,
-                            _plasmaTxNumInBlock1, 
+                            _plasmaTxNumInBlock1,
                             _inputNumber1,
-                            _plasmaTransaction1, 
+                            _plasmaTransaction1,
                             _merkleProof1,
-                            _plasmaBlockNumber2, 
-                            _plasmaTxNumInBlock2, 
+                            _plasmaBlockNumber2,
+                            _plasmaTxNumInBlock2,
                             _inputNumber2,
-                            _plasmaTransaction2, 
+                            _plasmaTransaction2,
                             _merkleProof2));
         doubleSpendRecords[index1][index2].prooved = true;
         doubleSpendRecords[index2][index1].prooved = true;
@@ -485,14 +485,14 @@ contract PlasmaParent {
     }
 
     function checkActualDoubleSpendProof (uint32 _plasmaBlockNumber1, //references and proves transaction number 1
-                            uint32 _plasmaTxNumInBlock1, 
+                            uint32 _plasmaTxNumInBlock1,
                             uint8 _inputNumber1,
-                            bytes _plasmaTransaction1, 
+                            bytes _plasmaTransaction1,
                             bytes _merkleProof1,
                             uint32 _plasmaBlockNumber2, //references and proves transaction number 2
-                            uint32 _plasmaTxNumInBlock2, 
+                            uint32 _plasmaTxNumInBlock2,
                             uint8 _inputNumber2,
-                            bytes _plasmaTransaction2, 
+                            bytes _plasmaTransaction2,
                             bytes _merkleProof2) public view returns (bool success) {
         var (signer1, input1) = getTXinputDetailsFromProof(_plasmaBlockNumber1, _plasmaTxNumInBlock1, _inputNumber1, _plasmaTransaction1, _merkleProof1);
         var (signer2, input2) = getTXinputDetailsFromProof(_plasmaBlockNumber2, _plasmaTxNumInBlock2, _inputNumber2, _plasmaTransaction2, _merkleProof2);
@@ -507,9 +507,9 @@ contract PlasmaParent {
 
 // transaction output is withdrawn (witthout express process) and spent in Plasma chain
     function proveSpendAndWithdraw(uint32 _plasmaBlockNumber, //references and proves transaction
-                            uint32 _plasmaTxNumInBlock, 
+                            uint32 _plasmaTxNumInBlock,
                             uint8 _inputNumber,
-                            bytes _plasmaTransaction, 
+                            bytes _plasmaTransaction,
                             bytes _merkleProof,
                             uint256 _withdrawIndex //references withdraw
                             ) public returns (bool success) {
@@ -527,11 +527,11 @@ contract PlasmaParent {
         } else if (record.status == WithdrawStatus.Started) {
             record.status = WithdrawStatus.Challenged;
             spendAndWithdrawRecords[txIndex][_withdrawIndex].prooved = true;
-            SpendAndWithdrawProovedEvent(txIndex, _withdrawIndex);    
+            SpendAndWithdrawProovedEvent(txIndex, _withdrawIndex);
         }
         return true;
     }
- 
+
 // ----------------------------------
 // Prove unlawful funding transactions on Plasma
 
@@ -546,12 +546,12 @@ contract PlasmaParent {
     mapping (uint256 => mapping(uint256 => FundingWithoutDepositRecord)) public fundingWithoutDepositRecords;
     mapping (uint256 => mapping(uint256 => DoubleFundingRecord)) public doubleFundingRecords;
 
-    event FundingWithoutDepositEvent(uint256 indexed _txIndex, uint256 indexed _depositIndex);                 
+    event FundingWithoutDepositEvent(uint256 indexed _txIndex, uint256 indexed _depositIndex);
     event DoubleFundingEvent(uint256 indexed _txIndex1, uint256 indexed _txIndex2);
 
 function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and proves transaction
-                            uint32 _plasmaTxNumInBlock, 
-                            bytes _plasmaTransaction, 
+                            uint32 _plasmaTxNumInBlock,
+                            bytes _plasmaTransaction,
                             bytes _merkleProof) public returns (bool success) {
         Header storage header = headers[uint256(_plasmaBlockNumber)];
         require(uint32(header.blockNumber) > 0);
@@ -582,15 +582,15 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         return false;
     }
 
-    //prove double funding of the same 
+    //prove double funding of the same
 
     function proveDoubleFunding(uint32 _plasmaBlockNumber1, //references and proves transaction number 1
-                            uint32 _plasmaTxNumInBlock1, 
-                            bytes _plasmaTransaction1, 
+                            uint32 _plasmaTxNumInBlock1,
+                            bytes _plasmaTransaction1,
                             bytes _merkleProof1,
                             uint32 _plasmaBlockNumber2, //references and proves transaction number 2
-                            uint32 _plasmaTxNumInBlock2, 
-                            bytes _plasmaTransaction2, 
+                            uint32 _plasmaTxNumInBlock2,
+                            bytes _plasmaTransaction2,
                             bytes _merkleProof2) public returns (bool success) {
         var (signer1, depositIndex1, transactionIndex1) = getFundingTXdetailsFromProof(_plasmaBlockNumber1, _plasmaTxNumInBlock1, _plasmaTransaction1, _merkleProof1);
         var (signer2, depositIndex2, transactionIndex2) = getFundingTXdetailsFromProof(_plasmaBlockNumber2, _plasmaTxNumInBlock2, _plasmaTransaction2, _merkleProof2);
@@ -618,10 +618,10 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
 // ----------------------------------
 // Convenience functions
 
-   function getTXinputDetailsFromProof(uint32 _plasmaBlockNumber, 
-                            uint32 _plasmaTxNumInBlock, 
+   function getTXinputDetailsFromProof(uint32 _plasmaBlockNumber,
+                            uint32 _plasmaTxNumInBlock,
                             uint8 _inputNumber,
-                            bytes _plasmaTransaction, 
+                            bytes _plasmaTransaction,
                             bytes _merkleProof) internal view returns (address signer, TransactionInput memory input) {
         Header storage header = headers[uint256(_plasmaBlockNumber)];
         require(uint32(header.blockNumber) > 0);
@@ -634,9 +634,9 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         input = TX.inputs[uint256(_inputNumber)];
     }
 
-    function getFundingTXdetailsFromProof(uint32 _plasmaBlockNumber, 
-                            uint32 _plasmaTxNumInBlock, 
-                            bytes _plasmaTransaction, 
+    function getFundingTXdetailsFromProof(uint32 _plasmaBlockNumber,
+                            uint32 _plasmaTxNumInBlock,
+                            bytes _plasmaTransaction,
                             bytes _merkleProof) internal view returns (address signer, uint256 depositIndex, uint256 transactionIndex) {
         Header storage header = headers[uint256(_plasmaBlockNumber)];
         require(uint32(header.blockNumber) > 0);
@@ -678,7 +678,7 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         return TX;
     }
 
-    function populateInsAndOuts(PlasmaTransaction memory _TX, uint256 _numIns, uint256 _numOuts, bytes memory _insAndOutsSlice) 
+    function populateInsAndOuts(PlasmaTransaction memory _TX, uint256 _numIns, uint256 _numOuts, bytes memory _insAndOutsSlice)
         internal view returns (bool success) {
             uint256 i;
             for (i = 0; i < _numIns; i++) {
@@ -687,7 +687,7 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
                 _TX.inputs[i] = input;
             }
             for (i = 0; i < _numOuts; i++) {
-                bytes memory rawOutput = _insAndOutsSlice.slice(_numIns*TransactionInputLength + i*TransactionOutputLength, 
+                bytes memory rawOutput = _insAndOutsSlice.slice(_numIns*TransactionInputLength + i*TransactionOutputLength,
                                                 _numIns*TransactionInputLength + (i+1)*TransactionOutputLength).toBytes();
                 TransactionOutput memory output = transactionOutputFromBytes(rawOutput);
                 if (output.outputNumberInTX == 255) {
@@ -734,7 +734,7 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         bytes memory prefix = PersonalMessagePrefixBytes.concat(lengthBytes);
         return keccak256(prefix, message);
     }
-    
+
     function recoverTXsigner(bytes memory txData, uint8 v, bytes32 r, bytes32 s, uint256 txType) internal view returns (address signer) {
         bytes memory sliceNoNumberNoSignatureParts = txData.slice(TxNumberLength, TxLengthForType[txType] - SignatureLength).toBytes();
         bytes32 persMessageHashWithoutNumber = createPersonalMessageTypeHash(sliceNoNumberNoSignatureParts);
@@ -755,7 +755,7 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         uint32 elLoc;
         for (uint32 i = 32; i <= uint32(proof.length); i += 33) {
             assembly {
-                loc  := proof 
+                loc  := proof
                 elLoc := add(loc, add(i, 1))
                 elProvided := mload(elLoc)
             }
@@ -768,8 +768,8 @@ function proveFundingWithoutDeposit(uint32 _plasmaBlockNumber, //references and 
         }
         return h == root;
       }
-    
-    function makeTransactionIndex(uint32 _blockNumber, uint32 _txNumberInBlock, uint8 _outputNumberInTX) pure public returns (uint256 index) { 
+
+    function makeTransactionIndex(uint32 _blockNumber, uint32 _txNumberInBlock, uint8 _outputNumberInTX) pure public returns (uint256 index) {
         index = uint256(_blockNumber) << ((TxNumberLength + TxTypeLength)*8) + uint256(_txNumberInBlock) << (TxTypeLength*8) + uint256(_outputNumberInTX);
         return index;
     }
