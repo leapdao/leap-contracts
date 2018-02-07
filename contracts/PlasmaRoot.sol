@@ -2,6 +2,12 @@ pragma solidity ^0.4.19;
 
 contract PlasmaRoot {
 
+  address public owner;
+
+  function PlasmaRoot() public {
+    owner = msg.sender;
+  }
+
   // submits a block, which is basically just the Merkle root of the transactions
   // in the block
   function submitBlock(bytes32 root) public {
