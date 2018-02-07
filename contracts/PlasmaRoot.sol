@@ -38,9 +38,9 @@ contract PlasmaRoot {
 
   // generates a block that contains only one transaction, generating a new UTXO
   // into existence with denomination equal to the msg.value deposited
-  function deposit() public payable {
+  /*function deposit() public payable {
 
-  }
+  }*/
 
   // starts an exit procedure for a given UTXO.
   // Requires as input
@@ -50,7 +50,7 @@ contract PlasmaRoot {
   // (iv) a Merkle proof of the transaction, and
   // (v) a confirm signature from each of the previous owners of the now-spent
   // outputs that were used to create the UTXO.
-  function startExit(
+  /*function startExit(
     uint256 plasmaBlockNum,
     uint256 txindex,
     uint256 oindex,
@@ -61,11 +61,11 @@ contract PlasmaRoot {
     public
   {
 
-  }
+  }*/
 
   // challenges an exit attempt in process, by providing a proof that the TXO was spent,
   // the spend was included in a block, and the owner made a confirm signature.
-  function challengeExit(
+  /*function challengeExit(
     uint256 exitId,
     uint256 plasmaBlockNum,
     uint256 txindex,
@@ -77,7 +77,7 @@ contract PlasmaRoot {
     public
   {
 
-  }
+  }*/
 
 
 }

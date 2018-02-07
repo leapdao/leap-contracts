@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "author": "Parsec Labs",
   "license": "MIT",
-  "main": "truffle.js",
   "keywords": [
     "plasma",
     "ethereum"
@@ -13,19 +12,11 @@
   },
   "dependencies": {
     "assert": "^1.4.1",
-    "bignumber.js": "^4.0.1",
-    "crypto": "^1.0.1",
-    "ethereumjs-util": "^5.1.3",
-    "js-sha3": "^0.7.0",
-    "strip-hex-prefix": "^1.0.0",
     "web3": "^1.0.0-beta.27",
     "zeppelin-solidity": "1.6.0"
   },
   "directories": {
     "test": "test"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
