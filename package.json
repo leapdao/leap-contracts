@@ -18,6 +18,22 @@
     "ethereumjs-util": "^5.1.3",
     "js-sha3": "^0.7.0",
     "strip-hex-prefix": "^1.0.0",
-    "web3": "^1.0.0-beta.27"
-  }
+    "web3": "^1.0.0-beta.27",
+    "zeppelin-solidity": "1.6.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parsec-labs/plasma-contracts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/parsec-labs/plasma-contracts/issues"
+  },
+  "homepage": "https://github.com/parsec-labs/plasma-contracts#readme",
+  "description": ""
 }
