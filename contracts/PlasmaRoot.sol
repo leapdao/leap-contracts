@@ -28,15 +28,32 @@ contract PlasmaRoot {
   // (iv) a Merkle proof of the transaction, and
   // (v) a confirm signature from each of the previous owners of the now-spent
   // outputs that were used to create the UTXO.
-  function startExit(uint256 plasmaBlockNum, uint256 txindex, uint256 oindex,
-                     bytes tx, bytes proof, bytes confirmSig) {
+  function startExit(
+    uint256 plasmaBlockNum,
+    uint256 txindex,
+    uint256 oindex,
+    bytes tx,
+    bytes proof,
+    bytes confirmSig
+  )
+    public
+  {
 
   }
 
   // challenges an exit attempt in process, by providing a proof that the TXO was spent,
   // the spend was included in a block, and the owner made a confirm signature.
-  function challengeExit(uint256 exitId, uint256 plasmaBlockNum, uint256 txindex,
-                         uint256 oindex, bytes tx, bytes proof, bytes confirmSig) {
+  function challengeExit(
+    uint256 exitId,
+    uint256 plasmaBlockNum,
+    uint256 txindex,
+    uint256 oindex,
+    bytes tx,
+    bytes proof,
+    bytes confirmSig
+  )
+    public
+  {
 
   }
 
