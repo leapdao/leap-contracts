@@ -140,6 +140,7 @@ contract PlasmaRoot {
     bytes sigs
   )
     public
+    incrementOldBlocks
   {
     var txList = txBytes.toRLPItem().toList();
     // check we have transaction. See comments to deposit() for tx bytes structure
