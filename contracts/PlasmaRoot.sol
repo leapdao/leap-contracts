@@ -1,6 +1,7 @@
 pragma solidity ^0.4.19;
 
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
+import 'zeppelin-solidity/contracts/math/Math.sol';
 import './libraries/RLP.sol';
 import './libraries/Merkle.sol';
 import './libraries/Validate.sol';
@@ -156,10 +157,11 @@ contract PlasmaRoot {
     uint256 exitId = txPos[0].mul(priority);
     // todo: why do we need weekOldBlock? Why can't we just use old block numbers
     // to calculate priority?
-    priority = priority.mul(Math.max(txPos[0], weekOldBlock));
+    priority = priority.mul(Math.max256(txPos[0], weekOldBlock));
     // check we are not exiting same UTXO twice
     require(exitIds[exitId] == 0);
     exitIds[exitId] = priority;
+    // exitsQueue acts a sorted list
     exitsQueue.insert(priority);
     // ahtung: priority may collide for old blocks if they happen to
     // have same tx id and same output index
