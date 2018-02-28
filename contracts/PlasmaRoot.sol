@@ -173,21 +173,58 @@ contract PlasmaRoot {
     });
   }
 
-  // challenges an exit attempt in process, by providing a proof that the TXO was spent,
-  // the spend was included in a block, and the owner made a confirm signature.
-  /*function challengeExit(
+  /// spec: challenges an exit attempt in process, by providing a proof that the TXO was spent,
+  /// the spend was included in a block, and the owner made a confirm signature.
+  ///
+  /// exitId - id of the exit (see startExit)
+  /// (1) txPos[0] - the Plasma block number
+  /// (2) txPos[1] - tx index in which the UTXO was created,
+  /// (3) txPos[2] - the output index,
+  /// (4) txBytes - the transaction containing that UTXO,
+  /// (5) proof - a Merkle proof of the transaction, and
+  /// (6) sigs - a confirm signature from each of the previous owners of the now-spent
+  ///            outputs that were used to create the UTXO.
+  /// (7) confirmationSig - commitment from the owner of UTXO(txPos) that he saw his tx (txBytes)
+  ///                       included in the child block (txPos[0])
+  ///
+  /// by calling challengeExit a challenger says "I declare that UTXO which is trying
+  /// to exit as exitId is already spend as TXO specified in txPos. Here is TXO bytes
+  /// with input signatures, merkle proof and confirmation from TXO owner that he saw
+  /// his TX in the block (= he confirmed spend)"
+  function challengeExit(
     uint256 exitId,
-    uint256 plasmaBlockNum,
-    uint256 txindex,
-    uint256 oindex,
-    bytes tx,
+    uint256[3] txPos,
+    bytes txBytes,
     bytes proof,
-    bytes confirmSig
+    bytes sigs,
+    bytes confirmationSig
   )
-    public
+      public
   {
-
-  }*/
+      var txList = txBytes.toRLPItem().toList();
+      require(txList.length == 11);
+      uint256 priority = exitIds[exitId];
+      uint256[3] memory exitsUtxoPos = exits[priority].utxoPos;
+      // check that tx we supplied is for challenged TXO
+      require(exitsUtxoPos[0] == txList[0 + 2 * exitsUtxoPos[2]].toUint());
+      require(exitsUtxoPos[1] == txList[1 + 2 * exitsUtxoPos[2]].toUint());
+      require(exitsUtxoPos[2] == txList[2 + 2 * exitsUtxoPos[2]].toUint());
+      var txHash = keccak256(txBytes);
+      var confirmationHash = keccak256(txHash, sigs, childChain[txPos[0]].root);
+      var merkleHash = keccak256(txHash, sigs);
+      address owner = exits[priority].owner;
+      // check that tx (txBytes) was seen by spender in the chain. At some point he
+      // confirmed that by signing confirmation hash with his key
+      require(owner == ECRecovery.recover(confirmationHash, confirmationSig));
+      // check that tx (txBytes) was indeed included in the block txPos[0]
+      require(merkleHash.checkMembership(txPos[1], childChain[txPos[0]].root, proof));
+      // if we are here, it means UTXO in exit (exitId) is already spent,
+      // so the exit is invalid and should be deleted
+      delete exits[priority];
+      // todo: for proper plasma we need to penalize TXO owner for fraudlent exit
+      // for Plasma MVP it is assumed everyone should be exiting at this point
+      // todo: how do they know? Emit event here?gi
+  }
 
 
 }
