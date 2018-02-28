@@ -14,6 +14,14 @@ Run test cases:
 # start test rpc server (which starts server on localhost:8545)
 $ npm run testrpc
 
+# deploy contracts
+$ npm run deploy
+
+# copy the contract address to config
+
+# start authority's server
+$ npm run authorized-dev
+
 # run test cases
 $ npm run test
 ```

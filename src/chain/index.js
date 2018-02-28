@@ -195,7 +195,7 @@ class Chain {
 
         // check if already exited
         const exitId = +await this.parentContract.methods
-          .exitIds(tx.exitIdByInputIndex(i))
+          .exits(tx.exitIdByInputIndex(i))
           .call()
 
         // if exit id > 0, utxo has been exited
