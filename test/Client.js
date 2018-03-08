@@ -92,7 +92,7 @@ contract('Root chain - client', async function(accounts) {
       // console.log(receipt)
 
       // wait for 5 sec (give time to sync chain. TODO fix it)
-      await waitFor(5000)
+      await waitFor(10000)
     })
 
     it('transfer', async function() {
@@ -105,13 +105,15 @@ contract('Root chain - client', async function(accounts) {
         .post('/')
         .send({
           jsonrpc: '2.0',
-          method: 'getUTXOs',
+          method: 'plasma_getUTXOs',
           params: [from.getAddressString()],
           id: 1
         })
       chai.expect(response).to.be.json
       chai.expect(response).to.have.status(200)
-      chai.expect(response.body.result.length).to.be.above(0)
+      chai
+        .expect(response.body.result.length)
+        .to.be.above(0, 'No UTXOs to transfer')
 
       const {blockNumber, txIndex, outputIndex} = response.body.result[0]
       const transferTx = getTransferTx(
@@ -128,7 +130,7 @@ contract('Root chain - client', async function(accounts) {
         .post('/')
         .send({
           jsonrpc: '2.0',
-          method: 'sendTx',
+          method: 'plasma_sendTx',
           params: [transferTxBytes],
           id: 1
         })
@@ -153,13 +155,15 @@ contract('Root chain - client', async function(accounts) {
         .post('/')
         .send({
           jsonrpc: '2.0',
-          method: 'getUTXOs',
+          method: 'plasma_getUTXOs',
           params: [withdrawer.getAddressString()],
           id: 1
         })
       chai.expect(response).to.be.json
       chai.expect(response).to.have.status(200)
-      chai.expect(response.body.result.length).to.be.above(0)
+      chai
+        .expect(response.body.result.length)
+        .to.be.above(0, 'No UTXOs to withdraw')
 
       const {blockNumber, txIndex, outputIndex, tx} = response.body.result[0]
       const exitTx = new Transaction(tx)
@@ -168,7 +172,7 @@ contract('Root chain - client', async function(accounts) {
         .post('/')
         .send({
           jsonrpc: '2.0',
-          method: 'getMerkleProof',
+          method: 'plasma_getMerkleProof',
           params: [parseInt(blockNumber), parseInt(txIndex)],
           id: 1
         })
