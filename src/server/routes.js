@@ -100,6 +100,7 @@ const methods = {
  */
 routes.post('/', (req, res) => {
   const data = req.body
+  console.log(data);
   const v = rpcValidator.validate(data, rpcSchema)
   if (v.errors && v.errors.length > 0) {
     return res.status(400).json({
