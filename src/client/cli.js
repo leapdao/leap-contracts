@@ -19,12 +19,13 @@ export default class Cli {
         })
 
       this.vorpal
-        .command('utxos <address>', 'Get UTXOs for address')
+        .command('utxos [address]', 'Get UTXOs for address')
         .types({
           string: ['_']
         })
         .action(async function(args, callback) {
-          console.log(await client.getUTXOs(Web3.utils.numberToHex(args.address)))
+          const address = Web3.utils.numberToHex(args.address) || utils.bufferToHex(wallet.getAddress())
+          console.log(await client.getUTXOs(address))
           callback()
         })
 
