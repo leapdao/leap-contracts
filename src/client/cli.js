@@ -1,5 +1,6 @@
 import Vorpal from 'vorpal'
 import utils from 'ethereumjs-util'
+import Web3 from 'web3'
 
 const BN = utils.BN
 
@@ -19,8 +20,11 @@ export default class Cli {
 
       this.vorpal
         .command('utxos <address>', 'Get UTXOs for address')
+        .types({
+          string: ['_']
+        })
         .action(async function(args, callback) {
-          console.log(await client.getUTXOs(args.address))
+          console.log(await client.getUTXOs(Web3.utils.numberToHex(args.address)))
           callback()
         })
 

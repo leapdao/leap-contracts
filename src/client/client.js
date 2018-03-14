@@ -11,7 +11,6 @@ export default class Client {
     this.wallet = wallet
     this.web3 = web3
 
-    console.log(rootChainContractAddr);
     this.rootChain = new this.web3.eth.Contract(
       RootChain.abi,
       rootChainContractAddr
