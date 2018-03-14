@@ -1,13 +1,16 @@
+import Web3 from 'web3'
 import Client from './client'
 import Cli from './cli'
 import Wallet from './wallet'
+import config from '../config'
 
-const CLIENT_CONFIG = {
-  childNodeUri: 'http://localhost:8080',
-  mnemonic:
-}
+const wallet = new Wallet(config.client.mnemonic)
 
-const wallet = new Wallet()
+const client = new Client(
+  new Web3(config.client.web3Provider),
+  wallet,
+  config.client.childNodeUri,
+  config.client.rootChainContract
+)
 
-const client = new Client(CLIENT_CONFIG.childNodeUri)
 new Cli(client, wallet)

@@ -41,6 +41,7 @@
     "ganache-cli": "^6.0.3",
     "nodemon": "^1.14.11",
     "solhint": "^1.1.9",
+    "thebugger": "^1.0.0",
     "truffle": "^4.0.5"
   },
   "dependencies": {

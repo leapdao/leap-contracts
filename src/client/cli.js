@@ -1,15 +1,34 @@
 import Vorpal from 'vorpal'
+import utils from 'ethereumjs-util'
+
+const BN = utils.BN
 
 export default class Cli {
-    constructor(client) {
+    constructor(client, wallet) {
       this.client = client
+      this.wallet = wallet
 
       this.vorpal = new Vorpal()
 
       this.vorpal
-        .command('getUTXOs <address>', 'Get UTXOs for address')
+        .command('address', 'Get address on Plasma chain')
         .action(function(args, callback) {
-          client.getUTXOs(args.address)
+          console.log(utils.bufferToHex(wallet.getAddress()))
+          callback()
+        })
+
+      this.vorpal
+        .command('utxos <address>', 'Get UTXOs for address')
+        .action(async function(args, callback) {
+          console.log(await client.getUTXOs(args.address))
+          callback()
+        })
+
+      this.vorpal
+        .command('deposit <value>', 'Deposit ETH to Plasma chain')
+        .action(function(args, callback) {
+          const plasmaAddress = wallet.getAddress()
+          client.deposit(plasmaAddress, new BN(args.value))
           callback()
         })
 

@@ -2,11 +2,20 @@ import request from 'request-promise-native'
 import utils from 'ethereumjs-util'
 import { Buffer } from 'safe-buffer'
 import Transaction from '../chain/transaction'
+import RootChain from '../../build/contracts/RootChain.json'
 
 export default class Client {
 
-  constructor(childNodeUri = 'http://localhost:8080') {
+  constructor(web3, wallet, childNodeUri = 'http://localhost:8080', rootChainContractAddr) {
     this.childNodeUri = childNodeUri
+    this.wallet = wallet
+    this.web3 = web3
+
+    console.log(rootChainContractAddr);
+    this.rootChain = new this.web3.eth.Contract(
+      RootChain.abi,
+      rootChainContractAddr
+    )
   }
 
   _call(method, params) {
@@ -22,11 +31,10 @@ export default class Client {
         id: 1
       }
     }
-    console.log(opts);
-    return request(opts)
+    return request(opts).then(response => response.result)
   }
 
-  deposit(from, to, value) {
+  async deposit(to, value) {
     const depositTx = new Transaction([
       new Buffer([]), // block number 1
       new Buffer([]), // tx number 1
@@ -35,7 +43,7 @@ export default class Client {
       new Buffer([]), // tx number 2
       new Buffer([]), // previous output number 2 (input 2)
 
-      utils.toBuffer(to), // output address 1
+      to instanceof Buffer ? to : utils.toBuffer(to), // output address 1
       value.toArrayLike(Buffer, 'be', 32), // value for output 2
 
       utils.zeros(20), // output address 2
@@ -44,15 +52,17 @@ export default class Client {
       new Buffer([]) // fee
     ])
 
-    const depositor = from
+    const depositor = (await this.web3.eth.getAccounts())[0]
+
     const depositTxBytes = utils.bufferToHex(depositTx.serializeTx())
 
     // deposit
-    const receipt = await rootChainContract.deposit(depositTxBytes, {
-      gas: 200000,
-      from: from,
-      value: value.toString() // 1 value
-    })
+    const receipt = await this.rootChain.methods.deposit(depositTxBytes)
+      .send({
+        from: depositor,
+        gas: 200000,
+        value: value.toString() // 1 value
+      })
   }
 
   sendTx() {

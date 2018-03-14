@@ -65,5 +65,13 @@ export default {
         .map(peer => peer.trim())
         .filter(peer => !!peer)
     }
+  },
+  client: {
+    childNodeUri: 'http://localhost:8080',
+    // todo: store encrypted wallet, ask for password on client start
+    mnemonic: process.env.MNEMONIC || 'clock radar mass judge dismiss just intact mind resemble fringe diary casino',
+    web3Provider: process.env.CHAIN_WEB3_PROVIDER || 'http://localhost:8545',
+    rootChainContract: process.env.CHAIN_ROOT_CONTRACT ||
+    '0xb4ee6879ba231824651991c8f0a34af4d6bfca6a'
   }
 }
