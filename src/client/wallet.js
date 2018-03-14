@@ -1,5 +1,6 @@
 import bip39 from 'bip39'
 import hdkey from 'ethereumjs-wallet/hdkey'
+import utils from 'ethereumjs-util'
 
 export default class Wallet {
 
@@ -13,8 +14,11 @@ export default class Wallet {
   }
 
   getAddress() {
-    //require('thebugger')();
-    return this.rootNode.deriveChild(0).getWallet().getAddress()
+    return utils.bufferToHex(this.rootNode.deriveChild(0).getWallet().getAddress())
+  }
+
+  isOur(address) {
+    return address == this.getAddress()
   }
 
 }

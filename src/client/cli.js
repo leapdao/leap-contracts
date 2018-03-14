@@ -14,7 +14,27 @@ export default class Cli {
       this.vorpal
         .command('address', 'Get address on Plasma chain')
         .action(function(args, callback) {
-          console.log(utils.bufferToHex(wallet.getAddress()))
+          console.log(wallet.getAddress())
+          callback()
+        })
+
+      this.vorpal
+        .command('balance', 'Get your balance on the Plasma chain')
+        .action(async function(args, callback) {
+          const address = wallet.getAddress()
+          const utxos = await client.getUTXOs(address)
+          const balance = utxos.map(utxo => {
+            let txBalance = 0
+            if (wallet.isOur(utxo.tx.newowner1)) {
+              txBalance += parseInt(utxo.tx.amount1)
+            }
+
+            if (wallet.isOur(utxo.tx.newowner2)) {
+              txBalance += parseInt(utxo.tx.amount2)
+            }
+            return txBalance;
+          }).reduce((sum, txBal) => { sum += txBal; return sum }, 0)
+          console.log(balance);
           callback()
         })
 
@@ -24,7 +44,7 @@ export default class Cli {
           string: ['_']
         })
         .action(async function(args, callback) {
-          const address = Web3.utils.numberToHex(args.address) || utils.bufferToHex(wallet.getAddress())
+          const address = Web3.utils.numberToHex(args.address) || wallet.getAddress()
           console.log(await client.getUTXOs(address))
           callback()
         })
@@ -32,7 +52,7 @@ export default class Cli {
       this.vorpal
         .command('deposit <value>', 'Deposit ETH to Plasma chain')
         .action(function(args, callback) {
-          const plasmaAddress = wallet.getAddress()
+          const plasmaAddress = utils.toBuffer(wallet.getAddress())
           client.deposit(plasmaAddress, new BN(args.value))
           callback()
         })
