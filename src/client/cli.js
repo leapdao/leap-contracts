@@ -34,7 +34,7 @@ export default class Cli {
             }
             return txBalance;
           }).reduce((sum, txBal) => { sum += txBal; return sum }, 0)
-          console.log(balance);
+          console.log(`${Web3.utils.fromWei(new BN(balance))} PETH`);
           callback()
         })
 
@@ -50,7 +50,7 @@ export default class Cli {
         })
 
       this.vorpal
-        .command('deposit <value>', 'Deposit ETH to Plasma chain')
+        .command('deposit <value>', 'Deposit ETH to Plasma chain (PETH)')
         .action(function(args, callback) {
           const plasmaAddress = utils.toBuffer(wallet.getAddress())
           client.deposit(plasmaAddress, new BN(args.value))
