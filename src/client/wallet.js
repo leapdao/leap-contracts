@@ -13,8 +13,8 @@ export default class Wallet {
     this.rootNode = this.hdwallet.derivePath("m/44'/612'/0'/0")
   }
 
-  getAddress() {
-    return utils.bufferToHex(this.rootNode.deriveChild(0).getWallet().getAddress())
+  getAddress(index = 0) {
+    return utils.bufferToHex(this.rootNode.deriveChild(index).getWallet().getAddress())
   }
 
   isOur(address) {

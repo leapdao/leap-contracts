@@ -12,9 +12,9 @@ export default class Cli {
       this.vorpal = new Vorpal()
 
       this.vorpal
-        .command('address', 'Get address on Plasma chain')
+        .command('address [index]', 'Get address on Plasma chain')
         .action(function(args, callback) {
-          console.log(wallet.getAddress())
+          console.log(wallet.getAddress(args.index))
           callback()
         })
 
