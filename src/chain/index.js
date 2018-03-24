@@ -76,6 +76,8 @@ class Chain {
     // start listening deposit block
     this.eventWatcher.on('DepositBlockCreated', data => {
       const {blockNumber, root, txBytes} = data.returnValues
+      console.log(`New deposit block created, number: ${blockNumber}, root: ${root}`)
+
       this.addDepositBlock(
         [
           new BN(blockNumber).toArrayLike(Buffer, 'be', 32),

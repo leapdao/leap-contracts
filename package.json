@@ -5,8 +5,7 @@
   "description": "",
   "main": "truffle-config.js",
   "scripts": {
-    "testrpc":
-      "ganache-cli --db=./testrpc-db --mnemonic='clock radar mass judge dismiss just intact mind resemble fringe diary casino' --gasLimit=13000000",
+    "testrpc": "ganache-cli --db=./testrpc-db --mnemonic='clock radar mass judge dismiss just intact mind resemble fringe diary casino' --gasLimit=13000000",
     "test": "truffle test",
     "test-ci": "npm run clean && npm run compile && scripts/test.sh",
     "compile": "truffle compile",
@@ -14,12 +13,12 @@
     "lint-contracts": "solhint -d contracts/**/*.sol",
     "lint-js": "eslint src/**/*.js test/**/*.js",
     "lint": "npm run lint-contracts && npm run lint-js",
-    "clean":
-      "rm -rf dist && rm -rf db/* && rm -rf testrpc-db/* && rm -rf devdb/*",
+    "clean": "rm -rf dist/ && rm -rf db/* && rm -rf client-db/* && rm -rf testrpc-db/* && rm -rf devdb/*",
     "authorized-dev": "scripts/authorized-dev.sh",
     "dev": "scripts/dev.sh",
     "build": "npm run clean && mkdir -p dist && babel src -s -D -d dist",
-    "start": "cross-env NODE_ENV=production node dist/index.js"
+    "start": "cross-env NODE_ENV=production node dist/index.js",
+    "client": "CHAIN_DB=./client-db babel-node src/client/"
   },
   "author": "Jaynti Kanani <jdkanani@gmail.com>",
   "license": "MIT",
@@ -42,6 +41,7 @@
     "ganache-cli": "^6.0.3",
     "nodemon": "^1.14.11",
     "solhint": "^1.1.9",
+    "thebugger": "^1.0.0",
     "truffle": "^4.0.5"
   },
   "dependencies": {
@@ -56,7 +56,10 @@
     "m-tree": "0.0.4",
     "monotonic-timestamp": "0.0.9",
     "morgan": "^1.9.0",
+    "request": "^2.83.0",
+    "request-promise-native": "^1.0.5",
     "safe-buffer": "^5.1.1",
+    "vorpal": "^1.12.0",
     "web3": "^1.0.0-beta.29"
   }
 }
