@@ -6,7 +6,9 @@
   "main": "truffle-config.js",
   "scripts": {
     "testrpc": "ganache-cli --db=./testrpc-db --mnemonic='clock radar mass judge dismiss just intact mind resemble fringe diary casino' --gasLimit=13000000",
-    "test": "truffle test",
+    "test": "npm run ganache-cli:dev && truffle test --network rpc",
+    "ganache-cli:dev": "scripts/ganache-cli.sh",
+    "test2": "truffle test",
     "test-ci": "npm run clean && npm run compile && scripts/test.sh",
     "compile": "truffle compile",
     "deploy": "truffle deploy",
@@ -60,6 +62,7 @@
     "request-promise-native": "^1.0.5",
     "safe-buffer": "^5.1.1",
     "vorpal": "^1.12.0",
-    "web3": "^1.0.0-beta.29"
+    "web3": "^1.0.0-beta.29",
+    "zeppelin-solidity": "^1.8.0"
   }
 }
