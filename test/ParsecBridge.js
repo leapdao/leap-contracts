@@ -18,12 +18,15 @@ contract('Parsec', (accounts) => {
     const ts = await token.totalSupply();
     await token.approve(parsec.address, ts);
     await parsec.join(ts.div(100));
-    //const op = await parsec.operators(accounts[0]);
-    await parsec.submitBlock(1, 0x00);
-    await parsec.submitBlock(2, 0x01);
-    await parsec.submitBlock(3, 0x02);
-    const tip = await parsec.getTip();
-    console.log(tip);
+    let tip = await parsec.tipHash();
+    await parsec.submitBlock(tip, 0x0a);
+    tip = await parsec.tipHash();
+    await parsec.submitBlock(tip, 0x0b);
+    tip = await parsec.tipHash();
+    await parsec.submitBlock(tip, 0x0c);
+    tip = await parsec.getTip();
+    assert.equal(tip[1], 3);
+    assert.equal(tip[3], accounts[0]);
   });
 
 });
