@@ -2,42 +2,40 @@ pragma solidity ^0.4.19;
 
 import "zeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
-  
-  
+
 contract ParsecBridge {
   using SafeMath for uint256;
   
   uint256 constant maxOpCount = 64; // max number of operators with stake, also length of 1 epoche in blocks
-  bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // I am very angry, but it was fun!
+  bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   ERC20 public token;
 
-  event NewHeight(uint256 blockNumber, bytes32 root);
-  event OperatorJoin(uint256 blockNumber, address signerAddr);
-  event OperatorLeave(uint256 blockNumber, address signerAddr);
+  event NewHeight(uint256 blockNumber, bytes32 indexed root);
+  event OperatorJoin(address indexed signerAddr, uint256 blockNumber);
+  event OperatorLeave(address indexed signerAddr, uint256 blockNumber);
 
   struct Block {
     bytes32 parent; // the id of the parent node
-    uint64 height;
+    uint64 height;  // the hight this block is stored at
     uint32 parentIndex; //  the position of this node in the Parent's children list
     address operator; // the operator that submitted the block
     bytes32[] children; // unordered list of children below this node
     // more node attributes here
   }
-
   mapping(bytes32 => Block) public chain;
-  uint32 public parentBlockInterval;
-  uint64 public lastParentBlock;
-  bytes32 public tipHash;
-  uint32 public operatorCount;
+
+  uint32 public parentBlockInterval; // how often plasma blocks can be submitted max
+  uint64 public lastParentBlock; // last ethereum block when plasma block submitted
+  bytes32 public tipHash;    // hash of first block that has extended chain to some hight
+  uint32 public operatorCount; // number of staked operators
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
     // once operator requested leave joinedAt set to block height when requested exit
     uint64 joinedAt; 
-    uint64 claimedUntil;
-    uint256 stakeAmount;
+    uint64 claimedUntil; // the epoche until which all reward claims have been processed
+    uint256 stakeAmount; // amount of staken tokens
   }
-  
   mapping(address => Operator) public operators;
 
 
@@ -81,11 +79,11 @@ contract ParsecBridge {
       claimedUntil: (chain[tipHash].height & 0xffffffffffffff40), // most recent epoche
       stakeAmount: amount
     });
-    OperatorJoin(chain[tipHash].height, msg.sender);
+    OperatorJoin(msg.sender, chain[tipHash].height);
   }
 
   /*
-   * operator is payed out and removed
+   * operator submits coinbase with prove of inclusion in longest chain
    */  
   function claimReward(bytes32[] coinbase, bytes32[] proof) mint() {
     // receive up to 5 hashes of blocks
@@ -122,12 +120,16 @@ contract ParsecBridge {
     }
     delete operators[signerAddr];
     operatorCount--;
+    OperatorLeave(signerAddr, chain[tipHash].height);
   }
-  
+
+  /*
+   * submit a new block on top or next to the tip
+   */
   // todo: add another parameter that allows to clear storage
   // from orphaned blocks which have not been captured by prune()
   function submitBlock(bytes32 prevHash, bytes32 root) public isOperator {
-    // check parent node exits
+    // check parent node exists
     require(chain[prevHash].parent > 0);
     // make sure we can only build on tip or next to it
     uint64 newHeight = chain[prevHash].height + 1;
@@ -135,14 +137,16 @@ contract ParsecBridge {
     require(maxHeight <= newHeight && newHeight <= maxHeight + 1);
     // make hash of new block
     bytes32 newHash = keccak256(prevHash, newHeight, root);
+    // check this block has not been submitted yet
+    require(chain[newHash].parent == 0);
     // do some magic if chain extended
     if (newHeight > maxHeight) {
       // new blocks can only be submitted every x Ethereum blocks
       require(block.number >= lastParentBlock + parentBlockInterval);
       tipHash = newHash;
-      // prune some blocks
-      // itterate from 1 epoche back
       if (newHeight > maxOpCount) {
+        // prune some blocks
+        // iterate backwards for 1 epoche
         bytes32 nextParent = chain[prevHash].parent;
         while(chain[nextParent].height > newHeight - maxOpCount) {
           nextParent = chain[nextParent].parent;        
@@ -153,8 +157,6 @@ contract ParsecBridge {
       lastParentBlock = uint64(block.number);
       NewHeight(newHeight, root);
     }
-    // check this block has not been submitted yet
-    require(chain[newHash].parent == 0);
     // store the block 
     Block memory newBlock;
     newBlock.parent = prevHash;
@@ -211,3 +213,4 @@ contract ParsecBridge {
   }
 
 }
+
