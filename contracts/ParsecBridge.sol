@@ -6,7 +6,7 @@ import "zeppelin-solidity/contracts/math/SafeMath.sol";
 contract ParsecBridge {
   using SafeMath for uint256;
   
-  uint256 constant maxOpCount = 64; // max number of operators with stake, also length of 1 epoche in blocks
+  uint256 constant maxOpCount = 8; // max number of operators with stake, also length of 1 epoche in blocks
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   ERC20 public token;
 
@@ -123,12 +123,22 @@ contract ParsecBridge {
     OperatorLeave(signerAddr, chain[tipHash].height);
   }
 
+  function submitBlockAndPrune(bytes32 prevHash, bytes32 root, bytes32[] orphans) public {
+    submitBlock(prevHash, root);
+    // delete all blocks that have non-existing parent
+    for (uint256 i = 0; i < orphans.length; i++) {
+      if (chain[chain[orphans[i]].parent].height == 0) {
+        delete chain[orphans[i]];
+      }
+    }
+  }
+
   /*
    * submit a new block on top or next to the tip
    */
   // todo: add another parameter that allows to clear storage
   // from orphaned blocks which have not been captured by prune()
-  function submitBlock(bytes32 prevHash, bytes32 root) public isOperator {
+  function submitBlock(bytes32 prevHash, bytes32 root) isOperator public {
     // check parent node exists
     require(chain[prevHash].parent > 0);
     // make sure we can only build on tip or next to it
@@ -170,22 +180,20 @@ contract ParsecBridge {
    * sets a block as the only branch in parent block
    * and deletes all other branches
    */
-  function prune(bytes32 hash) public {
+  function prune(bytes32 hash) internal {
     Block storage parent = chain[chain[hash].parent];
-    if (chain[hash].parentIndex > 0) {
-      // delete child 0
-      delete chain[parent.children[0]].children;
-      delete chain[parent.children[0]];
-      // move this block to child 0
-      chain[hash].parentIndex = 0;
+    uint256 i = chain[hash].parentIndex;
+    if (i > 0) {
+      // swap with child 0
+      parent.children[i] = parent.children[0];
       parent.children[0] = hash;
+      chain[hash].parentIndex = 0;
     }
     // delete other blocks
-    for (uint256 i = parent.children.length - 1; i > 0; i--) {
-      delete chain[parent.children[i]].children;
+    for (i = parent.children.length - 1; i > 0; i--) {
       delete chain[parent.children[i]];
-      parent.children.length--;
     }
+    parent.children.length = 1;
   }
   
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
