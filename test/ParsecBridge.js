@@ -17,101 +17,160 @@ contract('Parsec', (accounts) => {
   const mRoot2 = '0x0000000000000000000000000000000000000000000000000000000000000003';
   let parsec;
   let token;
+  let b = [];
 
   before(async () => {
     token = await SimpleToken.new();
+    parsec = await ParsecBridge.new(token.address, 0, 8);
   });  
 
-  beforeEach(async () => {
-    parsec = await ParsecBridge.new(token.address, 0);
-  });
-
-  //                / -> B03
-  // GB -> B01 -> B02 -> B04 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13 -> B14 -> B15
-  //                \ -> B05 -> B06 -> B16
+  //
+  // b[0] -> b[1] -> b[2]
+  //
   it('should allow to join and submit block', async () => {
     // initialize contract
     const ts = await token.totalSupply();
     await token.approve(parsec.address, ts);
     await parsec.join(ts.div(100));
-    const GB = await parsec.tipHash();
-
+    b[0] = await parsec.tipHash();
 
     // 2 blocks in line
-    await parsec.submitBlock(GB, mRoot1);
-    const B01 = hash(GB, 1, mRoot1);
-    assert.equal(B01, await parsec.tipHash());
-    
-    await parsec.submitBlock(B01, mRoot1);
-    const B02 = hash(B01, 2, mRoot1);
-    assert.equal(B02, await parsec.tipHash());
+    await parsec.submitBlock(b[0], mRoot1);
+    b[1] = hash(b[0], 1, mRoot1);
+    assert.equal(b[1], await parsec.tipHash());
 
-    
+    await parsec.submitBlock(b[1], mRoot1);
+    b[2] = hash(b[1], 2, mRoot1);
+    assert.equal(b[2], await parsec.tipHash());
+  });
+
+
+  //                     /-> b[3]
+  // b[0] -> b[1] -> b[2] -> b[4] -> b[7] -> b[8] ->  ... -> b[15]
+  //                     \-> b[5] -> b[6] -> b[16]
+  it('should allow to branch and prune chain', async () => {
     // 3 blocks in paralel
-    await parsec.submitBlock(B02, mRoot0);
-    const B03 = hash(B02, 3, mRoot0);
-    assert.equal(B03, await parsec.tipHash());
+    await parsec.submitBlock(b[2], mRoot0);
+    b[3] = hash(b[2], 3, mRoot0);
+    assert.equal(b[3], await parsec.tipHash());
 
-    await parsec.submitBlock(B02, mRoot1);
-    const B04 = hash(B02, 3, mRoot1);
+    await parsec.submitBlock(b[2], mRoot1);
+    b[4] = hash(b[2], 3, mRoot1);
     
-    await parsec.submitBlock(B02, mRoot2);
-    const B05 = hash(B02, 3, mRoot2);
+    await parsec.submitBlock(b[2], mRoot2);
+    b[5] = hash(b[2], 3, mRoot2);
 
     // 2 blocks in paralel
-    await parsec.submitBlock(B05, mRoot2);
-    const B06 = hash(B05, 4, mRoot2);
-    assert.equal(B06, await parsec.tipHash());
+    await parsec.submitBlock(b[5], mRoot2);
+    b[6] = hash(b[5], 4, mRoot2);
+    assert.equal(b[6], await parsec.tipHash());
 
-    await parsec.submitBlock(B04, mRoot1);
-    const B07 = hash(B04, 4, mRoot1);
+    await parsec.submitBlock(b[4], mRoot1);
+    b[7] = hash(b[4], 4, mRoot1);
 
     // 2 blocks in paralel
-    await parsec.submitBlock(B07, mRoot1);
-    const B08 = hash(B07, 5, mRoot1);
-    assert.equal(B08, await parsec.tipHash());
+    await parsec.submitBlock(b[7], mRoot1);
+    b[8] = hash(b[7], 5, mRoot1);
+    assert.equal(b[8], await parsec.tipHash());
 
-    await parsec.submitBlock(B06, mRoot1);
-    const B16 = hash(B06, 5, mRoot1);
+    await parsec.submitBlock(b[6], mRoot1);
+    b[16] = hash(b[6], 5, mRoot1);
 
     // more blocks in line
-    await parsec.submitBlock(B08, mRoot1);
-    const B09 = hash(B08, 6, mRoot1);
-    assert.equal(B09, await parsec.tipHash());
+    await parsec.submitBlock(b[8], mRoot1);
+    b[9] = hash(b[8], 6, mRoot1);
+    assert.equal(b[9], await parsec.tipHash());
 
-    await parsec.submitBlock(B09, mRoot1);
-    const B10 = hash(B09, 7, mRoot1);
-    assert.equal(B10, await parsec.tipHash());
+    await parsec.submitBlock(b[9], mRoot1);
+    b[10] = hash(b[9], 7, mRoot1);
+    assert.equal(b[10], await parsec.tipHash());
 
-    await parsec.submitBlock(B10, mRoot1);
-    const B11 = hash(B10, 8, mRoot1);
-    assert.equal(B11, await parsec.tipHash());
+    await parsec.submitBlock(b[10], mRoot1);
+    b[11] = hash(b[10], 8, mRoot1);
+    assert.equal(b[11], await parsec.tipHash());
 
-    await parsec.submitBlock(B11, mRoot1);
-    const B12 = hash(B11, 9, mRoot1);
-    assert.equal(B12, await parsec.tipHash());
+    await parsec.submitBlock(b[11], mRoot1);
+    b[12] = hash(b[11], 9, mRoot1);
+    assert.equal(b[12], await parsec.tipHash());
 
-    const receipt1 = await parsec.submitBlock(B12, mRoot1);
-    const B13 = hash(B12, 10, mRoot1);
-    assert.equal(B13, await parsec.tipHash());
+    const receipt1 = await parsec.submitBlock(b[12], mRoot1);
+    b[13] = hash(b[12], 10, mRoot1);
+    assert.equal(b[13], await parsec.tipHash());
 
     // test pruning
-    assert.equal((await parsec.getBranchCount(B02)).toNumber(), 3);
-    const receipt2 = await parsec.submitBlock(B13, mRoot1); // <- this call is pruning
-    assert.equal((await parsec.getBranchCount(B02)).toNumber(), 1);
+    assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 3);
+    const receipt2 = await parsec.submitBlock(b[13], mRoot1); // <- this call is pruning
+    assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 1);
     assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
-    const B14 = hash(B13, 11, mRoot1);
-    assert.equal(B14, await parsec.tipHash());
+    b[14] = hash(b[13], 11, mRoot1);
+    assert.equal(b[14], await parsec.tipHash());
 
     // prune orphans
-    const receipt3 = await parsec.submitBlockAndPrune(B14, mRoot1, [B06, B16]); 
+    const receipt3 = await parsec.submitBlockAndPrune(b[14], mRoot1, [b[6], b[16]]); 
     assert(receipt1.receipt.gasUsed > receipt3.receipt.gasUsed);
-    const B15 = hash(B14, 12, mRoot1);
-    assert.equal(B15, await parsec.tipHash());
+    b[15] = hash(b[14], 12, mRoot1);
+    assert.equal(b[15], await parsec.tipHash());
 
     let tip = await parsec.getTip();
     assert.equal(tip[1].toNumber(), 12);
     assert.equal(tip[3], accounts[0]);
+  });
+
+  //
+  // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[24]
+  //
+  it('should allow to mine beyond archive horizon and delete genesis', async () => {
+    // more blocks in line
+    await parsec.submitBlock(b[15], mRoot1);
+    b[17] = hash(b[15], 13, mRoot1);
+    assert.equal(b[17], await parsec.tipHash());
+
+    await parsec.submitBlock(b[17], mRoot1);
+    b[18] = hash(b[17], 14, mRoot1);
+    assert.equal(b[18], await parsec.tipHash());
+
+    await parsec.submitBlock(b[18], mRoot1);
+    b[19] = hash(b[18], 15, mRoot1);
+    assert.equal(b[19], await parsec.tipHash());
+
+    await parsec.submitBlock(b[19], mRoot1);
+    b[20] = hash(b[19], 16, mRoot1);
+    assert.equal(b[20], await parsec.tipHash());
+
+    await parsec.submitBlock(b[20], mRoot1);
+    b[21] = hash(b[20], 17, mRoot1);
+    assert.equal(b[21], await parsec.tipHash());
+
+    await parsec.submitBlock(b[21], mRoot1);
+    b[22] = hash(b[21], 18, mRoot1);
+    assert.equal(b[22], await parsec.tipHash());
+
+    await parsec.submitBlock(b[22], mRoot1);
+    b[23] = hash(b[22], 19, mRoot1);
+    assert.equal(b[23], await parsec.tipHash());
+
+    await parsec.submitBlock(b[23], mRoot1);
+    b[24] = hash(b[23], 20, mRoot1);
+    assert.equal(b[24], await parsec.tipHash());
+
+    await parsec.submitBlock(b[24], mRoot1);
+    b[25] = hash(b[24], 21, mRoot1);
+    assert.equal(b[25], await parsec.tipHash());
+
+    const receipt1 = await parsec.submitBlock(b[25], mRoot1);
+    b[26] = hash(b[25], 22, mRoot1);
+    assert.equal(b[26], await parsec.tipHash());
+
+    await parsec.submitBlock(b[26], mRoot1);
+    b[27] = hash(b[26], 23, mRoot1);
+    assert.equal(b[27], await parsec.tipHash());
+
+    // archive genesis
+    const receipt2 = await parsec.submitBlockAndPrune(b[27], mRoot1, [b[0]]);
+    assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
+    assert(receipt2.logs[1].event == 'ArchiveBlock');
+    b[28] = hash(b[27], 24, mRoot1);
+    assert.equal(b[28], await parsec.tipHash());
   });
 
 });

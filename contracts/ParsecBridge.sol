@@ -21,12 +21,12 @@ contract ParsecBridge {
    *  |-----------------------------|------------------------------|-----------------------------
    *  EL = epoch-length, l[height] = logEntry, b[height] = block, 0 < x/y/z < EL
    *
-   * Consensus Window: This is a sliding window with the size of epoch-length spanning back from
-   * ---------------- the chain tip. Blocks can be challenged and invalidated. In this window the 
-   *                  tree can branch, and competing branches can be clipped. Blocks can be submitted
-   *                  at chain-height or height + 1. The block submission prunes all branches at
-   *                  (height - epoch-length), leving only a trunk of blocks on the valid chain
-   *                  in storage after the consensus window.
+   * Consensus Window: This is a sliding window with the size of epoch-length blocks spanning back
+   * ---------------- from the chain tip. Blocks in this window can be challenged and invalidated.
+   *                  In this window the tree can branch, and competing branches can be clipped.
+   *                  Blocks can be submitted at chain-height or height + 1. The block submission
+   *                  prunes all branches at (height - epoch-length), leving only a trunk of blocks
+   *                  on the valid chain in storage after the consensus window.
    * 
    * Payout Epoch: This epoch starts at a distance of x * EL from the genesis block. It is the youngest 
    * ------------ epoch that has more than epoch-length distance from the tip. Hence, it contains 
@@ -38,11 +38,12 @@ contract ParsecBridge {
    * -------------- until the payout epoch. In these epochs the block data is not needed any more.
    *                Blocks are archived by deletion and replaced by log-entlies of block-hash and height.
    */
-  uint256 constant epochLength = 8; // length of 1 epoche in child blocks
+  
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   ERC20 public token;
 
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
+  event ArchiveBlock(uint256 indexed blockNumber, bytes32 root);
   event OperatorJoin(address indexed signerAddr, uint256 blockNumber);
   event OperatorLeave(address indexed signerAddr, uint256 blockNumber);
 
@@ -60,6 +61,7 @@ contract ParsecBridge {
   uint64 public lastParentBlock; // last ethereum block when plasma block submitted
   bytes32 public tipHash;    // hash of first block that has extended chain to some hight
   uint32 public operatorCount; // number of staked operators
+  uint32 public epochLength; // length of 1 epoche in child blocks
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
@@ -71,14 +73,15 @@ contract ParsecBridge {
   mapping(address => Operator) public operators;
 
 
-  function ParsecBridge(ERC20 _token, uint256 _parentBlockInterval) public {
+  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;
     genBlock.parent = genesis; 
     tipHash = keccak256(genesis, uint64(0), bytes32(0));
     chain[tipHash] = genBlock;
-    parentBlockInterval = uint32(_parentBlockInterval);
+    parentBlockInterval = _parentBlockInterval;
+    epochLength = _epochLength;
     lastParentBlock = uint64(block.number);
   }
   
@@ -159,8 +162,23 @@ contract ParsecBridge {
     submitBlock(prevHash, root);
     // delete all blocks that have non-existing parent
     for (uint256 i = 0; i < orphans.length; i++) {
-      if (chain[chain[orphans[i]].parent].height == 0) {
-        delete chain[orphans[i]];
+      Block memory orphan = chain[orphans[i]];
+      // if orphan exists
+      if (orphan.parent > 0) {
+        uint256 tmp = chain[tipHash].height;
+        // if block is behind archive horizon
+        if (tmp >= (3 * epochLength) && orphan.height <= tmp  - (3 * epochLength)) {
+          ArchiveBlock(orphan.height, orphans[i]);
+          tmp = 0; // mark delete
+        }
+        // if block is orphaned
+        else if (chain[orphan.parent].parent == 0) {          
+          tmp = 0; // mark delete
+        }
+        // if marked, then delete
+        if (tmp == 0) {
+          delete chain[orphans[i]];
+        }
       }
     }
   }
@@ -236,12 +254,43 @@ contract ParsecBridge {
     return chain[nodeId].children[index];
   }
 
+  // operator - stake: 1-5 - total: 100 - already claimed: 1
+  // 
+
+  // data = [winner, operator, operator ...]
+  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
+  // winner: 1b claimCountTotal - 11b 0x - 20b address
+  function dfs(bytes32[] _data, bytes32 _nodeHash) constant returns(bytes32[] data) {
+    Block memory node = chain[_nodeHash];
+
+    data = updateRewards(_data, node.operator);
+    
+    // more tree to walk
+    if (node.children.length > 0) {
+      bytes32[][] options = new bytes[node.children.length][_data.length];
+      for (i = 0; i < node.children.length; i++) {
+        options[i] = dfs(operators, node.children[i]);
+      }
+      // compare options,
+      // return the best
+    } 
+    // reached a tip, return data
+  }
+
   /*
    * todo
    */    
-  function getTip() public constant returns (bytes32, uint64, uint32, address) {
+  function getTip(address[] operators) public constant returns (bytes32, uint64, uint32, address) {
     return (chain[tipHash].parent, chain[tipHash].height, chain[tipHash].parentIndex, chain[tipHash].operator);
 
+    // find consensus horizon
+    bytes32 consensusHorizon = chain[tipHash].parent;
+    uint256 depth = (chain[tipHash].height < epochLength) ? chain[tipHash].height : chain[tipHash].height - epochLength;
+    while(chain[consensusHorizon].height > depth) {
+      consensusHorizon = chain[consensusHorizon].parent;        
+    }
+    // 
+    - dfs until tip, add up rewards, save tip as winner
   }
   
   /*
