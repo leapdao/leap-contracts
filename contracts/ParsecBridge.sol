@@ -6,7 +6,39 @@ import "zeppelin-solidity/contracts/math/SafeMath.sol";
 contract ParsecBridge {
   using SafeMath for uint256;
   
-  uint256 constant maxOpCount = 8; // max number of operators with stake, also length of 1 epoche in blocks
+  /*
+   *  an epoch describes a sections in block height. 
+   *
+   *       genesis/archive epoch             payout epoch                consensus window
+   *                ↓                             ↓                              ↓               
+   *    0*EL ->    ...    -> 1*EL-1   2*EL ->    ...    -> 3*EL-1    3*EL ->    ...    -> 4*EL-x 
+   *  |-----------------------------|------------------------------|-----------------------------
+   *  |                             |                              |
+   *  |                             |                              |      /-> b[3*EL+y]
+   *  | l[0] ->  ...  -> l[1*EL-1] -> b[2*EL] -> ... -> b[3*EL-1] -> b[3*EL] ->  ...    -> b[4*EL-x]
+   *  |                             |                              |               \-> b[3*EL+z]
+   *  |                             |                              |
+   *  |-----------------------------|------------------------------|-----------------------------
+   *  EL = epoch-length, l[height] = logEntry, b[height] = block, 0 < x/y/z < EL
+   *
+   * Consensus Window: This is a sliding window with the size of epoch-length spanning back from
+   * ---------------- the chain tip. Blocks can be challenged and invalidated. In this window the 
+   *                  tree can branch, and competing branches can be clipped. Blocks can be submitted
+   *                  at chain-height or height + 1. The block submission prunes all branches at
+   *                  (height - epoch-length), leving only a trunk of blocks on the valid chain
+   *                  in storage after the consensus window.
+   * 
+   * Payout Epoch: This epoch starts at a distance of x * EL from the genesis block. It is the youngest 
+   * ------------ epoch that has more than epoch-length distance from the tip. Hence, it contains 
+   *              a trunk of epoch-length blocks. Operators claim rewards from blocks in the payout
+   *              epoch. The blocks in the payout epoch are on the longest chain and final, determined
+   *              by pruning and clipping during the consensus window.
+   *
+   * Archive Epochs: These epochs also start at distances of x * EL from the genesis block and span
+   * -------------- until the payout epoch. In these epochs the block data is not needed any more.
+   *                Blocks are archived by deletion and replaced by log-entlies of block-hash and height.
+   */
+  uint256 constant epochLength = 8; // length of 1 epoche in child blocks
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   ERC20 public token;
 
@@ -67,9 +99,9 @@ contract ParsecBridge {
    * Add an operator
    */
   function join(uint256 amount) public {
-    require(operators[msg.sender].stakeAmount + amount <= token.totalSupply().div(maxOpCount).mul(5));
+    require(operators[msg.sender].stakeAmount + amount <= token.totalSupply().div(epochLength).mul(5));
     require(token.allowance(msg.sender, this) >= amount);
-    require(operatorCount < maxOpCount);
+    require(operatorCount < epochLength);
 
     token.transferFrom(msg.sender, this, amount);
     operatorCount++;
@@ -115,7 +147,7 @@ contract ParsecBridge {
     // empty operator
     if (op.stakeAmount > 0) {
       // operator that has requested leave
-      require(op.joinedAt <= chain[tipHash].height - (2 * maxOpCount));
+      require(op.joinedAt <= chain[tipHash].height - (2 * epochLength));
       token.transfer(signerAddr, op.stakeAmount);
     }
     delete operators[signerAddr];
@@ -154,11 +186,11 @@ contract ParsecBridge {
       // new blocks can only be submitted every x Ethereum blocks
       require(block.number >= lastParentBlock + parentBlockInterval);
       tipHash = newHash;
-      if (newHeight > maxOpCount) {
+      if (newHeight > epochLength) {
         // prune some blocks
         // iterate backwards for 1 epoche
         bytes32 nextParent = chain[prevHash].parent;
-        while(chain[nextParent].height > newHeight - maxOpCount) {
+        while(chain[nextParent].height > newHeight - epochLength) {
           nextParent = chain[nextParent].parent;        
         }
         // prune chain 
