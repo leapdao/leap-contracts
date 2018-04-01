@@ -17,33 +17,42 @@ contract('Parsec', (accounts) => {
   const mRoot2 = '0x0000000000000000000000000000000000000000000000000000000000000003';
   let parsec;
   let token;
+  let totalSupply;
   let b = [];
 
   before(async () => {
     token = await SimpleToken.new();
+    // initialize contract
     parsec = await ParsecBridge.new(token.address, 0, 8);
+    totalSupply = await token.totalSupply();
+    token.transfer(accounts[1], totalSupply.div(2));
   });  
+
+  //
+  // b[0] -> b[1]
+  //
+  it('should allow to join and submit block', async () => {
+    await token.approve(parsec.address, totalSupply, {from: accounts[0]});
+    await parsec.join(totalSupply.div(100), {from: accounts[0]});
+    b[0] = await parsec.tipHash();
+
+    await parsec.submitBlock(b[0], mRoot1, {from: accounts[0]});
+    b[1] = hash(b[0], 1, mRoot1);
+    assert.equal(b[1], await parsec.tipHash());
+  });
 
   //
   // b[0] -> b[1] -> b[2]
   //
-  it('should allow to join and submit block', async () => {
+  it('should allow second operator to join and submit block', async () => {
     // initialize contract
-    const ts = await token.totalSupply();
-    await token.approve(parsec.address, ts);
-    await parsec.join(ts.div(100));
-    b[0] = await parsec.tipHash();
+    await token.approve(parsec.address, totalSupply, {from: accounts[1]});
+    await parsec.join(totalSupply.div(100), {from: accounts[1]});
 
-    // 2 blocks in line
-    await parsec.submitBlock(b[0], mRoot1);
-    b[1] = hash(b[0], 1, mRoot1);
-    assert.equal(b[1], await parsec.tipHash());
-
-    await parsec.submitBlock(b[1], mRoot1);
+    await parsec.submitBlock(b[1], mRoot1, {from: accounts[1]});
     b[2] = hash(b[1], 2, mRoot1);
     assert.equal(b[2], await parsec.tipHash());
   });
-
 
   //                     /-> b[3]
   // b[0] -> b[1] -> b[2] -> b[4] -> b[7] -> b[8] ->  ... -> b[15]
@@ -111,7 +120,7 @@ contract('Parsec', (accounts) => {
     b[15] = hash(b[14], 12, mRoot1);
     assert.equal(b[15], await parsec.tipHash());
 
-    let tip = await parsec.getTip();
+    let tip = await parsec.getHighest();
     assert.equal(tip[1].toNumber(), 12);
     assert.equal(tip[3], accounts[0]);
   });

@@ -254,43 +254,70 @@ contract ParsecBridge {
     return chain[nodeId].children[index];
   }
 
-  // operator - stake: 1-5 - total: 100 - already claimed: 1
-  // 
-
-  // data = [winner, operator, operator ...]
-  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
-  // winner: 1b claimCountTotal - 11b 0x - 20b address
-  function dfs(bytes32[] _data, bytes32 _nodeHash) constant returns(bytes32[] data) {
-    Block memory node = chain[_nodeHash];
-
-    data = updateRewards(_data, node.operator);
-    
-    // more tree to walk
-    if (node.children.length > 0) {
-      bytes32[][] options = new bytes[node.children.length][_data.length];
-      for (i = 0; i < node.children.length; i++) {
-        options[i] = dfs(operators, node.children[i]);
-      }
-      // compare options,
-      // return the best
-    } 
-    // reached a tip, return data
-  }
-
   /*
    * todo
    */    
-  function getTip(address[] operators) public constant returns (bytes32, uint64, uint32, address) {
+  function getHighest() public constant returns (bytes32, uint64, uint32, address) {
     return (chain[tipHash].parent, chain[tipHash].height, chain[tipHash].parentIndex, chain[tipHash].operator);
+  }
 
+
+  // data = [winnerHash, claimCountTotal, operator, operator ...]
+  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
+  function dfs(bytes32[] _data, bytes32 _nodeHash) internal constant returns(bytes32[] data) {
+    Block memory node = chain[_nodeHash];
+    // visit this node
+    data = new bytes32[](_data.length);
+    for (uint i = 0; i < _data.length; i++) {
+      data[i] = _data[i];
+    }
+    // find the operator that mined this block
+    i = 2;
+    while(address(_data[i]) != node.operator) {
+      require(i++ < _data.length);
+    }
+    // parse operator stake and claim status
+    uint256 claimCountByOperator = uint256(_data[i]) >> 248;
+    uint256 stakeByOperator = uint168(_data[i]) >> 160;
+    // if operator can claim rewards, assign
+    if (claimCountByOperator < stakeByOperator) {
+      data[i] = bytes32(claimCountByOperator + 1 << 248) | bytes32(uint248(_data[i]));
+      data[1] = bytes32(uint256(data[1]) + 1);
+      data[0] = _nodeHash;
+    }
+    // more of tree to walk
+    if (node.children.length > 0) {
+      bytes32[][] memory options = new bytes32[][](_data.length);
+      for (i = 0; i < node.children.length; i++) {
+        options[i] = dfs(data, node.children[i]);
+        // compare options,
+        // return the best
+        if (uint256(options[i][1]) > uint256(data[1])) {
+          data[0] = options[i][0];
+          data[1] = options[i][1];
+        }
+      }
+    } 
+    // else - reached a tip
+    // return data
+  }
+
+  function getTip(address[] _operators) public constant returns (bytes32, uint256) {
     // find consensus horizon
     bytes32 consensusHorizon = chain[tipHash].parent;
-    uint256 depth = (chain[tipHash].height < epochLength) ? chain[tipHash].height : chain[tipHash].height - epochLength;
+    uint256 depth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     while(chain[consensusHorizon].height > depth) {
       consensusHorizon = chain[consensusHorizon].parent;        
     }
-    // 
-    - dfs until tip, add up rewards, save tip as winner
+    // create data structure for depth first search
+    bytes32[] memory data = new bytes32[](_operators.length + 2);
+    for (uint i = 2; i < _operators.length + 2; i++) {
+      data[i] = bytes32(((operators[_operators[i-2]].stakeAmount * 100) / token.totalSupply()) << 160) | bytes32(_operators[i-2]);
+    }
+    // run search
+    bytes32[] memory rsp = dfs(data, consensusHorizon);
+    // return result
+    return (rsp[0], uint256(rsp[1]));
   }
   
   /*
