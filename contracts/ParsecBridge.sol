@@ -59,9 +59,10 @@ contract ParsecBridge {
 
   uint32 public parentBlockInterval; // how often plasma blocks can be submitted max
   uint64 public lastParentBlock; // last ethereum block when plasma block submitted
-  bytes32 public tipHash;    // hash of first block that has extended chain to some hight
   uint32 public operatorCount; // number of staked operators
   uint32 public epochLength; // length of 1 epoche in child blocks
+  uint64 public blockReward; // reward per single block
+  bytes32 public tipHash;    // hash of first block that has extended chain to some hight
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
@@ -73,7 +74,7 @@ contract ParsecBridge {
   mapping(address => Operator) public operators;
 
 
-  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength) public {
+  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;
@@ -84,6 +85,7 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     epochLength = _epochLength;
     lastParentBlock = uint64(block.number);
+    blockReward = _blockReward;
   }
   
   /*
@@ -113,25 +115,89 @@ contract ParsecBridge {
     
     operators[msg.sender] = Operator({
       joinedAt: uint32(now),
-      claimedUntil: (chain[tipHash].height & 0xffffffffffffff40), // most recent epoche
+      claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoche
       stakeAmount: amount
     });
     OperatorJoin(msg.sender, chain[tipHash].height);
   }
 
+  function createTx(uint64 _height, bytes32[] _coinbase, address _op) pure returns (bytes32) {
+    uint8 txType = 0;
+    uint8 txInNum = uint8(_coinbase.length);
+    uint8 txOutNum = 1;
+    return keccak256(txType, _height, txInNum, _coinbase, txOutNum, uint256(0), _op);
+  }
+
   /*
    * operator submits coinbase with prove of inclusion in longest chain
+   * tx structure
+   * type 4b
+   * b# 8b
+   * #txin 1b
+   * in0 1 - 129
+   * #txout 1b
+   * txOut 20
+   * 
+   * type4 in
+   * #prevClaims 1b
+   * claimx 32b  <- hash of block in same claim epoch
+   * claimy 32b
+   * 
+   * type4 out
+   * value 32b
+   * address 20b
+   *
+   *          pe     cw
+   *  0 - 7 8 - 15 16 - 23
+   *
+   *  ae(0-1) pe      cw(17-25)
+   *  0 - 7 8 - 15 16 - 23 24 - 25  
+   *
+   *  ae(0-6) pe      cw(23-30)
+   *  0 - 7 8 - 15 16 - 23 24 - 30  
+   *
+   *    ae(e-7)      pe   cw(24-31)
+   *  0 - 7 8 - 15 16 - 23 24 - 31  
    */  
-  function claimReward(bytes32[] coinbase, bytes32[] proof) mint() {
+  function claimReward(bytes32 _hash, bytes32[] _coinbase, bytes32[] _proof) public {
     // receive up to 5 hashes of blocks
-    // all 5 must have been mined by operator in same claim epoche
+    // first one to hold references to all previous ones
+    Block memory node = chain[_hash];
     // claim epoche must have passed challenge period
-    // reward calculated and payed
-    // epoch marked as claimed
-  }
-  
+    uint256 payoutEpoch = uint256(node.height).div(epochLength).mul(epochLength);
+    require(payoutEpoch >= chain[tipHash].height - (3 * epochLength));
+    require(payoutEpoch < uint256(chain[tipHash].height - epochLength).div(epochLength).mul(epochLength));
+    // check operator
+    if (operators[msg.sender].claimedUntil > 0) {
+      require(operators[msg.sender].claimedUntil < payoutEpoch);
+    }
+    uint256 claimCount = (operators[msg.sender].stakeAmount * epochLength) / token.totalSupply();
+    require(_coinbase.length < claimCount);
+    // all 5 must have been mined by operator in same claim epoche
+    require(node.height >= payoutEpoch);
+    require(node.height < payoutEpoch + epochLength);
+    require(node.operator == msg.sender);
+    for (uint256 i = 0; i < _coinbase.length; i++) {
+      Block memory coinbase = chain[_coinbase[i]];
+      require(coinbase.height >= payoutEpoch);
+      require(coinbase.height < payoutEpoch + epochLength);
+      require(coinbase.operator == msg.sender);
+    }
+    // reconstruct tx and check tx proof
+    bytes32 hash = createTx(node.height, _coinbase, msg.sender);
+    // check proof
+    for (i = 0; i < _proof.length; i++) {
+      hash = keccak256(hash, _proof[i]);
+    }
+    require(_hash == keccak256(node.parent, node.height, hash));
 
-    /*
+    // reward calculated and payed
+    token.transfer(msg.sender, (_coinbase.length + 1).mul(blockReward));
+    // epoch marked as claimed
+    operators[msg.sender].claimedUntil = uint64(payoutEpoch + epochLength);
+  }
+
+  /*
    * operator requests to leave
    */
   function requestLeave() public {
@@ -336,4 +402,3 @@ contract ParsecBridge {
   }
 
 }
-
