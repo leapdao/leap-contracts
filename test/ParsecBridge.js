@@ -54,7 +54,7 @@ contract('Parsec', (accounts) => {
   before(async () => {
     token = await SimpleToken.new();
     // initialize contract
-    parsec = await ParsecBridge.new(token.address, 0, 8, 5000000);
+    parsec = await ParsecBridge.new(token.address, 0, 8, 5000000, 0);
     epochLength = await parsec.epochLength();
     totalSupply = await token.totalSupply();
     token.transfer(accounts[1], totalSupply.div(epochLength));
@@ -143,6 +143,8 @@ contract('Parsec', (accounts) => {
     let tip = await parsec.getTip(ops);
     assert.equal(b[9], tip[0]);
     assert.equal(7, tip[1]);
+
+    await parsec.requestLeave({from: d});
   });
     
   //                           /-> xxxxxx
@@ -221,14 +223,20 @@ contract('Parsec', (accounts) => {
     b[28] = blockHash(b[27], 24, mRoot1);
 
     // claim rewards
-    const bal1 = await token.balanceOf(c);
+    let bal1 = await token.balanceOf(c);
     await parsec.claimReward(b[10], [b[1], b[4], b[9]], [empty]); 
-    const bal2 = await token.balanceOf(c);
+    let bal2 = await token.balanceOf(c);
     assert(bal1.toNumber() < bal2.toNumber());
 
     let tip = await parsec.getTip(ops);
     assert.equal(b[28], tip[0]);
     assert.equal(4, tip[1]);
+
+    // leave operator set
+    bal1 = await token.balanceOf(d);
+    await parsec.payout(d);
+    bal2 = await token.balanceOf(d);
+    assert(bal1.toNumber() < bal2.toNumber());
   });
 
 });

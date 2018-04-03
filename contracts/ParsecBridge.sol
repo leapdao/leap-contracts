@@ -62,6 +62,7 @@ contract ParsecBridge {
   uint32 public operatorCount; // number of staked operators
   uint32 public epochLength; // length of 1 epoche in child blocks
   uint64 public blockReward; // reward per single block
+  uint32 public stakePeriod;
   bytes32 public tipHash;    // hash of first block that has extended chain to some hight
 
   struct Operator {
@@ -74,7 +75,7 @@ contract ParsecBridge {
   mapping(address => Operator) public operators;
 
 
-  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward) public {
+  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;
@@ -86,6 +87,7 @@ contract ParsecBridge {
     epochLength = _epochLength;
     lastParentBlock = uint64(block.number);
     blockReward = _blockReward;
+    stakePeriod = _stakePeriod;
   }
   
   /*
@@ -202,7 +204,7 @@ contract ParsecBridge {
    */
   function requestLeave() public {
     require(operators[msg.sender].stakeAmount > 0);
-    require(operators[msg.sender].joinedAt < now - 12 weeks);
+    require(operators[msg.sender].joinedAt < now - (stakePeriod));
     operators[msg.sender].joinedAt = chain[tipHash].height;
     // now the operator will have to wait another 2 epochs
     // before being able to get a pay-out
