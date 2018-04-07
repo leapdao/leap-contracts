@@ -245,8 +245,22 @@ contract ParsecBridge {
     }
   }
 
+  function reportHeightConflict(bytes32 hashA, bytes32 hashB) public {
+    require(hashA != hashB);
+    Block storage blockA = chain[hashA];
+    require(blockA.height == chain[hashB].height);
+    require(blockA.height > chain[tipHash].height - epochLength);
+    require(blockA.operator == chain[hashB].operator);
+    // slash 10 block rewards
+    Operator storage operator = operators[blockA.operator];
+    uint256 slashAmount = (operator.stakeAmount < 10 * blockReward) ? operator.stakeAmount : 10 * blockReward;
+    operator.stakeAmount = operator.stakeAmount.sub(slashAmount);
+    // reward 1 block reward
+    token.transfer(msg.sender, blockReward);
+  }
+
   /*
-   * submit a new block on top or next to the tip
+   * submit a new block
    *
    * block hash process:
    * 1. block generated: prevHash, height, root
@@ -261,7 +275,7 @@ contract ParsecBridge {
     // TODO recover operator address and check membership
     bytes32 sigHash = keccak256(prevHash, newHeight, root);
     address operatorAddr = ecrecover(sigHash, v, r, s);
-    require(operators[operatorAddr].stakeAmount > 0);
+    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
     // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);

@@ -1,4 +1,5 @@
 import utils from 'ethereumjs-util';
+import assertRevert from './helpers/assertRevert';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
@@ -49,9 +50,6 @@ function txHash(height, coinbase, operatorAddr) {
 
 contract('Parsec', (accounts) => {
   const empty = '0x0000000000000000000000000000000000000000000000000000000000000000';
-  const mRoot0 = '0x0000000000000000000000000000000000000000000000000000000000000001';
-  const mRoot1 = '0x0000000000000000000000000000000000000000000000000000000000000002';
-  const mRoot2 = '0x0000000000000000000000000000000000000000000000000000000000000003';
   const c = accounts[0];  // operator charlie, stake: 4 * ts / epochLength
   const cPriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const d = accounts[1];  // operator danie,   stake: 1 * ts / epochLength
@@ -101,9 +99,9 @@ contract('Parsec', (accounts) => {
     await token.approve(parsec.address, totalSupply, {from: d});
     await parsec.join(totalSupply.div(epochLength).mul(1), {from: d});
 
-    const [v, r, s] = signHeader(b[1], 2, mRoot1, dPriv);
-    await parsec.submitBlock(b[1], mRoot1, v, r, s);
-    b[2] = blockHash(b[1], 2, mRoot1, v, r, s);
+    const [v, r, s] = signHeader(b[1], 2, empty, dPriv);
+    await parsec.submitBlock(b[1], empty, v, r, s);
+    b[2] = blockHash(b[1], 2, empty, v, r, s);
     assert.equal(b[2], await parsec.tipHash());
   });
 
@@ -115,9 +113,9 @@ contract('Parsec', (accounts) => {
     await parsec.join(totalSupply.div(epochLength).mul(3), {from: e});
 
     // 3 blocks in paralel
-    let [v, r, s] = signHeader(b[2], 3, mRoot0, ePriv);
-    await parsec.submitBlock(b[2], mRoot0, v, r, s);
-    b[3] = blockHash(b[2], 3, mRoot0, v, r, s);
+    let [v, r, s] = signHeader(b[2], 3, empty, ePriv);
+    await parsec.submitBlock(b[2], empty, v, r, s);
+    b[3] = blockHash(b[2], 3, empty, v, r, s);
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
 
     let merkleRoot = rootHash(txHash(3, [b[1]], c));
@@ -127,9 +125,9 @@ contract('Parsec', (accounts) => {
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
     
     // tip not updated because operator D reached share
-    [v, r, s] = signHeader(b[2], 3, mRoot2, dPriv);
-    await parsec.submitBlock(b[2], mRoot2, v, r, s);
-    b[5] = blockHash(b[2], 3, mRoot2, v, r, s);
+    [v, r, s] = signHeader(b[2], 3, empty, dPriv);
+    await parsec.submitBlock(b[2], empty, v, r, s);
+    b[5] = blockHash(b[2], 3, empty, v, r, s);
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
   });
 
@@ -137,16 +135,16 @@ contract('Parsec', (accounts) => {
   // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c]  <- 4 rewards
   //                           \-> b[5,d] -> b[6,c] -> b[16,c]  <- 5 rewards
   it('should allow build longer chain', async () => {
-    let [v, r, s] = signHeader(b[5], 4, mRoot2, cPriv);
-    await parsec.submitBlock(b[5], mRoot2, v, r, s, {from: c});
-    b[6] = blockHash(b[5], 4, mRoot2, v, r, s);
+    let [v, r, s] = signHeader(b[5], 4, empty, cPriv);
+    await parsec.submitBlock(b[5], empty, v, r, s, {from: c});
+    b[6] = blockHash(b[5], 4, empty, v, r, s);
     let tip = await parsec.getTip(ops);
     assert.equal(b[3], tip[0]);
     assert.equal(4, tip[1]);
 
-    [v, r, s] = signHeader(b[6], 5, mRoot2, cPriv);
-    await parsec.submitBlock(b[6], mRoot2, v, r, s, {from: c});
-    b[16] = blockHash(b[6], 5, mRoot2, v, r, s);
+    [v, r, s] = signHeader(b[6], 5, empty, cPriv);
+    await parsec.submitBlock(b[6], empty, v, r, s, {from: c});
+    b[16] = blockHash(b[6], 5, empty, v, r, s);
     tip = await parsec.getTip(ops);
     assert.equal(b[16], tip[0]);
     assert.equal(5, tip[1]);
@@ -156,13 +154,13 @@ contract('Parsec', (accounts) => {
   // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> b[9,c]   <- 7 rewards
   //                           \-> b[5,d] -> b[6,c] -> b[16,c]   <- 5 rewards
   it('should allow to extend other branch', async () => {
-    let [v, r, s] = signHeader(b[4], 4, mRoot1, ePriv);
-    await parsec.submitBlock(b[4], mRoot1, v, r, s, {from: e});
-    b[7] = blockHash(b[4], 4, mRoot1, v, r, s);
+    let [v, r, s] = signHeader(b[4], 4, empty, ePriv);
+    await parsec.submitBlock(b[4], empty, v, r, s, {from: e});
+    b[7] = blockHash(b[4], 4, empty, v, r, s);
 
-    [v, r, s] = signHeader(b[7], 5, mRoot1, ePriv);
-    await parsec.submitBlock(b[7], mRoot1, v, r, s, {from: e});
-    b[8] = blockHash(b[7], 5, mRoot1, v, r, s);
+    [v, r, s] = signHeader(b[7], 5, empty, ePriv);
+    await parsec.submitBlock(b[7], empty, v, r, s, {from: e});
+    b[8] = blockHash(b[7], 5, empty, v, r, s);
 
     let merkleRoot = rootHash(txHash(6, [b[1], b[4]], c));
     [v, r, s] = signHeader(b[8], 6, merkleRoot, cPriv);
@@ -173,6 +171,18 @@ contract('Parsec', (accounts) => {
     assert.equal(7, tip[1]);
 
     await parsec.requestLeave({from: d});
+  });
+
+  //                           /-> b[3,e]
+  // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> b[9,c]   <- 7 rewards
+  //                           \-> b[5,d] -> b[6,c] -> b[16,c]
+  it('operators that are leaving should not be able to submit blocks', async () => {
+    await parsec.requestLeave({from: d});
+
+    let [v, r, s] = signHeader(b[9], 7, empty, dPriv);
+    await assertRevert(
+      parsec.submitBlock(b[9], empty, v, r, s)
+    );
   });
     
   //                           /-> xxxxxx
@@ -185,69 +195,69 @@ contract('Parsec', (accounts) => {
     b[10] = blockHash(b[9], 7, merkleRoot, claimV, claimR, claimS);
     assert.equal(b[10], await parsec.tipHash());
 
-    let [v, r, s] = signHeader(b[10], 8, mRoot1, cPriv);
-    await parsec.submitBlock(b[10], mRoot1, v, r, s);
-    b[11] = blockHash(b[10], 8, mRoot1, v, r, s);
+    let [v, r, s] = signHeader(b[10], 8, empty, cPriv);
+    await parsec.submitBlock(b[10], empty, v, r, s);
+    b[11] = blockHash(b[10], 8, empty, v, r, s);
     assert.equal(b[11], await parsec.tipHash());
 
-    [v, r, s] = signHeader(b[11], 9, mRoot1, cPriv);
-    await parsec.submitBlock(b[11], mRoot1, v, r, s);
-    b[12] = blockHash(b[11], 9, mRoot1, v, r, s);
+    [v, r, s] = signHeader(b[11], 9, empty, cPriv);
+    await parsec.submitBlock(b[11], empty, v, r, s);
+    b[12] = blockHash(b[11], 9, empty, v, r, s);
     assert.equal(b[12], await parsec.tipHash());
 
-    [v, r, s] = signHeader(b[12], 10, mRoot1, cPriv);
-    const receipt1 = await parsec.submitBlock(b[12], mRoot1, v, r, s);
-    b[13] = blockHash(b[12], 10, mRoot1, v, r, s);
+    [v, r, s] = signHeader(b[12], 10, empty, cPriv);
+    const receipt1 = await parsec.submitBlock(b[12], empty, v, r, s);
+    b[13] = blockHash(b[12], 10, empty, v, r, s);
     assert.equal(b[13], await parsec.tipHash());
 
     // test pruning
     assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 3);
-    [v, r, s] = signHeader(b[13], 11, mRoot1, cPriv);
-    const receipt2 = await parsec.submitBlock(b[13], mRoot1, v, r, s); // <- this call is pruning
+    [v, r, s] = signHeader(b[13], 11, empty, cPriv);
+    const receipt2 = await parsec.submitBlock(b[13], empty, v, r, s); // <- this call is pruning
     assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 1);
     assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
-    b[14] = blockHash(b[13], 11, mRoot1, v, r, s);
+    b[14] = blockHash(b[13], 11, empty, v, r, s);
     assert.equal(b[14], await parsec.tipHash());
 
     // prune orphans
-    [v, r, s] = signHeader(b[14], 12, mRoot1, cPriv);
-    const receipt3 = await parsec.submitBlockAndPrune(b[14], mRoot1, v, r, s, [b[6], b[16]]); 
+    [v, r, s] = signHeader(b[14], 12, empty, cPriv);
+    const receipt3 = await parsec.submitBlockAndPrune(b[14], empty, v, r, s, [b[6], b[16]]); 
     assert(receipt1.receipt.gasUsed > receipt3.receipt.gasUsed);
-    b[15] = blockHash(b[14], 12, mRoot1, v, r, s);
+    b[15] = blockHash(b[14], 12, empty, v, r, s);
     assert.equal(b[15], await parsec.tipHash());
   });
 
   //
-  // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[24]
+  // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[28]
   //
   it('should allow to mine beyond archive horizon and delete genesis', async () => {
     // more blocks
-    let [v, r, s] = signHeader(b[15], 13, mRoot1, cPriv);
-    await parsec.submitBlock(b[15], mRoot1, v, r, s);
-    b[17] = blockHash(b[15], 13, mRoot1, v, r, s);
+    let [v, r, s] = signHeader(b[15], 13, empty, cPriv);
+    await parsec.submitBlock(b[15], empty, v, r, s);
+    b[17] = blockHash(b[15], 13, empty, v, r, s);
     assert.equal(b[17], await parsec.tipHash());
 
     for(let i = 17; i < 25; i++) {
-      [v, r, s] = signHeader(b[i], i-3, mRoot1, cPriv);
-      await parsec.submitBlock(b[i], mRoot1, v, r, s);
-      b[i+1] = blockHash(b[i], i-3, mRoot1, v, r, s);      
+      [v, r, s] = signHeader(b[i], i-3, empty, cPriv);
+      await parsec.submitBlock(b[i], empty, v, r, s);
+      b[i+1] = blockHash(b[i], i-3, empty, v, r, s);      
     }
 
-    [v, r, s] = signHeader(b[25], 22, mRoot1, cPriv);
-    const receipt1 = await parsec.submitBlock(b[25], mRoot1, v, r, s);
-    b[26] = blockHash(b[25], 22, mRoot1, v, r, s);
+    [v, r, s] = signHeader(b[25], 22, empty, cPriv);
+    const receipt1 = await parsec.submitBlock(b[25], empty, v, r, s);
+    b[26] = blockHash(b[25], 22, empty, v, r, s);
     assert.equal(b[26], await parsec.tipHash());
 
-    [v, r, s] = signHeader(b[26], 23, mRoot1, cPriv);
-    await parsec.submitBlock(b[26], mRoot1, v, r, s);
-    b[27] = blockHash(b[26], 23, mRoot1, v, r, s);
+    [v, r, s] = signHeader(b[26], 23, empty, cPriv);
+    await parsec.submitBlock(b[26], empty, v, r, s);
+    b[27] = blockHash(b[26], 23, empty, v, r, s);
 
     // archive genesis
-    [v, r, s] = signHeader(b[27], 24, mRoot1, cPriv);
-    const receipt2 = await parsec.submitBlockAndPrune(b[27], mRoot1, v, r, s, [b[0]]);
+    [v, r, s] = signHeader(b[27], 24, empty, cPriv);
+    const receipt2 = await parsec.submitBlockAndPrune(b[27], empty, v, r, s, [b[0]]);
     assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
     assert(receipt2.logs[1].event == 'ArchiveBlock');
-    b[28] = blockHash(b[27], 24, mRoot1, v, r, s);
+    b[28] = blockHash(b[27], 24, empty, v, r, s);
 
     // claim rewards
     let bal1 = await token.balanceOf(c);
@@ -264,6 +274,25 @@ contract('Parsec', (accounts) => {
     await parsec.payout(d);
     bal2 = await token.balanceOf(d);
     assert(bal1.toNumber() < bal2.toNumber());
+  });
+
+  //                                                      /-> b[25,c]
+  // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[24] -> b[25,c] -> ... -> b[28]
+  //
+  it('should allow to slash if 2 blocks proposed at same height', async () => {
+    const rootHash = '0x112200000000000000000000000000000000000000000000000000000000eeff';
+    let [v, r, s] = signHeader(b[24], 21, rootHash, cPriv);
+    await parsec.submitBlock(b[24], rootHash, v, r, s);
+    const b25b = blockHash(b[24], 21, rootHash, v, r, s);
+
+    // slash
+    const bal1 = await token.balanceOf(d);
+    const stake1 = await parsec.operators(c);
+    await parsec.reportHeightConflict(b[25], b25b, {from: d});
+    const bal2 = await token.balanceOf(d);
+    const stake2 = await parsec.operators(c);
+    assert(bal1.toNumber() < bal2.toNumber());
+    assert(stake1[2].toNumber() > stake2[2].toNumber());
   });
 
 });
