@@ -64,6 +64,7 @@ contract('Parsec', (accounts) => {
   let epochLength;
   let totalSupply;
   let b = [];
+  let claimV, claimR, claimS;
 
   //
   // b[0]
@@ -101,7 +102,7 @@ contract('Parsec', (accounts) => {
     await parsec.join(totalSupply.div(epochLength).mul(1), {from: d});
 
     const [v, r, s] = signHeader(b[1], 2, mRoot1, dPriv);
-    await parsec.submitBlock(b[1], mRoot1, v, r, s, {from: d});
+    await parsec.submitBlock(b[1], mRoot1, v, r, s);
     b[2] = blockHash(b[1], 2, mRoot1, v, r, s);
     assert.equal(b[2], await parsec.tipHash());
   });
@@ -115,19 +116,19 @@ contract('Parsec', (accounts) => {
 
     // 3 blocks in paralel
     let [v, r, s] = signHeader(b[2], 3, mRoot0, ePriv);
-    await parsec.submitBlock(b[2], mRoot0, v, r, s, {from: e});
+    await parsec.submitBlock(b[2], mRoot0, v, r, s);
     b[3] = blockHash(b[2], 3, mRoot0, v, r, s);
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
 
     let merkleRoot = rootHash(txHash(3, [b[1]], c));
     [v, r, s] = signHeader(b[2], 3, merkleRoot, cPriv);
-    await parsec.submitBlock(b[2], merkleRoot, v, r, s, {from: c});
+    await parsec.submitBlock(b[2], merkleRoot, v, r, s);
     b[4] = blockHash(b[2], 3, merkleRoot, v, r, s);
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
     
     // tip not updated because operator D reached share
     [v, r, s] = signHeader(b[2], 3, mRoot2, dPriv);
-    await parsec.submitBlock(b[2], mRoot2, v, r, s, {from: d});
+    await parsec.submitBlock(b[2], mRoot2, v, r, s);
     b[5] = blockHash(b[2], 3, mRoot2, v, r, s);
     assert.equal(b[3], (await parsec.getTip(ops))[0]);
   });
@@ -179,12 +180,12 @@ contract('Parsec', (accounts) => {
   //                           \-> xxxxxx -> b[6,c] -> b[16,c]
   it('should allow to prune', async () => {
     let merkleRoot = rootHash(txHash(7, [b[1], b[4], b[9]], c));
-    let [v, r, s] = signHeader(b[9], 7, merkleRoot, cPriv);
-    await parsec.submitBlock(b[9], merkleRoot, v, r, s, {from: c});
-    b[10] = blockHash(b[9], 7, merkleRoot, v, r, s);
+    [claimV, claimR, claimS] = signHeader(b[9], 7, merkleRoot, cPriv);
+    await parsec.submitBlock(b[9], merkleRoot, claimV, claimR, claimS, {from: c});
+    b[10] = blockHash(b[9], 7, merkleRoot, claimV, claimR, claimS);
     assert.equal(b[10], await parsec.tipHash());
 
-    [v, r, s] = signHeader(b[10], 8, mRoot1, cPriv);
+    let [v, r, s] = signHeader(b[10], 8, mRoot1, cPriv);
     await parsec.submitBlock(b[10], mRoot1, v, r, s);
     b[11] = blockHash(b[10], 8, mRoot1, v, r, s);
     assert.equal(b[11], await parsec.tipHash());
@@ -250,9 +251,7 @@ contract('Parsec', (accounts) => {
 
     // claim rewards
     let bal1 = await token.balanceOf(c);
-    let merkleRoot = rootHash(txHash(7, [b[1], b[4], b[9]], c));
-    [v, r, s] = signHeader(b[9], 7, merkleRoot, cPriv);
-    await parsec.claimReward(b[10], [b[1], b[4], b[9]], [r, s, empty], v); 
+    await parsec.claimReward(b[10], [b[1], b[4], b[9]], [claimR, claimS, empty], claimV); 
     let bal2 = await token.balanceOf(c);
     assert(bal1.toNumber() < bal2.toNumber());
 
@@ -260,7 +259,7 @@ contract('Parsec', (accounts) => {
     assert.equal(b[28], tip[0]);
     assert.equal(4, tip[1]);
 
-    // leave operator set
+    // leave operator set, get stake back
     bal1 = await token.balanceOf(d);
     await parsec.payout(d);
     bal2 = await token.balanceOf(d);

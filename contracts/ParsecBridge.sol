@@ -81,7 +81,7 @@ contract ParsecBridge {
     Block memory genBlock;
     genBlock.operator = msg.sender;
     genBlock.parent = genesis; 
-    tipHash = keccak256(genesis, uint64(0), bytes32(0));
+    tipHash = genesis;
     chain[tipHash] = genBlock;
     parentBlockInterval = _parentBlockInterval;
     epochLength = _epochLength;
