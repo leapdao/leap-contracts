@@ -90,14 +90,6 @@ contract ParsecBridge {
     stakePeriod = _stakePeriod;
   }
   
-  /*
-   *  Modifiers
-   */
-  modifier isOperator() {
-    require(operators[msg.sender].stakeAmount > 0);
-    _;
-  }
-  
   modifier mint() {
     // todo: mine some tokens, if needed
     _;
@@ -161,7 +153,7 @@ contract ParsecBridge {
    *    ae(e-7)      pe   cw(24-31)
    *  0 - 7 8 - 15 16 - 23 24 - 31  
    */  
-  function claimReward(bytes32 _hash, bytes32[] _coinbase, bytes32[] _proof) public {
+  function claimReward(bytes32 _hash, bytes32[] _coinbase, bytes32[] _proof, uint8 v) public {
     // receive up to 5 hashes of blocks
     // first one to hold references to all previous ones
     Block memory node = chain[_hash];
@@ -188,10 +180,10 @@ contract ParsecBridge {
     // reconstruct tx and check tx proof
     bytes32 hash = createTx(node.height, _coinbase, msg.sender);
     // check proof
-    for (i = 0; i < _proof.length; i++) {
+    for (i = 2; i < _proof.length; i++) {
       hash = keccak256(hash, _proof[i]);
     }
-    require(_hash == keccak256(node.parent, node.height, hash));
+    require(_hash == keccak256(node.parent, node.height, hash, v, _proof[0], _proof[1]));
 
     // reward calculated and payed
     token.transfer(msg.sender, (_coinbase.length + 1).mul(blockReward));
@@ -228,8 +220,8 @@ contract ParsecBridge {
     OperatorLeave(signerAddr, chain[tipHash].height);
   }
 
-  function submitBlockAndPrune(bytes32 prevHash, bytes32 root, bytes32[] orphans) public {
-    submitBlock(prevHash, root);
+  function submitBlockAndPrune(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s, bytes32[] orphans) public {
+    submitBlock(prevHash, root, v, r, s);
     // delete all blocks that have non-existing parent
     for (uint256 i = 0; i < orphans.length; i++) {
       Block memory orphan = chain[orphans[i]];
@@ -255,18 +247,26 @@ contract ParsecBridge {
 
   /*
    * submit a new block on top or next to the tip
+   *
+   * block hash process:
+   * 1. block generated: prevHash, height, root
+   * 2. sigHash: keccak256(prevHash, height, root) + priv => v, r, s
+   * 3. block hash: keccak256(prevHash, height, root, v, r, s)
    */
-  // todo: add another parameter that allows to clear storage
-  // from orphaned blocks which have not been captured by prune()
-  function submitBlock(bytes32 prevHash, bytes32 root) isOperator public {
+  function submitBlock(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s) public {
     // check parent node exists
     require(chain[prevHash].parent > 0);
-    // make sure we can only build on tip or next to it
+    // calculate height
     uint64 newHeight = chain[prevHash].height + 1;
+    // TODO recover operator address and check membership
+    bytes32 sigHash = keccak256(prevHash, newHeight, root);
+    address operatorAddr = ecrecover(sigHash, v, r, s);
+    require(operators[operatorAddr].stakeAmount > 0);
+    // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
     // make hash of new block
-    bytes32 newHash = keccak256(prevHash, newHeight, root);
+    bytes32 newHash = keccak256(prevHash, newHeight, root, v, r, s);
     // check this block has not been submitted yet
     require(chain[newHash].parent == 0);
     // do some magic if chain extended
@@ -291,7 +291,7 @@ contract ParsecBridge {
     Block memory newBlock;
     newBlock.parent = prevHash;
     newBlock.height = newHeight;
-    newBlock.operator = msg.sender;
+    newBlock.operator = operatorAddr;
     newBlock.parentIndex = uint32(chain[prevHash].children.push(newHash) - 1);
     chain[newHash] = newBlock;
   }
