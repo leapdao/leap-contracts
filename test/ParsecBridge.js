@@ -150,6 +150,34 @@ contract('Parsec', (accounts) => {
     assert.equal(5, tip[1]);
   });
 
+  //
+  // b[0,c] -> b[1,c] -> b[2,d]  -> b[5,d]  -> b[6,c]  -> b[16,c]  <- 5 rewards = heavy
+  //                 \-> b[29,d] -> b[30,d] -> b[31,d] -> b[32,d] -> b[33,d]  <- 3 rewards = light
+  it('should allow to clip off light branch', async () => {
+    let [v, r, s] = signHeader(b[1], 2, dPriv, dPriv);
+    await parsec.submitBlock(b[1], dPriv, v, r, s);
+    b[29] = blockHash(b[1], 2, dPriv, v, r, s);
+
+    for(let i = 29; i < 34; i++) {
+      [v, r, s] = signHeader(b[i], i-26, empty, dPriv);
+      await parsec.submitBlock(b[i], empty, v, r, s);
+      b[i+1] = blockHash(b[i], i-26, empty, v, r, s);      
+    }
+
+    let data = [
+      b[0], // parent of fork node
+      "0x060700000000010205060000f3beac30c498d9e26865f34fcaa57dbb935b0d74", // c
+      "0x010000000000030000000000e10f3d125e5f4c753a6456fc37123cf17c6900f2", // d
+      b[16], // heavy tip
+      b[33], // light tip
+    ];
+    const bal1 = await token.balanceOf(e);
+    await parsec.reportLightBranch(data, {from: e});
+    const bal2 = await token.balanceOf(e);
+    assert(bal1.toNumber() < bal2.toNumber());
+    assert.equal(b[16], await parsec.tipHash());
+  });
+
   //                           /-> b[3,e]  <- 4 rewards
   // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> b[9,c]   <- 7 rewards
   //                           \-> b[5,d] -> b[6,c] -> b[16,c]   <- 5 rewards
@@ -201,12 +229,12 @@ contract('Parsec', (accounts) => {
     assert.equal(b[11], await parsec.tipHash());
 
     [v, r, s] = signHeader(b[11], 9, empty, cPriv);
-    await parsec.submitBlock(b[11], empty, v, r, s);
+    const receipt1 = await parsec.submitBlock(b[11], empty, v, r, s);
     b[12] = blockHash(b[11], 9, empty, v, r, s);
     assert.equal(b[12], await parsec.tipHash());
 
     [v, r, s] = signHeader(b[12], 10, empty, cPriv);
-    const receipt1 = await parsec.submitBlock(b[12], empty, v, r, s);
+    await parsec.submitBlock(b[12], empty, v, r, s);
     b[13] = blockHash(b[12], 10, empty, v, r, s);
     assert.equal(b[13], await parsec.tipHash());
 
@@ -226,19 +254,6 @@ contract('Parsec', (accounts) => {
     b[15] = blockHash(b[14], 12, empty, v, r, s);
     assert.equal(b[15], await parsec.tipHash());
   });
-
-  /*
-   * b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[28]
-   *
-   * the consensus horizon trims the graph uncoditionnally according to the first path that grows long enough.
-   * The first path is not necessarily the one with the most fees payed, but can be forced by an operator
-   * that is ready to pay high main-net fees to get his blocks in, even though he might not receive a reward.
-   * We introduce clipping to be able to submit a proof that some branch is long, but not heavy.
-   * 
-   *
-   */
-  // it('should allow to mine beyond archive horizon and delete genesis', async () => {
-  // });
 
   //
   // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[28]

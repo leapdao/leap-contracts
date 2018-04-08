@@ -300,6 +300,8 @@ contract ParsecBridge {
       prune(prevHash);
     }
     tipHash = _data[_data.length-2];
+    // reward 1 block reward
+    token.transfer(msg.sender, blockReward);
   }
 
   function buildMap(bytes32[] _data, uint256 _offset) public constant returns (uint256[] map) {
