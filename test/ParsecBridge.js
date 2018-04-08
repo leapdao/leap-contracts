@@ -227,6 +227,19 @@ contract('Parsec', (accounts) => {
     assert.equal(b[15], await parsec.tipHash());
   });
 
+  /*
+   * b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[28]
+   *
+   * the consensus horizon trims the graph uncoditionnally according to the first path that grows long enough.
+   * The first path is not necessarily the one with the most fees payed, but can be forced by an operator
+   * that is ready to pay high main-net fees to get his blocks in, even though he might not receive a reward.
+   * We introduce clipping to be able to submit a proof that some branch is long, but not heavy.
+   * 
+   *
+   */
+  // it('should allow to mine beyond archive horizon and delete genesis', async () => {
+  // });
+
   //
   // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[28]
   //

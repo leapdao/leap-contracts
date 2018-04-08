@@ -259,6 +259,109 @@ contract ParsecBridge {
     token.transfer(msg.sender, blockReward);
   }
 
+  /* Clipping implementation
+   *
+   * the consensus horizon trims the graph according to the first path that grows longer than epochLength.
+   * The longest branch is not necessarily the one with the most rewards payed, but could be forced by
+   * a malicious operator that is ready to pay main-net fees to get his blocks in, without receiving any
+   * additional reward just to grieve the other operators.
+   * We introduce clipping to be able to submit a proof that some branch is long, but not heavy. The branch
+   * will then be "clipped off", by deleting the first node after the fork on the light branch.
+   *
+   * Example:
+   *   epochLength = 6 
+   *   stake: a = 2, b = 2, c = 2
+   *
+   *                   /-> b[2,b] -> b[3,b] -> b[4,b] -> b[5,b]   <- rewards = 3, light branch
+   *   b[0,a] -> b[1,b] -> b[2,c] -> b[3,a] -> b[4,b]             <- rewards = 5, heavy branch
+   *
+   * clipping conditions: 
+   * - a branch covers >= 2/3 of epochLength
+   * - filling up the light branch with reward blocks will not outweight heavy branch
+   *
+   * data:
+   * data[0]        = forkNodeHash
+   * data[1]        = 1b claims light, 5b mappings light, 1b claims heavy, 5b mappings heavy, 20b operator
+   * ...
+   * data[length-3] = 1b claims light, 5b mappings light, 1b claims heavy, 5b mappings heavy, 20b operator
+   * data[length-2] = heavyBranchTipHash
+   * data[length-1] = lightBranchTipHash
+   * data size: (epochLength + 3) * 32b
+   *
+   * max complexity: assuming that all operators have min stake, and max amount of operators participate,
+   * there could exist 2 branches with epochLength-1 fork distance, giving:
+   *   O(4 * epochLength)
+   */
+  function reportLightBranch(bytes32[] _data) public {
+    bool isLight;
+    bytes32 prevHash;
+    (isLight, prevHash) = isLightBranch(_data);
+    if (isLight) {
+      prune(prevHash);
+    }
+    tipHash = _data[_data.length-2];
+  }
+
+  function buildMap(bytes32[] _data, uint256 _offset) public constant returns (uint256[] map) {
+    map = new uint256[](epochLength + 1);
+    for (uint i = 1; i < _data.length - 2; i++) {
+      uint256 stake = (operators[address(_data[i])].stakeAmount * epochLength) / token.totalSupply();
+      uint256 claimCount = 0;
+      for (uint j = (_offset + 40); j > _offset; j = j - 8) {
+        uint8 pos = uint8(_data[i] >> j);
+        if (pos > 0) {
+            claimCount++;
+            map[pos] = i;
+        }
+      }
+      require(claimCount <= stake);
+    }
+  }
+  
+  function getWeight(bytes32[] _data, bytes32 nodeHash, uint256[] _map) public constant returns (uint256 weight, uint256 i, bytes32 prevHash) {
+    // check heavy path to common fork
+    i = 0;
+    bytes32 previous;
+    weight = 0;
+    while(nodeHash != _data[0]) {
+      i++;
+      // if we have a claim
+      if (_map[i] > 0) {
+        // check correctnes of mapping
+        require(chain[nodeHash].operator == address(_data[_map[i]]));
+        weight++;
+      }
+      prevHash = previous;
+      previous = nodeHash;
+      nodeHash = chain[nodeHash].parent;
+    }      
+  }
+ 
+  function isLightBranch(bytes32[] _data) constant public returns (bool isLight, bytes32 prevHash) {
+    require(_data.length < epochLength + 3);
+    
+    // build heavy-branch mapping
+    uint256[] memory map = buildMap(_data, 160);
+
+    // check heavy path to common fork
+    uint256 heavyWeight;
+    uint256 length;
+    (heavyWeight, length, prevHash) = getWeight(_data, _data[_data.length-2], map);
+
+    // build light mapping
+    map = buildMap(_data, 208);
+
+    // check light path to common fork
+    uint256 lightWeight;
+    (lightWeight, length, ) = getWeight(_data, _data[_data.length-1], map);
+
+    // only forks longer than 2/3 of epochLength matter
+    require(length >= (epochLength * 2) / 3);
+
+    // compare branch weights
+    isLight = (lightWeight + (epochLength - length) <= heavyWeight);
+  }
+
   /*
    * submit a new block
    *
