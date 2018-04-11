@@ -64,7 +64,6 @@ contract ParsecBridge {
   uint32 public epochLength; // length of 1 epoche in child blocks
   uint64 public blockReward; // reward per single block
   uint32 public stakePeriod;
-  uint32 public depositId;
   bytes32 public tipHash;    // hash of first block that has extended chain to some hight
 
   struct Operator {
@@ -299,6 +298,8 @@ contract ParsecBridge {
    * max complexity: assuming that all operators have min stake, and max amount of operators participate,
    * there could exist 2 branches with epochLength-1 fork distance, giving:
    *   O(4 * epochLength)
+   *
+   * Q: could we restrict the amount of blocks that one operator can submit in the consensus windown
    */
   function reportLightBranch(bytes32[] _data) public {
     bool isLight;
@@ -451,6 +452,9 @@ contract ParsecBridge {
       parent.children[i] = parent.children[parent.children.length - 1];
     }
     parent.children.length--;
+    if (hash == tipHash) {
+      tipHash = chain[hash].parent;
+    }
     delete chain[hash];
   }
 
@@ -555,12 +559,13 @@ contract ParsecBridge {
   function deposit(uint256 amount) public {
     require(token.allowance(msg.sender, this) >= amount);
     token.transferFrom(msg.sender, this, amount);
+    depositCount++;
     deposits[depositCount] = Deposit({
       height: chain[tipHash].height,
       owner: msg.sender,
       amount: amount
     });
-    NewDeposit(depositCount++, msg.sender);
+    NewDeposit(depositCount, msg.sender);
   }
 
 
@@ -596,29 +601,24 @@ contract ParsecBridge {
     require(b.height > chain[tipHash].height - epochLength);
     // check transaction proof
     bytes32 txHash = keccak256(uint8(_txData[3]), _txData[4]);
-    uint64 txPos = uint64(_txData[3] >> 20);
-    uint32 offset = uint32(_txData[3] >> 28);
-    bytes32 root = getMerkleRoot(txHash, txPos, offset, _txData);
-    uint8 v = uint8(_txData[3] >> 19);
-    bytes32 blockHash = keccak256(b.parent, b.height, root, v, _txData[1], _txData[2]);
+    bytes32 root = getMerkleRoot(txHash, uint64(_txData[3] >> 160), uint32(_txData[3] >> 224), _txData);
+    bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_txData[3] >> 144), _txData[1], _txData[2]);
     require(blockHash == _txData[0]);
 
-    uint32 depositId = uint32(_txData[4] >> 28);
-    Deposit memory deposit = deposits[depositId];
-    // check height of block ???
+    uint32 depositId = uint32(_txData[4] >> 224);
+    Deposit memory dep = deposits[depositId];
 
-    uint64 value = uint64(_txData[4] >> 20);
-    if (value != deposit.amount
-      || address(_txData[4]) != deposit.owner
-      || b.height > deposit.height + 2) {
+    uint64 value = uint64(_txData[4] >> 160);
+    if (value != dep.amount
+      || address(_txData[4]) != dep.owner
+      || b.height > dep.height + 2) {
       // delete invalid block
       deleteBlock(_txData[0]);
       // EVENT
+      // slash operator
+      slashOperator(b.operator, 10 * blockReward);
+      // reward 1 block reward
+      token.transfer(msg.sender, blockReward);
     }
-    // slash operator
-    slashOperator(b.operator, 10 * blockReward);
-    // reward 1 block reward
-    token.transfer(msg.sender, blockReward);
   }
-
 }

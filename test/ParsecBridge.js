@@ -3,6 +3,8 @@ import assertRevert from './helpers/assertRevert';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
+const MAX_UINT32 = 0xFFFFFFFF;
+
 function blockHash(prevHash, newHeight, root, v, r, s) {
   const payload = Buffer.alloc(137);
   payload.write(prevHash.replace('0x',''), 0, 'hex');
@@ -32,6 +34,48 @@ function rootHash(coinbaseHash) {
   // 32 bytes empty
   //payload.write('0000000000000000000000000000000000000000000000000000000000000000', 32, 'hex');
   return utils.bufferToHex(utils.sha3(payload));
+}
+
+function depositTx(depositId, value, address) {
+  const big = ~~(value / MAX_UINT32);
+  const low = (value % MAX_UINT32) - big;
+  const payload = Buffer.alloc(33);
+  payload.writeUInt8(1, 0);
+  payload.writeUInt32BE(depositId, 1);
+  payload.writeUInt32BE(big, 5);
+  payload.writeUInt32BE(low, 9);
+  payload.write(address.replace('0x',''), 13, 'hex');
+  return payload;
+}
+
+//  _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
+function proofData(blockHash, v, r, s, pos, txData, proof) {
+  const big = ~~(pos / MAX_UINT32);
+  const low = (pos % MAX_UINT32) - big;
+
+  const slices = [];
+  slices.push(blockHash);
+  slices.push(r);
+  slices.push(s);
+
+  const sliceCount = Math.floor(txData.length / 32) + 1;
+
+  const payload = Buffer.alloc(32);
+  payload.writeUInt32BE(sliceCount + 3, 0);
+  payload.writeUInt32BE(big, 4);
+  payload.writeUInt32BE(low, 8);
+  payload.writeUInt8(v, 13);
+  txData.copy(payload, 32 - txData.length % 32, 0, txData.length % 32);
+  
+  slices.push(utils.bufferToHex(payload));
+
+  for (let i = 1; i < sliceCount; i += 1) {
+    slices.push(utils.bufferToHex(txData.slice(txData.length % 32, (txData.length % 32) + (i * 32))));
+  }
+  for (let i = 0; i < proof.length; i += 1) {
+    slices.push(proof[i]);
+  }
+  return slices;
 }
 
 function txHash(height, coinbase, operatorAddr) {
@@ -302,6 +346,34 @@ contract('Parsec', (accounts) => {
     await parsec.payout(d);
     bal2 = await token.balanceOf(d);
     assert(bal1.toNumber() < bal2.toNumber());
+  });
+
+  //
+  // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[34]
+  //
+  it('should allow to deposit', async () => {
+    // deposit
+    let bal = await token.balanceOf(d);
+    const receipt = await parsec.deposit(bal, { from: d }); 
+    const depositId = receipt.logs[0].args.depositId.toNumber();
+
+    // wait until operator included tx
+    const txData = depositTx(depositId, bal.toNumber(), e);
+    const depositHash = utils.bufferToHex(utils.sha3(txData));
+    let merkleRoot = rootHash(depositHash);
+    let [v, r, s] = signHeader(b[28], 25, merkleRoot, ePriv);
+    await parsec.submitBlock(b[28], merkleRoot, v, r, s);
+    b[34] = blockHash(b[28], 25, merkleRoot, v, r, s);
+
+    // complain, if deposit tx wrong
+    const data = proofData(b[34], v, r, s, 0, txData, [empty]);
+    const bal1 = await token.balanceOf(d);
+    const stake1 = await parsec.operators(e);
+    await parsec.reportInvalidDeposit(data, {from: d});
+    const bal2 = await token.balanceOf(d);
+    const stake2 = await parsec.operators(e);
+    assert(bal1.toNumber() < bal2.toNumber());
+    assert(stake1[2].toNumber() > stake2[2].toNumber());
   });
 
   //                                                      /-> b[25,c]
