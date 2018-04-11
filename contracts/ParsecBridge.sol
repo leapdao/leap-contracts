@@ -46,6 +46,7 @@ contract ParsecBridge {
   event ArchiveBlock(uint256 indexed blockNumber, bytes32 root);
   event OperatorJoin(address indexed signerAddr, uint256 blockNumber);
   event OperatorLeave(address indexed signerAddr, uint256 blockNumber);
+  event NewDeposit(uint32 indexed depositId, address depositor);
 
   struct Block {
     bytes32 parent; // the id of the parent node
@@ -63,6 +64,7 @@ contract ParsecBridge {
   uint32 public epochLength; // length of 1 epoche in child blocks
   uint64 public blockReward; // reward per single block
   uint32 public stakePeriod;
+  uint32 public depositId;
   bytes32 public tipHash;    // hash of first block that has extended chain to some hight
 
   struct Operator {
@@ -73,6 +75,14 @@ contract ParsecBridge {
     uint256 stakeAmount; // amount of staken tokens
   }
   mapping(address => Operator) public operators;
+
+  struct Deposit {
+    uint64 height; 
+    address owner;
+    uint256 amount;
+  }
+  mapping(uint32 => Deposit) public deposits;
+  uint32 depositCount = 0;
 
 
   function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
@@ -252,9 +262,7 @@ contract ParsecBridge {
     require(blockA.height > chain[tipHash].height - epochLength);
     require(blockA.operator == chain[hashB].operator);
     // slash 10 block rewards
-    Operator storage operator = operators[blockA.operator];
-    uint256 slashAmount = (operator.stakeAmount < 10 * blockReward) ? operator.stakeAmount : 10 * blockReward;
-    operator.stakeAmount = operator.stakeAmount.sub(slashAmount);
+    slashOperator(blockA.operator, 10 * blockReward);
     // reward 1 block reward
     token.transfer(msg.sender, blockReward);
   }
@@ -434,6 +442,25 @@ contract ParsecBridge {
     }
     parent.children.length = 1;
   }
+
+  function deleteBlock(bytes32 hash) internal {
+    Block storage parent = chain[chain[hash].parent];
+    uint256 i = chain[hash].parentIndex;
+    if (i < parent.children.length - 1) {
+      // swap with last child
+      parent.children[i] = parent.children[parent.children.length - 1];
+    }
+    parent.children.length--;
+    delete chain[hash];
+  }
+
+  function slashOperator(address _opAddr, uint256 _slashAmount) internal {
+    Operator storage op = operators[_opAddr];
+    if (op.stakeAmount < _slashAmount) {
+      _slashAmount = op.stakeAmount;
+    }
+    op.stakeAmount -= _slashAmount;
+  }
   
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
     return(chain[nodeId].children.length);
@@ -520,6 +547,78 @@ contract ParsecBridge {
   function getBlock(uint256 height) public view returns (bytes32 root, address operator) {
     require(height <= chain[tipHash].height);
     return (bytes32(height),0);
+  }
+
+  /*
+   * Add funds
+   */
+  function deposit(uint256 amount) public {
+    require(token.allowance(msg.sender, this) >= amount);
+    token.transferFrom(msg.sender, this, amount);
+    deposits[depositCount] = Deposit({
+      height: chain[tipHash].height,
+      owner: msg.sender,
+      amount: amount
+    });
+    NewDeposit(depositCount++, msg.sender);
+  }
+
+
+ /*          /-> []
+  *    /-> [] -> []/-> []  3   -> l, l, r
+  *  [] -> [] -> [] -> []  2
+  *          \-> []
+  */
+  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+    for (uint256 i = _offset; i < _proof.length; i++) {
+      // solhint-disable-next-line no-inline-assembly
+      if (_index % 2 == 0) {
+        _leaf = keccak256(_leaf, _proof[i]);
+      } else {
+        _leaf = keccak256(_proof[i], _leaf);
+      }
+      _index = _index / 2;
+    }
+    return _leaf;
+  }
+
+  /*
+   * _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
+   *
+   * # 2 Deposit TX (33b)
+   *   1b type
+   *     4b depositId 
+   *     8b value, 20b address
+   *
+   */
+  function reportInvalidDeposit(bytes32[] _txData) public {
+    Block memory b = chain[_txData[0]];
+    require(b.height > chain[tipHash].height - epochLength);
+    // check transaction proof
+    bytes32 txHash = keccak256(uint8(_txData[3]), _txData[4]);
+    uint64 txPos = uint64(_txData[3] >> 20);
+    uint32 offset = uint32(_txData[3] >> 28);
+    bytes32 root = getMerkleRoot(txHash, txPos, offset, _txData);
+    uint8 v = uint8(_txData[3] >> 19);
+    bytes32 blockHash = keccak256(b.parent, b.height, root, v, _txData[1], _txData[2]);
+    require(blockHash == _txData[0]);
+
+    uint32 depositId = uint32(_txData[4] >> 28);
+    Deposit memory deposit = deposits[depositId];
+    // check height of block ???
+
+    uint64 value = uint64(_txData[4] >> 20);
+    if (value != deposit.amount
+      || address(_txData[4]) != deposit.owner
+      || b.height > deposit.height + 2) {
+      // delete invalid block
+      deleteBlock(_txData[0]);
+      // EVENT
+    }
+    // slash operator
+    slashOperator(b.operator, 10 * blockReward);
+    // reward 1 block reward
+    token.transfer(msg.sender, blockReward);
   }
 
 }
