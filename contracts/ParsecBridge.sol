@@ -132,75 +132,6 @@ contract ParsecBridge {
   }
 
   /*
-   * operator submits coinbase with prove of inclusion in longest chain
-   * tx structure
-   * type 4b
-   * b# 8b
-   * #txin 1b
-   * in0 1 - 129
-   * #txout 1b
-   * txOut 20
-   * 
-   * type4 in
-   * #prevClaims 1b
-   * claimx 32b  <- hash of block in same claim epoch
-   * claimy 32b
-   * 
-   * type4 out
-   * value 32b
-   * address 20b
-   *
-   *          pe     cw
-   *  0 - 7 8 - 15 16 - 23
-   *
-   *  ae(0-1) pe      cw(17-25)
-   *  0 - 7 8 - 15 16 - 23 24 - 25  
-   *
-   *  ae(0-6) pe      cw(23-30)
-   *  0 - 7 8 - 15 16 - 23 24 - 30  
-   *
-   *    ae(e-7)      pe   cw(24-31)
-   *  0 - 7 8 - 15 16 - 23 24 - 31  
-   */  
-  function claimReward(bytes32 _hash, bytes32[] _coinbase, bytes32[] _proof, uint8 v) public {
-    // receive up to 5 hashes of blocks
-    // first one to hold references to all previous ones
-    Block memory node = chain[_hash];
-    // claim epoche must have passed challenge period
-    uint256 payoutEpoch = uint256(node.height).div(epochLength).mul(epochLength);
-    require(payoutEpoch >= chain[tipHash].height - (3 * epochLength));
-    require(payoutEpoch < uint256(chain[tipHash].height - epochLength).div(epochLength).mul(epochLength));
-    // check operator
-    if (operators[msg.sender].claimedUntil > 0) {
-      require(operators[msg.sender].claimedUntil < payoutEpoch);
-    }
-    uint256 claimCount = (operators[msg.sender].stakeAmount * epochLength) / token.totalSupply();
-    require(_coinbase.length < claimCount);
-    // all 5 must have been mined by operator in same claim epoche
-    require(node.height >= payoutEpoch);
-    require(node.height < payoutEpoch + epochLength);
-    require(node.operator == msg.sender);
-    for (uint256 i = 0; i < _coinbase.length; i++) {
-      Block memory coinbase = chain[_coinbase[i]];
-      require(coinbase.height >= payoutEpoch);
-      require(coinbase.height < payoutEpoch + epochLength);
-      require(coinbase.operator == msg.sender);
-    }
-    // reconstruct tx and check tx proof
-    bytes32 hash = createTx(node.height, _coinbase, msg.sender);
-    // check proof
-    for (i = 2; i < _proof.length; i++) {
-      hash = keccak256(hash, _proof[i]);
-    }
-    require(_hash == keccak256(node.parent, node.height, hash, v, _proof[0], _proof[1]));
-
-    // reward calculated and payed
-    token.transfer(msg.sender, (_coinbase.length + 1).mul(blockReward));
-    // epoch marked as claimed
-    operators[msg.sender].claimedUntil = uint64(payoutEpoch + epochLength);
-  }
-
-  /*
    * operator requests to leave
    */
   function requestLeave() public {
@@ -253,6 +184,100 @@ contract ParsecBridge {
       }
     }
   }
+
+  /*
+   * submit a new block
+   *
+   * block hash process:
+   * 1. block generated: prevHash, height, root
+   * 2. sigHash: keccak256(prevHash, height, root) + priv => v, r, s
+   * 3. block hash: keccak256(prevHash, height, root, v, r, s)
+   */
+  function submitBlock(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s) public {
+    // check parent node exists
+    require(chain[prevHash].parent > 0);
+    // calculate height
+    uint64 newHeight = chain[prevHash].height + 1;
+    // TODO recover operator address and check membership
+    bytes32 sigHash = keccak256(prevHash, newHeight, root);
+    address operatorAddr = ecrecover(sigHash, v, r, s);
+    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
+    // make sure block is placed in consensus window
+    uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
+    require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
+    // make hash of new block
+    bytes32 newHash = keccak256(prevHash, newHeight, root, v, r, s);
+    // check this block has not been submitted yet
+    require(chain[newHash].parent == 0);
+    // do some magic if chain extended
+    if (newHeight > chain[tipHash].height) {
+      // new blocks can only be submitted every x Ethereum blocks
+      require(block.number >= lastParentBlock + parentBlockInterval);
+      tipHash = newHash;
+      if (newHeight > epochLength) {
+        // prune some blocks
+        // iterate backwards for 1 epoche
+        bytes32 nextParent = chain[prevHash].parent;
+        while(chain[nextParent].height > newHeight - epochLength) {
+          nextParent = chain[nextParent].parent;        
+        }
+        // prune chain 
+        prune(nextParent);
+      }
+      lastParentBlock = uint64(block.number);
+      NewHeight(newHeight, root);
+    }
+    // store the block 
+    Block memory newBlock;
+    newBlock.parent = prevHash;
+    newBlock.height = newHeight;
+    newBlock.operator = operatorAddr;
+    newBlock.parentIndex = uint32(chain[prevHash].children.push(newHash) - 1);
+    chain[newHash] = newBlock;
+  }
+
+  /*
+   * sets a block as the only branch in parent block
+   * and deletes all other branches
+   */
+  function prune(bytes32 hash) internal {
+    Block storage parent = chain[chain[hash].parent];
+    uint256 i = chain[hash].parentIndex;
+    if (i > 0) {
+      // swap with child 0
+      parent.children[i] = parent.children[0];
+      parent.children[0] = hash;
+      chain[hash].parentIndex = 0;
+    }
+    // delete other blocks
+    for (i = parent.children.length - 1; i > 0; i--) {
+      delete chain[parent.children[i]];
+    }
+    parent.children.length = 1;
+  }
+
+  function deleteBlock(bytes32 hash) internal {
+    Block storage parent = chain[chain[hash].parent];
+    uint256 i = chain[hash].parentIndex;
+    if (i < parent.children.length - 1) {
+      // swap with last child
+      parent.children[i] = parent.children[parent.children.length - 1];
+    }
+    parent.children.length--;
+    if (hash == tipHash) {
+      tipHash = chain[hash].parent;
+    }
+    delete chain[hash];
+  }
+
+  function slashOperator(address _opAddr, uint256 _slashAmount) internal {
+    Operator storage op = operators[_opAddr];
+    if (op.stakeAmount < _slashAmount) {
+      _slashAmount = op.stakeAmount;
+    }
+    op.stakeAmount -= _slashAmount;
+  }
+
 
   function reportHeightConflict(bytes32 hashA, bytes32 hashB) public {
     require(hashA != hashB);
@@ -373,98 +398,61 @@ contract ParsecBridge {
     isLight = (lightWeight + (epochLength - length) <= heavyWeight);
   }
 
-  /*
-   * submit a new block
-   *
-   * block hash process:
-   * 1. block generated: prevHash, height, root
-   * 2. sigHash: keccak256(prevHash, height, root) + priv => v, r, s
-   * 3. block hash: keccak256(prevHash, height, root, v, r, s)
-   */
-  function submitBlock(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s) public {
-    // check parent node exists
-    require(chain[prevHash].parent > 0);
-    // calculate height
-    uint64 newHeight = chain[prevHash].height + 1;
-    // TODO recover operator address and check membership
-    bytes32 sigHash = keccak256(prevHash, newHeight, root);
-    address operatorAddr = ecrecover(sigHash, v, r, s);
-    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
-    // make sure block is placed in consensus window
-    uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
-    require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
-    // make hash of new block
-    bytes32 newHash = keccak256(prevHash, newHeight, root, v, r, s);
-    // check this block has not been submitted yet
-    require(chain[newHash].parent == 0);
-    // do some magic if chain extended
-    if (newHeight > chain[tipHash].height) {
-      // new blocks can only be submitted every x Ethereum blocks
-      require(block.number >= lastParentBlock + parentBlockInterval);
-      tipHash = newHash;
-      if (newHeight > epochLength) {
-        // prune some blocks
-        // iterate backwards for 1 epoche
-        bytes32 nextParent = chain[prevHash].parent;
-        while(chain[nextParent].height > newHeight - epochLength) {
-          nextParent = chain[nextParent].parent;        
-        }
-        // prune chain 
-        prune(nextParent);
+ /*          /-> []
+  *    /-> [] -> []/-> []  3   -> l, l, r
+  *  [] -> [] -> [] -> []  2
+  *          \-> []
+  */
+  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+    for (uint256 i = _offset; i < _proof.length; i++) {
+      // solhint-disable-next-line no-inline-assembly
+      if (_index % 2 == 0) {
+        _leaf = keccak256(_leaf, _proof[i]);
+      } else {
+        _leaf = keccak256(_proof[i], _leaf);
       }
-      lastParentBlock = uint64(block.number);
-      NewHeight(newHeight, root);
+      _index = _index / 2;
     }
-    // store the block 
-    Block memory newBlock;
-    newBlock.parent = prevHash;
-    newBlock.height = newHeight;
-    newBlock.operator = operatorAddr;
-    newBlock.parentIndex = uint32(chain[prevHash].children.push(newHash) - 1);
-    chain[newHash] = newBlock;
+    return _leaf;
   }
 
   /*
-   * sets a block as the only branch in parent block
-   * and deletes all other branches
+   * _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
+   *
+   * # 2 Deposit TX (33b)
+   *   1b type
+   *     4b depositId 
+   *     8b value, 20b address
+   *
    */
-  function prune(bytes32 hash) internal {
-    Block storage parent = chain[chain[hash].parent];
-    uint256 i = chain[hash].parentIndex;
-    if (i > 0) {
-      // swap with child 0
-      parent.children[i] = parent.children[0];
-      parent.children[0] = hash;
-      chain[hash].parentIndex = 0;
+  function reportInvalidDeposit(bytes32[] _txData) public {
+    Block memory b = chain[_txData[0]];
+    require(b.height > chain[tipHash].height - epochLength);
+    // check transaction proof
+    bytes32 txHash = keccak256(uint8(_txData[3]), _txData[4]);
+    bytes32 root = getMerkleRoot(txHash, uint64(_txData[3] >> 160), uint32(_txData[3] >> 224), _txData);
+    bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_txData[3] >> 144), _txData[1], _txData[2]);
+    require(blockHash == _txData[0]);
+
+    uint32 depositId = uint32(_txData[4] >> 224);
+    Deposit memory dep = deposits[depositId];
+
+    uint64 value = uint64(_txData[4] >> 160);
+    if (value != dep.amount
+      || address(_txData[4]) != dep.owner
+      || b.height > dep.height + 2) {
+      // delete invalid block
+      deleteBlock(_txData[0]);
+      // EVENT
+      // slash operator
+      slashOperator(b.operator, 10 * blockReward);
+      // reward 1 block reward
+      token.transfer(msg.sender, blockReward);
     }
-    // delete other blocks
-    for (i = parent.children.length - 1; i > 0; i--) {
-      delete chain[parent.children[i]];
-    }
-    parent.children.length = 1;
   }
 
-  function deleteBlock(bytes32 hash) internal {
-    Block storage parent = chain[chain[hash].parent];
-    uint256 i = chain[hash].parentIndex;
-    if (i < parent.children.length - 1) {
-      // swap with last child
-      parent.children[i] = parent.children[parent.children.length - 1];
-    }
-    parent.children.length--;
-    if (hash == tipHash) {
-      tipHash = chain[hash].parent;
-    }
-    delete chain[hash];
-  }
 
-  function slashOperator(address _opAddr, uint256 _slashAmount) internal {
-    Operator storage op = operators[_opAddr];
-    if (op.stakeAmount < _slashAmount) {
-      _slashAmount = op.stakeAmount;
-    }
-    op.stakeAmount -= _slashAmount;
-  }
+
   
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
     return(chain[nodeId].children.length);
@@ -545,13 +533,12 @@ contract ParsecBridge {
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
   
-  /*
-   * todo
-   */  
   function getBlock(uint256 height) public view returns (bytes32 root, address operator) {
     require(height <= chain[tipHash].height);
     return (bytes32(height),0);
   }
+
+
 
   /*
    * Add funds
@@ -568,57 +555,4 @@ contract ParsecBridge {
     NewDeposit(depositCount, msg.sender);
   }
 
-
- /*          /-> []
-  *    /-> [] -> []/-> []  3   -> l, l, r
-  *  [] -> [] -> [] -> []  2
-  *          \-> []
-  */
-  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
-    for (uint256 i = _offset; i < _proof.length; i++) {
-      // solhint-disable-next-line no-inline-assembly
-      if (_index % 2 == 0) {
-        _leaf = keccak256(_leaf, _proof[i]);
-      } else {
-        _leaf = keccak256(_proof[i], _leaf);
-      }
-      _index = _index / 2;
-    }
-    return _leaf;
-  }
-
-  /*
-   * _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
-   *
-   * # 2 Deposit TX (33b)
-   *   1b type
-   *     4b depositId 
-   *     8b value, 20b address
-   *
-   */
-  function reportInvalidDeposit(bytes32[] _txData) public {
-    Block memory b = chain[_txData[0]];
-    require(b.height > chain[tipHash].height - epochLength);
-    // check transaction proof
-    bytes32 txHash = keccak256(uint8(_txData[3]), _txData[4]);
-    bytes32 root = getMerkleRoot(txHash, uint64(_txData[3] >> 160), uint32(_txData[3] >> 224), _txData);
-    bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_txData[3] >> 144), _txData[1], _txData[2]);
-    require(blockHash == _txData[0]);
-
-    uint32 depositId = uint32(_txData[4] >> 224);
-    Deposit memory dep = deposits[depositId];
-
-    uint64 value = uint64(_txData[4] >> 160);
-    if (value != dep.amount
-      || address(_txData[4]) != dep.owner
-      || b.height > dep.height + 2) {
-      // delete invalid block
-      deleteBlock(_txData[0]);
-      // EVENT
-      // slash operator
-      slashOperator(b.operator, 10 * blockReward);
-      // reward 1 block reward
-      token.transfer(msg.sender, blockReward);
-    }
-  }
 }

@@ -1,5 +1,7 @@
 import utils from 'ethereumjs-util';
 import assertRevert from './helpers/assertRevert';
+import { Transaction } from 'Parsec-lib';
+console.log(Transaction);
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
@@ -34,18 +36,6 @@ function rootHash(coinbaseHash) {
   // 32 bytes empty
   //payload.write('0000000000000000000000000000000000000000000000000000000000000000', 32, 'hex');
   return utils.bufferToHex(utils.sha3(payload));
-}
-
-function depositTx(depositId, value, address) {
-  const big = ~~(value / MAX_UINT32);
-  const low = (value % MAX_UINT32) - big;
-  const payload = Buffer.alloc(33);
-  payload.writeUInt8(1, 0);
-  payload.writeUInt32BE(depositId, 1);
-  payload.writeUInt32BE(big, 5);
-  payload.writeUInt32BE(low, 9);
-  payload.write(address.replace('0x',''), 13, 'hex');
-  return payload;
 }
 
 //  _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
@@ -331,20 +321,14 @@ contract('Parsec', (accounts) => {
     assert(receipt2.logs[1].event == 'ArchiveBlock');
     b[28] = blockHash(b[27], 24, empty, v, r, s);
 
-    // claim rewards
-    let bal1 = await token.balanceOf(c);
-    await parsec.claimReward(b[10], [b[1], b[4], b[9]], [claimR, claimS, empty], claimV); 
-    let bal2 = await token.balanceOf(c);
-    assert(bal1.toNumber() < bal2.toNumber());
-
     let tip = await parsec.getTip(ops);
     assert.equal(b[28], tip[0]);
     assert.equal(4, tip[1]);
 
     // leave operator set, get stake back
-    bal1 = await token.balanceOf(d);
+    const bal1 = await token.balanceOf(d);
     await parsec.payout(d);
-    bal2 = await token.balanceOf(d);
+    const bal2 = await token.balanceOf(d);
     assert(bal1.toNumber() < bal2.toNumber());
   });
 
@@ -358,15 +342,14 @@ contract('Parsec', (accounts) => {
     const depositId = receipt.logs[0].args.depositId.toNumber();
 
     // wait until operator included tx
-    const txData = depositTx(depositId, bal.toNumber(), e);
-    const depositHash = utils.bufferToHex(utils.sha3(txData));
-    let merkleRoot = rootHash(depositHash);
+    const deposit = new Transaction().deposit(depositId, bal.toNumber(), e);
+    let merkleRoot = rootHash(deposit.hash());
     let [v, r, s] = signHeader(b[28], 25, merkleRoot, ePriv);
     await parsec.submitBlock(b[28], merkleRoot, v, r, s);
     b[34] = blockHash(b[28], 25, merkleRoot, v, r, s);
 
     // complain, if deposit tx wrong
-    const data = proofData(b[34], v, r, s, 0, txData, [empty]);
+    const data = proofData(b[34], v, r, s, 0, deposit.buf(), [empty]);
     const bal1 = await token.balanceOf(d);
     const stake1 = await parsec.operators(e);
     await parsec.reportInvalidDeposit(data, {from: d});
@@ -395,70 +378,70 @@ contract('Parsec', (accounts) => {
     assert(stake1[2].toNumber() > stake2[2].toNumber());
   });
 
-  describe('gasTests ... this will take a while ...', () => {
-    it('should allow to have epoch length of 64', async () => {
-      const token64 = await SimpleToken.new();
-      const parsec64 = await ParsecBridge.new(token64.address, 0, 64, 5000000, 0);
-      await token64.approve(parsec64.address, totalSupply);
-      await parsec64.join(totalSupply.div(64).mul(4));
+  // describe('gasTests ... this will take a while ...', () => {
+  //   it('should allow to have epoch length of 64', async () => {
+  //     const token64 = await SimpleToken.new();
+  //     const parsec64 = await ParsecBridge.new(token64.address, 0, 64, 5000000, 0);
+  //     await token64.approve(parsec64.address, totalSupply);
+  //     await parsec64.join(totalSupply.div(64).mul(4));
 
-      const b64 = [];
-      b64[0] = await parsec64.tipHash();
-      let [v, r, s] = signHeader(b64[0], 1, empty, cPriv);
-      await parsec64.submitBlock(b64[0], empty, v, r, s);
-      b64[1] = blockHash(b64[0], 1, empty, v, r, s);
+  //     const b64 = [];
+  //     b64[0] = await parsec64.tipHash();
+  //     let [v, r, s] = signHeader(b64[0], 1, empty, cPriv);
+  //     await parsec64.submitBlock(b64[0], empty, v, r, s);
+  //     b64[1] = blockHash(b64[0], 1, empty, v, r, s);
 
-      for(let i = 1; i < 64; i++) {
-        [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
-        await parsec64.submitBlock(b64[i], empty, v, r, s);
-        b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
-      }
-      assert.equal(b64[64], await parsec64.tipHash());
+  //     for(let i = 1; i < 64; i++) {
+  //       [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
+  //       await parsec64.submitBlock(b64[i], empty, v, r, s);
+  //       b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
+  //     }
+  //     assert.equal(b64[64], await parsec64.tipHash());
 
-      // test submitting a block that checks for pruning
-      [v, r, s] = signHeader(b64[64], 65, empty, cPriv);
-      let receipt = await parsec64.submitBlock(b64[64], empty, v, r, s);
-      b64[65] = blockHash(b64[64], 65, empty, v, r, s);
-      assert(receipt.receipt.gasUsed < 220000);
+  //     // test submitting a block that checks for pruning
+  //     [v, r, s] = signHeader(b64[64], 65, empty, cPriv);
+  //     let receipt = await parsec64.submitBlock(b64[64], empty, v, r, s);
+  //     b64[65] = blockHash(b64[64], 65, empty, v, r, s);
+  //     assert(receipt.receipt.gasUsed < 220000);
 
-      for(let i = 65; i < 192; i++) {
-        [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
-        await parsec64.submitBlock(b64[i], empty, v, r, s);
-        b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
-      }
-      assert.equal(b64[192], await parsec64.tipHash());
+  //     for(let i = 65; i < 192; i++) {
+  //       [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
+  //       await parsec64.submitBlock(b64[i], empty, v, r, s);
+  //       b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
+  //     }
+  //     assert.equal(b64[192], await parsec64.tipHash());
 
-      // check that archiving works with high epoch length
-      [v, r, s] = signHeader(b64[192], 193, empty, cPriv);
-      receipt = await parsec64.submitBlockAndPrune(b64[192], empty, v, r, s, [b64[0]]);
-      b64[193] = blockHash(b64[192], 193, empty, v, r, s);
-      assert(receipt.receipt.gasUsed < 198000);
-    });
+  //     // check that archiving works with high epoch length
+  //     [v, r, s] = signHeader(b64[192], 193, empty, cPriv);
+  //     receipt = await parsec64.submitBlockAndPrune(b64[192], empty, v, r, s, [b64[0]]);
+  //     b64[193] = blockHash(b64[192], 193, empty, v, r, s);
+  //     assert(receipt.receipt.gasUsed < 198000);
+  //   });
 
-    it('should allow to have epoch length of 128', async () => {
-      const token128 = await SimpleToken.new();
-      const parsec128 = await ParsecBridge.new(token128.address, 0, 128, 5000000, 0);
-      await token128.approve(parsec128.address, totalSupply);
-      await parsec128.join(totalSupply.div(128).mul(4));
+  //   it('should allow to have epoch length of 128', async () => {
+  //     const token128 = await SimpleToken.new();
+  //     const parsec128 = await ParsecBridge.new(token128.address, 0, 128, 5000000, 0);
+  //     await token128.approve(parsec128.address, totalSupply);
+  //     await parsec128.join(totalSupply.div(128).mul(4));
 
-      const b128 = [];
-      b128[0] = await parsec128.tipHash();
-      let [v, r, s] = signHeader(b128[0], 1, empty, cPriv);
-      await parsec128.submitBlock(b128[0], empty, v, r, s);
-      b128[1] = blockHash(b128[0], 1, empty, v, r, s);
+  //     const b128 = [];
+  //     b128[0] = await parsec128.tipHash();
+  //     let [v, r, s] = signHeader(b128[0], 1, empty, cPriv);
+  //     await parsec128.submitBlock(b128[0], empty, v, r, s);
+  //     b128[1] = blockHash(b128[0], 1, empty, v, r, s);
 
-      for(let i = 1; i < 128; i++) {
-        [v, r, s] = signHeader(b128[i], i+1, empty, cPriv);
-        await parsec128.submitBlock(b128[i], empty, v, r, s);
-        b128[i+1] = blockHash(b128[i], i+1, empty, v, r, s);
-      }
-      assert.equal(b128[128], await parsec128.tipHash());
+  //     for(let i = 1; i < 128; i++) {
+  //       [v, r, s] = signHeader(b128[i], i+1, empty, cPriv);
+  //       await parsec128.submitBlock(b128[i], empty, v, r, s);
+  //       b128[i+1] = blockHash(b128[i], i+1, empty, v, r, s);
+  //     }
+  //     assert.equal(b128[128], await parsec128.tipHash());
 
-      // test submitting a block that checks for pruning
-      [v, r, s] = signHeader(b128[128], 129, empty, cPriv);
-      const receipt = await parsec128.submitBlock(b128[128], empty, v, r, s);
-      b128[129] = blockHash(b128[128], 129, empty, v, r, s);
-      assert(receipt.receipt.gasUsed < 282000);
-    });
-  });
+  //     // test submitting a block that checks for pruning
+  //     [v, r, s] = signHeader(b128[128], 129, empty, cPriv);
+  //     const receipt = await parsec128.submitBlock(b128[128], empty, v, r, s);
+  //     b128[129] = blockHash(b128[128], 129, empty, v, r, s);
+  //     assert(receipt.receipt.gasUsed < 282000);
+  //   });
+  // });
 });
