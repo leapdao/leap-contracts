@@ -1,7 +1,6 @@
 import utils from 'ethereumjs-util';
 import assertRevert from './helpers/assertRevert';
 import { Transaction } from 'Parsec-lib';
-console.log(Transaction);
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
@@ -40,9 +39,6 @@ function rootHash(coinbaseHash) {
 
 //  _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
 function proofData(blockHash, v, r, s, pos, txData, proof) {
-  const big = ~~(pos / MAX_UINT32);
-  const low = (pos % MAX_UINT32) - big;
-
   const slices = [];
   slices.push(blockHash);
   slices.push(r);
@@ -51,8 +47,11 @@ function proofData(blockHash, v, r, s, pos, txData, proof) {
   const sliceCount = Math.floor(txData.length / 32) + 1;
 
   const payload = Buffer.alloc(32);
-  payload.writeUInt32BE(sliceCount + 3, 0);
+  payload.writeUInt32BE(txData.length, 0);
+  payload.writeUInt8(sliceCount + 3, 1);
+  const big = ~~(pos / MAX_UINT32);
   payload.writeUInt32BE(big, 4);
+  const low = (pos % MAX_UINT32) - big;
   payload.writeUInt32BE(low, 8);
   payload.writeUInt8(v, 13);
   txData.copy(payload, 32 - txData.length % 32, 0, txData.length % 32);
@@ -60,7 +59,7 @@ function proofData(blockHash, v, r, s, pos, txData, proof) {
   slices.push(utils.bufferToHex(payload));
 
   for (let i = 1; i < sliceCount; i += 1) {
-    slices.push(utils.bufferToHex(txData.slice(txData.length % 32, (txData.length % 32) + (i * 32))));
+    slices.push(utils.bufferToHex(txData.slice(txData.length % 32 + ((i-1) * 32), (txData.length % 32) + (i * 32))));
   }
   for (let i = 0; i < proof.length; i += 1) {
     slices.push(proof[i]);
@@ -176,12 +175,23 @@ contract('Parsec', (accounts) => {
     assert.equal(b[3], tip[0]);
     assert.equal(4, tip[1]);
 
-    [v, r, s] = signHeader(b[6], 5, empty, cPriv);
-    await parsec.submitBlock(b[6], empty, v, r, s, {from: c});
-    b[16] = blockHash(b[6], 5, empty, v, r, s);
+    const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
+    const value = 99000000;
+    let transfer = new Transaction(6).transfer([{prevTx, outPos: 0}], [{ value, addr: c}]);
+    transfer = transfer.sign([cPriv]);
+    let merkleRoot = rootHash(transfer.hash());
+
+    [v, r, s] = signHeader(b[6], 5, merkleRoot, cPriv);
+    await parsec.submitBlock(b[6], merkleRoot, v, r, s, {from: c});
+    b[16] = blockHash(b[6], 5, merkleRoot, v, r, s);
     tip = await parsec.getTip(ops);
     assert.equal(b[16], tip[0]);
     assert.equal(5, tip[1]);
+
+    const data = proofData(b[16], v, r, s, 0, transfer.buf(), [empty]);
+    const isSame = await parsec.reportDoubleSpend(data, data);
+    console.log(isSame);
+    
   });
 
   //

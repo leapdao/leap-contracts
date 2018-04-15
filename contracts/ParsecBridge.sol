@@ -416,8 +416,21 @@ contract ParsecBridge {
     return _leaf;
   }
 
+  function validateProof(uint256 offset, bytes32[] _proof) internal {
+    uint16 txLength = uint16(_proof[3] >> 224);
+    bytes memory tx = new bytes(txLength);
+    assembly {
+      calldatacopy(add(tx, 0x20), add(178, offset), txLength)
+    }
+    Block memory b = chain[_proof[0]];
+    bytes32 txHash = keccak256(tx);
+    bytes32 root = getMerkleRoot(txHash, uint64(_proof[3] >> 160), uint8(_proof[3] >> 240), _proof);
+    bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_proof[3] >> 144), _proof[1], _proof[2]);
+    require(blockHash == _proof[0]);
+  }
+
   /*
-   * _txData = [ 32b blockHash, 32b r, 32b s, (4b offset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
+   * _txData = [ 32b blockHash, 32b r, 32b s, (1b Proofoffset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
    *
    * # 2 Deposit TX (33b)
    *   1b type
@@ -429,30 +442,48 @@ contract ParsecBridge {
     Block memory b = chain[_txData[0]];
     require(b.height > chain[tipHash].height - epochLength);
     // check transaction proof
-    bytes32 txHash = keccak256(uint8(_txData[3]), _txData[4]);
-    bytes32 root = getMerkleRoot(txHash, uint64(_txData[3] >> 160), uint32(_txData[3] >> 224), _txData);
-    bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_txData[3] >> 144), _txData[1], _txData[2]);
-    require(blockHash == _txData[0]);
+    validateProof(17, _txData);
 
+    // check deposit values
     uint32 depositId = uint32(_txData[4] >> 224);
-    Deposit memory dep = deposits[depositId];
-
     uint64 value = uint64(_txData[4] >> 160);
-    if (value != dep.amount
-      || address(_txData[4]) != dep.owner
-      || b.height > dep.height + 2) {
-      // delete invalid block
-      deleteBlock(_txData[0]);
-      // EVENT
-      // slash operator
-      slashOperator(b.operator, 10 * blockReward);
-      // reward 1 block reward
-      token.transfer(msg.sender, blockReward);
-    }
+    Deposit memory dep = deposits[depositId];
+    require(value != dep.amount || address(_txData[4]) != dep.owner || b.height > dep.height + 2);
+
+    // delete invalid block
+    deleteBlock(_txData[0]);
+    // EVENT
+    // slash operator
+    slashOperator(b.operator, 10 * blockReward);
+    // reward 1 block reward
+    token.transfer(msg.sender, blockReward);
   }
 
 
+  function reportDoubleSpend(bytes32[] _proof, bytes32[] _prevProof) constant public returns (bool) {
+    Block memory b = chain[_proof[0]];
+    //require(b.height > chain[tipHash].height - epochLength);
+    uint256 offset = 32 * (_proof.length + 2);
+    validateProof(offset + 10, _prevProof);
+    validateProof(42, _proof);
 
+    bytes32 prevHash1;
+    bytes32 prevHash2;
+    uint8 outPos1;
+    uint8 outPos2;
+    assembly {
+      prevHash1 := calldataload(add(198, 32))
+      outPos1 := calldataload(add(230, 32))
+      prevHash2 := calldataload(add(198, offset))
+      outPos2 := calldataload(add(230, offset))
+    }
+
+    return (prevHash1 == prevHash2 && outPos1 == outPos2);
+  }
+
+  function reportInvalidCoinbase(bytes32[] _txData) public {
+
+  }
   
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
     return(chain[nodeId].children.length);
