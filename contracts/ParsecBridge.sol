@@ -331,7 +331,7 @@ contract ParsecBridge {
     bytes32 prevHash;
     (isLight, prevHash) = isLightBranch(_data);
     if (isLight) {
-      prune(prevHash);
+      deleteBlock(prevHash);
     }
     tipHash = _data[_data.length-2];
     // reward 1 block reward
@@ -382,14 +382,14 @@ contract ParsecBridge {
     // check heavy path to common fork
     uint256 heavyWeight;
     uint256 length;
-    (heavyWeight, length, prevHash) = getWeight(_data, _data[_data.length-2], map);
+    (heavyWeight, length, ) = getWeight(_data, _data[_data.length-2], map);
 
     // build light mapping
     map = buildMap(_data, 208);
 
     // check light path to common fork
     uint256 lightWeight;
-    (lightWeight, length, ) = getWeight(_data, _data[_data.length-1], map);
+    (lightWeight, length, prevHash) = getWeight(_data, _data[_data.length-1], map);
 
     // only forks longer than 2/3 of epochLength matter
     require(length >= (epochLength * 2) / 3);
@@ -416,7 +416,7 @@ contract ParsecBridge {
     return _leaf;
   }
 
-  function validateProof(uint256 offset, bytes32[] _proof) internal {
+  function validateProof(uint256 offset, bytes32[] _proof) internal returns (uint64 txPos) {
     uint16 txLength = uint16(_proof[3] >> 224);
     bytes memory tx = new bytes(txLength);
     assembly {
@@ -424,7 +424,8 @@ contract ParsecBridge {
     }
     Block memory b = chain[_proof[0]];
     bytes32 txHash = keccak256(tx);
-    bytes32 root = getMerkleRoot(txHash, uint64(_proof[3] >> 160), uint8(_proof[3] >> 240), _proof);
+    txPos = uint64(_proof[3] >> 160);
+    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[3] >> 240), _proof);
     bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_proof[3] >> 144), _proof[1], _proof[2]);
     require(blockHash == _proof[0]);
   }
@@ -440,7 +441,9 @@ contract ParsecBridge {
    */
   function reportInvalidDeposit(bytes32[] _txData) public {
     Block memory b = chain[_txData[0]];
-    require(b.height > chain[tipHash].height - epochLength);
+    if (chain[tipHash].height > epochLength) {
+      require(b.height > chain[tipHash].height - epochLength);
+    }
     // check transaction proof
     validateProof(17, _txData);
 
@@ -460,13 +463,20 @@ contract ParsecBridge {
   }
 
 
-  function reportDoubleSpend(bytes32[] _proof, bytes32[] _prevProof) constant public returns (bool) {
+  function reportDoubleSpend(bytes32[] _proof, bytes32[] _prevProof) public {
+    // make sure block can still be slashed
     Block memory b = chain[_proof[0]];
-    //require(b.height > chain[tipHash].height - epochLength);
+    if (chain[tipHash].height > epochLength) {
+      require(b.height > chain[tipHash].height - epochLength);
+    }
+    // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
-    validateProof(offset + 10, _prevProof);
-    validateProof(42, _proof);
+    uint64 txPos1 = validateProof(offset + 10, _prevProof);
+    uint64 txPos2 = validateProof(42, _proof);
+    // make sure transactions are different
+    require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
 
+    // get iputs and validate
     bytes32 prevHash1;
     bytes32 prevHash2;
     uint8 outPos1;
@@ -478,7 +488,15 @@ contract ParsecBridge {
       outPos2 := calldataload(add(230, offset))
     }
 
-    return (prevHash1 == prevHash2 && outPos1 == outPos2);
+    // check that spending same outputs
+    require(prevHash1 == prevHash2 && outPos1 == outPos2);
+    // delete invalid block
+    deleteBlock(_proof[0]);
+    // EVENT
+    // slash operator
+    // slashOperator(b.operator, 10 * blockReward);
+    // reward 1 block reward
+    token.transfer(msg.sender, blockReward);
   }
 
   function reportInvalidCoinbase(bytes32[] _txData) public {
