@@ -64,6 +64,7 @@ contract ParsecBridge {
   uint32 public epochLength; // length of 1 epoche in child blocks
   uint64 public blockReward; // reward per single block
   uint32 public stakePeriod;
+  uint256 public totalStake;
   bytes32 public tipHash;    // hash of first block that has extended chain to some hight
 
   struct Operator {
@@ -108,12 +109,12 @@ contract ParsecBridge {
    * Add an operator
    */
   function join(uint256 amount) public {
-    require(operators[msg.sender].stakeAmount + amount <= token.totalSupply().div(epochLength).mul(5));
-    require(amount >= token.totalSupply().div(epochLength));
+    require(amount >= (totalStake + amount) / epochLength);
     require(token.allowance(msg.sender, this) >= amount);
     require(operatorCount < epochLength);
 
     token.transferFrom(msg.sender, this, amount);
+    totalStake += amount;
     operatorCount++;
     
     operators[msg.sender] = Operator({
@@ -341,7 +342,10 @@ contract ParsecBridge {
   function buildMap(bytes32[] _data, uint256 _offset) public constant returns (uint256[] map) {
     map = new uint256[](epochLength + 1);
     for (uint i = 1; i < _data.length - 2; i++) {
-      uint256 stake = (operators[address(_data[i])].stakeAmount * epochLength) / token.totalSupply();
+      uint256 stake = (operators[address(_data[i])].stakeAmount * epochLength) / totalStake;
+      if (stake > totalStake.div(20)) {
+        stake = totalStake.div(20);
+      }
       uint256 claimCount = 0;
       for (uint j = (_offset + 40); j > _offset; j = j - 8) {
         uint8 pos = uint8(_data[i] >> j);
@@ -574,7 +578,7 @@ contract ParsecBridge {
     // create data structure for depth first search
     bytes32[] memory data = new bytes32[](_operators.length + 2);
     for (uint i = 2; i < _operators.length + 2; i++) {
-      data[i] = bytes32(((operators[_operators[i-2]].stakeAmount * epochLength) / token.totalSupply()) << 160) | bytes32(_operators[i-2]);
+      data[i] = bytes32(((operators[_operators[i-2]].stakeAmount * epochLength) / totalStake) << 160) | bytes32(_operators[i-2]);
     }
     // run search
     bytes32[] memory rsp = dfs(data, consensusHorizon);
