@@ -132,13 +132,6 @@ contract ParsecBridge {
     OperatorJoin(msg.sender, chain[tipHash].height);
   }
 
-  function createTx(uint64 _height, bytes32[] _coinbase, address _op) pure returns (bytes32) {
-    uint8 txType = 0;
-    uint8 txInNum = uint8(_coinbase.length);
-    uint8 txOutNum = 1;
-    return keccak256(txType, _height, txInNum, _coinbase, txOutNum, uint256(0), _op);
-  }
-
   /*
    * operator requests to leave
    */
@@ -427,15 +420,18 @@ contract ParsecBridge {
     return _leaf;
   }
 
-  function validateProof(uint256 offset, bytes32[] _proof) internal returns (uint64 txPos, bytes32 txHash) {
+  function validateProof(uint256 offset, bytes32[] _proof) view internal returns (uint64 txPos, bytes32 txHash) {
     uint256 txLength = uint16(_proof[3] >> 224);
     //uint256 startPos = uint8(_proof[3] >> 248);
     bytes memory txData = new bytes(txLength);
+    // txHash = bytes32(txLength);
+    // return;
     assembly {
       calldatacopy(add(txData, 0x20), add(178, offset), txLength)
     }
     Block memory b = chain[_proof[0]];
     txHash = keccak256(txData);
+    //return;
     txPos = uint64(_proof[3] >> 160);
     bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[3] >> 240), _proof);
     bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_proof[3] >> 144), _proof[1], _proof[2]);
@@ -515,10 +511,6 @@ contract ParsecBridge {
     // slashOperator(b.operator, 10 * blockReward);
     // reward 1 block reward
     token.transfer(msg.sender, blockReward);
-  }
-
-  function reportInvalidCoinbase(bytes32[] _txData) public {
-
   }
   
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
@@ -632,23 +624,16 @@ contract ParsecBridge {
     uint8 v;
     assembly {
       calldatacopy(add(txData, 32), add(178, offset), 43)
-      r := calldataload(add(213, offset))
-      s := calldataload(add(245, offset))
-      v := calldataload(add(246, offset))
-      calldatacopy(add(txData, 140), add(286, offset), 28)
+      r := calldataload(add(221, offset))
+      s := calldataload(add(253, offset))
+      v := calldataload(add(254, offset))
+      calldatacopy(add(txData, 140), add(286, offset), 28) // 32 + 43 + 65
     }
     dest = ecrecover(keccak256(txData), v, r, s);
   }
 
   /*
    * Take funds
-
-0x 03000000000754d4ec11777777777777777777777777777777777777777777777777777777777777777700 
-r bf1c0887456f6ddf7fd45c1d3c8d09a00e85249f2eb998a6121717ac08b81d62
-s 7fb8d91bf1323ecef665dab97acc27ed1c761eda23422b96b8eeaca317b5bda7
-v 1b
-amount 0000000005e69ec0
-addr 82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f 
    */
   function withdrawBurn(bytes32[] _proof) public {
     // make sure block is final
@@ -658,22 +643,22 @@ addr 82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f
 
     // validate proof
     bytes32 txHash;
-    validateProof(42, _proof);
+    ( , txHash) = validateProof(10, _proof);
 
     // check not withdrawn yet
-    require(exits[txHash].amount > 0);
+    require(exits[txHash].amount == 0);
 
     address dest;
     uint64 amount;
     assembly {
       // first output
-      dest := calldataload(278)
-      amount := calldataload(298)
+      amount := calldataload(272)
+      dest := calldataload(292)
     }
     require(dest == address(this));
 
     // recover signer
-    dest = recoverTxSigner(42, _proof);
+    dest = recoverTxSigner(10, _proof);
 
     exits[txHash] = Exit({
       amount: amount,
