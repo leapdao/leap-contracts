@@ -84,6 +84,13 @@ contract ParsecBridge {
   mapping(uint32 => Deposit) public deposits;
   uint32 depositCount = 0;
 
+  struct Exit {
+    uint64 amount;
+    uint32 opened;
+    address owner;
+  }
+  mapping(bytes32 => Exit) public exits;
+
 
   function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
     require(_token != address(0));
@@ -420,14 +427,15 @@ contract ParsecBridge {
     return _leaf;
   }
 
-  function validateProof(uint256 offset, bytes32[] _proof) internal returns (uint64 txPos) {
-    uint16 txLength = uint16(_proof[3] >> 224);
-    bytes memory tx = new bytes(txLength);
+  function validateProof(uint256 offset, bytes32[] _proof) internal returns (uint64 txPos, bytes32 txHash) {
+    uint256 txLength = uint16(_proof[3] >> 224);
+    //uint256 startPos = uint8(_proof[3] >> 248);
+    bytes memory txData = new bytes(txLength);
     assembly {
-      calldatacopy(add(tx, 0x20), add(178, offset), txLength)
+      calldatacopy(add(txData, 0x20), add(178, offset), txLength)
     }
     Block memory b = chain[_proof[0]];
-    bytes32 txHash = keccak256(tx);
+    txHash = keccak256(txData);
     txPos = uint64(_proof[3] >> 160);
     bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[3] >> 240), _proof);
     bytes32 blockHash = keccak256(b.parent, b.height, root, uint8(_proof[3] >> 144), _proof[1], _proof[2]);
@@ -473,10 +481,16 @@ contract ParsecBridge {
     if (chain[tipHash].height > epochLength) {
       require(b.height > chain[tipHash].height - epochLength);
     }
+    // TODO: either PrevProof has to be final or in parent block of proof
+    // otherwise sibling blocks can be slashed
     // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
-    uint64 txPos1 = validateProof(offset + 10, _prevProof);
-    uint64 txPos2 = validateProof(42, _proof);
+    uint64 txPos1;
+    (txPos1, ) = validateProof(offset + 10, _prevProof);
+
+    uint64 txPos2;
+    (txPos2, ) = validateProof(42, _proof);
+
     // make sure transactions are different
     require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
 
@@ -606,6 +620,69 @@ contract ParsecBridge {
       amount: amount
     });
     NewDeposit(depositCount, msg.sender);
+  }
+
+
+
+  function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
+    uint16 txLength = uint16(_proof[3] >> 224);
+    bytes memory txData = new bytes(txLength);
+    bytes32 r;
+    bytes32 s;
+    uint8 v;
+    assembly {
+      calldatacopy(add(txData, 32), add(178, offset), 43)
+      r := calldataload(add(213, offset))
+      s := calldataload(add(245, offset))
+      v := calldataload(add(246, offset))
+      calldatacopy(add(txData, 140), add(286, offset), 28)
+    }
+    dest = ecrecover(keccak256(txData), v, r, s);
+  }
+
+  /*
+   * Take funds
+
+0x 03000000000754d4ec11777777777777777777777777777777777777777777777777777777777777777700 
+r bf1c0887456f6ddf7fd45c1d3c8d09a00e85249f2eb998a6121717ac08b81d62
+s 7fb8d91bf1323ecef665dab97acc27ed1c761eda23422b96b8eeaca317b5bda7
+v 1b
+amount 0000000005e69ec0
+addr 82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f 
+   */
+  function withdrawBurn(bytes32[] _proof) public {
+    // make sure block is final
+    Block memory b = chain[_proof[0]];
+    require(chain[tipHash].height > epochLength);
+    require(b.height < chain[tipHash].height - epochLength);
+
+    // validate proof
+    bytes32 txHash;
+    validateProof(42, _proof);
+
+    // check not withdrawn yet
+    require(exits[txHash].amount > 0);
+
+    address dest;
+    uint64 amount;
+    assembly {
+      // first output
+      dest := calldataload(278)
+      amount := calldataload(298)
+    }
+    require(dest == address(this));
+
+    // recover signer
+    dest = recoverTxSigner(42, _proof);
+
+    exits[txHash] = Exit({
+      amount: amount,
+      opened: uint32(now - 4 days),
+      owner: dest
+    });
+
+    // EVENT
+    token.transfer(dest, amount);
   }
 
 }

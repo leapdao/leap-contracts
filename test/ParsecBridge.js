@@ -4,68 +4,15 @@ import { Tx, Block } from 'Parsec-lib';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
-const MAX_UINT32 = 0xFFFFFFFF;
-
-function blockHash(prevHash, newHeight, root, v, r, s) {
-  const payload = Buffer.alloc(137);
-  payload.write(prevHash.replace('0x',''), 0, 'hex');
-  payload.writeUInt32BE(0, 32);
-  payload.writeUInt32BE(newHeight, 36);
-  payload.write(root.replace('0x',''), 40, 'hex');
-  payload.writeUInt8(v, 72);
-  payload.write(r.replace('0x',''), 73, 'hex');
-  payload.write(s.replace('0x',''), 105, 'hex');
-  return utils.bufferToHex(utils.sha3(payload));
-}
-
-function signHeader(prevHash, newHeight, root, privKey) {
-  const privBuf = new Buffer(privKey.replace('0x', ''), 'hex');
-  const payload = Buffer.alloc(72);
-  payload.write(prevHash.replace('0x',''), 0, 'hex');
-  payload.writeUInt32BE(0, 32);
-  payload.writeUInt32BE(newHeight, 36);
-  payload.write(root.replace('0x',''), 40, 'hex');
-  const sig = utils.ecsign(utils.sha3(payload), privBuf);
-  return [sig.v, `0x${sig.r.toString('hex')}`, `0x${sig.s.toString('hex')}`];
-}
-
-function rootHash(coinbaseHash) {
-  const payload = Buffer.alloc(64);
-  payload.write(coinbaseHash.replace('0x',''), 0, 'hex');
-  // 32 bytes empty
-  //payload.write('0000000000000000000000000000000000000000000000000000000000000000', 32, 'hex');
-  return utils.bufferToHex(utils.sha3(payload));
-}
-
-
-
-function txHash(height, coinbase, operatorAddr) {
-  const payload = Buffer.alloc(63 + (32 * coinbase.length));
-  payload.writeUInt8(0, 0);
-  payload.writeUInt32BE(0, 1);
-  payload.writeUInt32BE(height, 5);
-  payload.writeUInt8(coinbase.length, 9);
-  for(let i = 0; i < coinbase.length; i++) {
-    payload.write(coinbase[i].replace('0x',''), 10 + (i * 32), 'hex');
-  }
-  payload.writeUInt8(1, 10 + (coinbase.length * 32));
-  payload.write(operatorAddr.replace('0x',''), 43 + (coinbase.length * 32), 'hex');
-  return utils.bufferToHex(utils.sha3(payload));
-}
-
 contract('Parsec', (accounts) => {
   const blockReward = 5000000;
   const empty = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const c = accounts[0];  // operator charlie, stake: 4 * ts / epochLength
   const cPriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
-  const cMerkleRoot = rootHash(new Tx().coinbase(blockReward, c).hash());
   const d = accounts[1];  // operator danie,   stake: 1 * ts / epochLength
   const dPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
-  const dMerkleRoot = rootHash(new Tx().coinbase(blockReward, d).hash());
   const e = accounts[2];  // operator eric,    stake: 3 * ts / epochLength
   const ePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
-  const eMerkleRoot = rootHash(new Tx().coinbase(blockReward, e).hash());
-  const ops = [c, d, e];
   
   let parsec;
   let token;
@@ -125,7 +72,7 @@ contract('Parsec', (accounts) => {
     let block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, e));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(ePriv));
     b[3] = block.hash();
-    assert.equal(b[3], (await parsec.getTip(ops))[0]);
+    assert.equal(b[3], (await parsec.getTip([c, d, e]))[0]);
 
     block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, c));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(cPriv));
@@ -136,7 +83,7 @@ contract('Parsec', (accounts) => {
     b[5] = block.hash();
 
     // tip not updated because operator D reached share
-    assert.equal(b[3], (await parsec.getTip(ops))[0]);
+    assert.equal(b[3], (await parsec.getTip([c, d, e]))[0]);
   });
 
   //                           /-> b[3,e]  <- 4 rewards
@@ -148,39 +95,38 @@ contract('Parsec', (accounts) => {
     const value = 99000000;
     let transfer = new Tx(6).transfer([{prevTx, outPos: 0}], [{ value, addr: c}]);
     transfer = transfer.sign([cPriv]);
-    let merkleRoot = rootHash(transfer.hash());
 
     // submit that tx
-    let block = new Block(b[5], 4, merkleRoot);
-    await parsec.submitBlock(b[5], merkleRoot, ...block.sign(cPriv));
+    let block = new Block(b[5], 4).addTx(transfer);
+    await parsec.submitBlock(b[5], block.merkleRoot(), ...block.sign(cPriv));
     b[6] = block.hash();
     const prevProof = block.proof(transfer.buf(), 0, [empty]);
 
     // check tip
-    let tip = await parsec.getTip(ops);
+    let tip = await parsec.getTip([c, d, e]);
     assert.equal(b[3], tip[0]);
     assert.equal(4, tip[1]);
 
     // submit tx spending same out in later block
-    block = new Block(b[6], 5, merkleRoot);
-    await parsec.submitBlock(b[6], merkleRoot, ...block.sign(cPriv));
+    block = new Block(b[6], 5).addTx(transfer);
+    await parsec.submitBlock(b[6], block.merkleRoot(), ...block.sign(cPriv));
     const proof = block.proof(transfer.buf(), 0, [empty]);
     
     // submit proof and get block deleted
     const bal1 = await token.balanceOf(c);
-    await parsec.reportDoubleSpend(proof, prevProof, {from: c});
+    const rsp = await parsec.reportDoubleSpend(proof, prevProof, {from: c});
     const bal2 = await token.balanceOf(c);
     assert(bal1.toNumber() < bal2.toNumber());
 
     // another block
-    block = new Block(b[6], 5, cMerkleRoot);
-    await parsec.submitBlock(b[6], cMerkleRoot, ...block.sign(cPriv));
+    block = new Block(b[6], 5).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[6], block.merkleRoot(), ...block.sign(cPriv));
     b[16] = block.hash();
 
     // check tip
-    tip = await parsec.getTip(ops);
+    tip = await parsec.getTip([c, d, e]);
     assert.equal(b[16], tip[0]);
-    assert.equal(5, tip[1].toNumber());    
+    assert.equal(5, tip[1].toNumber());
   });
 
   //
@@ -188,12 +134,12 @@ contract('Parsec', (accounts) => {
   //                 \-> b[29,d] -> b[30,d] -> b[31,d] -> b[32,d] -> b[33,d]  <- 3 rewards = light
   it('should allow to clip off light branch', async () => {
 
-    let block = new Block(b[1], 2, cMerkleRoot);
-    await parsec.submitBlock(b[1], cMerkleRoot, ...block.sign(dPriv));
+    let block = new Block(b[1], 2).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[1], block.merkleRoot(), ...block.sign(dPriv));
     b[29] = block.hash();
     for(let i = 29; i < 34; i++) {
-      block = new Block(b[i], i-26, dMerkleRoot);
-      await parsec.submitBlock(b[i], dMerkleRoot, ...block.sign(dPriv));
+      block = new Block(b[i], i-26).addTx(new Tx().coinbase(blockReward, d));
+      await parsec.submitBlock(b[i], block.merkleRoot(), ...block.sign(dPriv));
       b[i+1] = block.hash();
     }
 
@@ -216,19 +162,18 @@ contract('Parsec', (accounts) => {
   // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> b[9,c]   <- 7 rewards
   //                           \-> b[5,d] -> b[6,c] -> b[16,c]   <- 5 rewards
   it('should allow to extend other branch', async () => {
-    let [v, r, s] = signHeader(b[4], 4, empty, ePriv);
-    await parsec.submitBlock(b[4], empty, v, r, s, {from: e});
-    b[7] = blockHash(b[4], 4, empty, v, r, s);
+    let block = new Block(b[4], 4).addTx(new Tx().coinbase(blockReward, e));
+    await parsec.submitBlock(b[4], block.merkleRoot(), ...block.sign(ePriv));
+    b[7] = block.hash();
 
-    [v, r, s] = signHeader(b[7], 5, empty, ePriv);
-    await parsec.submitBlock(b[7], empty, v, r, s, {from: e});
-    b[8] = blockHash(b[7], 5, empty, v, r, s);
+    block = new Block(b[7], 5).addTx(new Tx().coinbase(blockReward, e));
+    await parsec.submitBlock(b[7], block.merkleRoot(), ...block.sign(ePriv));
+    b[8] = block.hash();
 
-    let merkleRoot = rootHash(txHash(6, [b[1], b[4]], c));
-    [v, r, s] = signHeader(b[8], 6, merkleRoot, cPriv);
-    await parsec.submitBlock(b[8], merkleRoot, v, r, s, {from: c});
-    b[9] = blockHash(b[8], 6, merkleRoot, v, r, s);
-    let tip = await parsec.getTip(ops);
+    block = new Block(b[8], 6).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[8], block.merkleRoot(), ...block.sign(cPriv));
+    b[9] = block.hash();
+    let tip = await parsec.getTip([c, d, e]);
     assert.equal(b[9], tip[0]);
     assert.equal(7, tip[1]);
 
@@ -241,9 +186,9 @@ contract('Parsec', (accounts) => {
   it('operators that are leaving should not be able to submit blocks', async () => {
     await parsec.requestLeave({from: d});
 
-    let [v, r, s] = signHeader(b[9], 7, empty, dPriv);
+    let block = new Block(b[9], 7).addTx(new Tx().coinbase(blockReward, d));
     await assertRevert(
-      parsec.submitBlock(b[9], empty, v, r, s)
+      parsec.submitBlock(b[9], block.merkleRoot(), ...block.sign(dPriv))
     );
   });
     
@@ -251,41 +196,37 @@ contract('Parsec', (accounts) => {
   // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> ... -> b[15]
   //                           \-> xxxxxx -> b[6,c] -> b[16,c]
   it('should allow to prune', async () => {
-    let merkleRoot = rootHash(txHash(7, [b[1], b[4], b[9]], c));
-    [claimV, claimR, claimS] = signHeader(b[9], 7, merkleRoot, cPriv);
-    await parsec.submitBlock(b[9], merkleRoot, claimV, claimR, claimS, {from: c});
-    b[10] = blockHash(b[9], 7, merkleRoot, claimV, claimR, claimS);
-    assert.equal(b[10], await parsec.tipHash());
+    let block = new Block(b[9], 7).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[9], block.merkleRoot(), ...block.sign(cPriv));
+    b[10] = block.hash();
 
-    let [v, r, s] = signHeader(b[10], 8, empty, cPriv);
-    await parsec.submitBlock(b[10], empty, v, r, s);
-    b[11] = blockHash(b[10], 8, empty, v, r, s);
-    assert.equal(b[11], await parsec.tipHash());
+    block = new Block(b[10], 8).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[10], block.merkleRoot(), ...block.sign(cPriv));
+    b[11] = block.hash();
 
-    [v, r, s] = signHeader(b[11], 9, empty, cPriv);
-    const receipt1 = await parsec.submitBlock(b[11], empty, v, r, s);
-    b[12] = blockHash(b[11], 9, empty, v, r, s);
-    assert.equal(b[12], await parsec.tipHash());
+    block = new Block(b[11], 9).addTx(new Tx().coinbase(blockReward, c));
+    const receipt1 = await parsec.submitBlock(b[11], block.merkleRoot(), ...block.sign(cPriv));
+    b[12] = block.hash();
 
-    [v, r, s] = signHeader(b[12], 10, empty, cPriv);
-    await parsec.submitBlock(b[12], empty, v, r, s);
-    b[13] = blockHash(b[12], 10, empty, v, r, s);
+    block = new Block(b[12], 10).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[12], block.merkleRoot(), ...block.sign(cPriv));
+    b[13] = block.hash();
     assert.equal(b[13], await parsec.tipHash());
 
     // test pruning
     assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 3);
-    [v, r, s] = signHeader(b[13], 11, empty, cPriv);
-    const receipt2 = await parsec.submitBlock(b[13], empty, v, r, s); // <- this call is pruning
+    block = new Block(b[13], 11).addTx(new Tx().coinbase(blockReward, c));
+    const receipt2 = await parsec.submitBlock(b[13], block.merkleRoot(), ...block.sign(cPriv)); // <- this call is pruning
     assert.equal((await parsec.getBranchCount(b[2])).toNumber(), 1);
     assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
-    b[14] = blockHash(b[13], 11, empty, v, r, s);
+    b[14] = block.hash();
     assert.equal(b[14], await parsec.tipHash());
 
     // prune orphans
-    [v, r, s] = signHeader(b[14], 12, empty, cPriv);
-    const receipt3 = await parsec.submitBlockAndPrune(b[14], empty, v, r, s, [b[6], b[16]]); 
+    block = new Block(b[14], 12).addTx(new Tx().coinbase(blockReward, c));
+    const receipt3 = await parsec.submitBlockAndPrune(b[14], block.merkleRoot(), ...block.sign(cPriv), [b[6], b[16]]); 
     assert(receipt1.receipt.gasUsed > receipt3.receipt.gasUsed);
-    b[15] = blockHash(b[14], 12, empty, v, r, s);
+    b[15] = block.hash();
     assert.equal(b[15], await parsec.tipHash());
   });
 
@@ -294,34 +235,34 @@ contract('Parsec', (accounts) => {
   //
   it('should allow to mine beyond archive horizon and delete genesis', async () => {
     // more blocks
-    let [v, r, s] = signHeader(b[15], 13, empty, cPriv);
-    await parsec.submitBlock(b[15], empty, v, r, s);
-    b[17] = blockHash(b[15], 13, empty, v, r, s);
+    let block = new Block(b[15], 13).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[15], block.merkleRoot(), ...block.sign(cPriv));
+    b[17] = block.hash();
     assert.equal(b[17], await parsec.tipHash());
 
     for(let i = 17; i < 25; i++) {
-      [v, r, s] = signHeader(b[i], i-3, empty, cPriv);
-      await parsec.submitBlock(b[i], empty, v, r, s);
-      b[i+1] = blockHash(b[i], i-3, empty, v, r, s);      
+      block = new Block(b[i], i-3).addTx(new Tx().coinbase(blockReward, c));
+      await parsec.submitBlock(b[i], block.merkleRoot(), ...block.sign(cPriv));
+      b[i+1] = block.hash();
     }
 
-    [v, r, s] = signHeader(b[25], 22, empty, cPriv);
-    const receipt1 = await parsec.submitBlock(b[25], empty, v, r, s);
-    b[26] = blockHash(b[25], 22, empty, v, r, s);
+    block = new Block(b[25], 22).addTx(new Tx().coinbase(blockReward, c));
+    const receipt1 = await parsec.submitBlock(b[25], block.merkleRoot(), ...block.sign(cPriv));
+    b[26] = block.hash();
     assert.equal(b[26], await parsec.tipHash());
 
-    [v, r, s] = signHeader(b[26], 23, empty, cPriv);
-    await parsec.submitBlock(b[26], empty, v, r, s);
-    b[27] = blockHash(b[26], 23, empty, v, r, s);
+    block = new Block(b[26], 23).addTx(new Tx().coinbase(blockReward, c));
+    await parsec.submitBlock(b[26], block.merkleRoot(), ...block.sign(cPriv));
+    b[27] = block.hash();
 
     // archive genesis
-    [v, r, s] = signHeader(b[27], 24, empty, cPriv);
-    const receipt2 = await parsec.submitBlockAndPrune(b[27], empty, v, r, s, [b[0]]);
+    block = new Block(b[27], 24).addTx(new Tx().coinbase(blockReward, c));
+    const receipt2 = await parsec.submitBlockAndPrune(b[27], block.merkleRoot(), ...block.sign(cPriv), [b[0]]);
     assert(receipt1.receipt.gasUsed > receipt2.receipt.gasUsed);
     assert(receipt2.logs[1].event == 'ArchiveBlock');
-    b[28] = blockHash(b[27], 24, empty, v, r, s);
+    b[28] = block.hash();
 
-    let tip = await parsec.getTip(ops);
+    let tip = await parsec.getTip([c, d, e]);
     assert.equal(b[28], tip[0]);
     assert.equal(4, tip[1]);
 
@@ -340,13 +281,11 @@ contract('Parsec', (accounts) => {
     let bal = await token.balanceOf(d);
     const receipt = await parsec.deposit(bal, { from: d }); 
     const depositId = receipt.logs[0].args.depositId.toNumber();
-
-    // wait until operator included tx
     const deposit = new Tx().deposit(depositId, bal.toNumber(), e);
-    let merkleRoot = rootHash(deposit.hash());
 
-    let block = new Block(b[28], 25, merkleRoot);
-    await parsec.submitBlock(b[28], merkleRoot, ...block.sign(ePriv));
+    // wait until operator included
+    let block = new Block(b[28], 25).addTx(deposit);
+    await parsec.submitBlock(b[28], block.merkleRoot(), ...block.sign(ePriv));
     b[34] = block.hash();
     const proof = block.proof(deposit.buf(), 0, [empty]);
 
@@ -364,15 +303,17 @@ contract('Parsec', (accounts) => {
   // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[24] -> b[25,c] -> ... -> b[28]
   //
   it('should allow to slash if 2 blocks proposed at same height', async () => {
-    const rootHash = '0x112200000000000000000000000000000000000000000000000000000000eeff';
-    let [v, r, s] = signHeader(b[24], 21, rootHash, cPriv);
-    await parsec.submitBlock(b[24], rootHash, v, r, s);
-    const b25b = blockHash(b[24], 21, rootHash, v, r, s);
+    const coinbase = new Tx().coinbase(blockReward, c);
+    let transfer = new Tx(6).transfer([{prevTx: coinbase.hash(), outPos: 0}], [{ value: blockReward, addr: c}]);
+    transfer = transfer.sign([cPriv]);
+
+    let block = new Block(b[24], 21).addTx(coinbase).addTx(transfer);
+    await parsec.submitBlock(b[24], block.merkleRoot(), ...block.sign(cPriv));
 
     // slash
     const bal1 = await token.balanceOf(d);
     const stake1 = await parsec.operators(c);
-    await parsec.reportHeightConflict(b[25], b25b, {from: d});
+    await parsec.reportHeightConflict(b[25], block.hash(), {from: d});
     const bal2 = await token.balanceOf(d);
     const stake2 = await parsec.operators(c);
     assert(bal1.toNumber() < bal2.toNumber());
