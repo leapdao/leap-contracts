@@ -235,10 +235,13 @@ contract('Parsec', (accounts) => {
   //
   it('should allow to mine beyond archive horizon and delete genesis', async () => {
     // more blocks
-    let block = new Block(b[15], 13).addTx(new Tx().coinbase(blockReward, c));
+    const coinbase = new Tx().coinbase(blockReward, c);
+    let transfer = new Tx(6).transfer([{prevTx: coinbase.hash(), outPos: 0}], [{ value: blockReward, addr: parsec.address}]);
+    transfer = transfer.sign([cPriv]);    
+    let block = new Block(b[15], 13).addTx(coinbase).addTx(transfer);
     await parsec.submitBlock(b[15], block.merkleRoot(), ...block.sign(cPriv));
     b[17] = block.hash();
-    assert.equal(b[17], await parsec.tipHash());
+    const proof = block.proof(transfer.buf(), 1, [coinbase.hash()]);
 
     for(let i = 17; i < 25; i++) {
       block = new Block(b[i], i-3).addTx(new Tx().coinbase(blockReward, c));
@@ -246,14 +249,15 @@ contract('Parsec', (accounts) => {
       b[i+1] = block.hash();
     }
 
-    block = new Block(b[25], 22).addTx(new Tx().coinbase(blockReward, c));
+    block = new Block(b[25], 22).addTx(coinbase).addTx(transfer);
     const receipt1 = await parsec.submitBlock(b[25], block.merkleRoot(), ...block.sign(cPriv));
     b[26] = block.hash();
-    assert.equal(b[26], await parsec.tipHash());
+    
 
     block = new Block(b[26], 23).addTx(new Tx().coinbase(blockReward, c));
     await parsec.submitBlock(b[26], block.merkleRoot(), ...block.sign(cPriv));
     b[27] = block.hash();
+    assert.equal(b[27], await parsec.tipHash());
 
     // archive genesis
     block = new Block(b[27], 24).addTx(new Tx().coinbase(blockReward, c));
@@ -267,11 +271,18 @@ contract('Parsec', (accounts) => {
     assert.equal(4, tip[1]);
 
     // leave operator set, get stake back
-    const bal1 = await token.balanceOf(d);
+    let bal1 = await token.balanceOf(d);
     await parsec.payout(d);
-    const bal2 = await token.balanceOf(d);
+    let bal2 = await token.balanceOf(d);
+    assert(bal1.toNumber() < bal2.toNumber());
+
+    // withdraw burned output
+    bal1 = await token.balanceOf(c);
+    await parsec.withdrawBurn(proof);
+    bal2 = await token.balanceOf(c);
     assert(bal1.toNumber() < bal2.toNumber());
   });
+
 
   //
   // b[0] -> b[1] -> ... -> b[15] -> b[16] -> ... -> b[34]
