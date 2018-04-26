@@ -331,45 +331,45 @@ contract('Parsec', (accounts) => {
     assert(stake1[2].toNumber() > stake2[2].toNumber());
   });
 
-  // describe('gasTests ... this will take a while ...', () => {
-  //   it('should allow to have epoch length of 64', async () => {
-  //     const token64 = await SimpleToken.new();
-  //     const parsec64 = await ParsecBridge.new(token64.address, 0, 64, 5000000, 0);
-  //     await token64.approve(parsec64.address, totalSupply);
-  //     await parsec64.join(totalSupply.div(64).mul(4));
-
-  //     const b64 = [];
-  //     b64[0] = await parsec64.tipHash();
-  //     let [v, r, s] = signHeader(b64[0], 1, empty, cPriv);
-  //     await parsec64.submitBlock(b64[0], empty, v, r, s);
-  //     b64[1] = blockHash(b64[0], 1, empty, v, r, s);
-
-  //     for(let i = 1; i < 64; i++) {
-  //       [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
-  //       await parsec64.submitBlock(b64[i], empty, v, r, s);
-  //       b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
-  //     }
-  //     assert.equal(b64[64], await parsec64.tipHash());
-
-  //     // test submitting a block that checks for pruning
-  //     [v, r, s] = signHeader(b64[64], 65, empty, cPriv);
-  //     let receipt = await parsec64.submitBlock(b64[64], empty, v, r, s);
-  //     b64[65] = blockHash(b64[64], 65, empty, v, r, s);
-  //     assert(receipt.receipt.gasUsed < 220000);
-
-  //     for(let i = 65; i < 192; i++) {
-  //       [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
-  //       await parsec64.submitBlock(b64[i], empty, v, r, s);
-  //       b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
-  //     }
-  //     assert.equal(b64[192], await parsec64.tipHash());
-
-  //     // check that archiving works with high epoch length
-  //     [v, r, s] = signHeader(b64[192], 193, empty, cPriv);
-  //     receipt = await parsec64.submitBlockAndPrune(b64[192], empty, v, r, s, [b64[0]]);
-  //     b64[193] = blockHash(b64[192], 193, empty, v, r, s);
-  //     assert(receipt.receipt.gasUsed < 198000);
-  //   });
+//   describe('gasTests ... this will take a while ...', () => {
+//     it('should allow to have epoch length of 64', async () => {
+//       const token64 = await SimpleToken.new();
+//       const parsec64 = await ParsecBridge.new(token64.address, 0, 64, 5000000, 0);
+//       await token64.approve(parsec64.address, totalSupply);
+//       await parsec64.join(totalSupply.div(64).mul(4));
+//
+//       const b64 = [];
+//       b64[0] = await parsec64.tipHash();
+//       let [v, r, s] = signHeader(b64[0], 1, empty, cPriv);
+//       await parsec64.submitBlock(b64[0], empty, v, r, s);
+//       b64[1] = blockHash(b64[0], 1, empty, v, r, s);
+//
+//       for(let i = 1; i < 64; i++) {
+//         [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
+//         await parsec64.submitBlock(b64[i], empty, v, r, s);
+//         b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
+//       }
+//       assert.equal(b64[64], await parsec64.tipHash());
+//
+//       // test submitting a block that checks for pruning
+//       [v, r, s] = signHeader(b64[64], 65, empty, cPriv);
+//       let receipt = await parsec64.submitBlock(b64[64], empty, v, r, s);
+//       b64[65] = blockHash(b64[64], 65, empty, v, r, s);
+//       assert(receipt.receipt.gasUsed < 220000);
+//
+//       for(let i = 65; i < 192; i++) {
+//         [v, r, s] = signHeader(b64[i], i+1, empty, cPriv);
+//         await parsec64.submitBlock(b64[i], empty, v, r, s);
+//         b64[i+1] = blockHash(b64[i], i+1, empty, v, r, s);
+//       }
+//       assert.equal(b64[192], await parsec64.tipHash());
+//
+//       // check that archiving works with high epoch length
+//       [v, r, s] = signHeader(b64[192], 193, empty, cPriv);
+//       receipt = await parsec64.submitBlockAndPrune(b64[192], empty, v, r, s, [b64[0]]);
+//       b64[193] = blockHash(b64[192], 193, empty, v, r, s);
+//       assert(receipt.receipt.gasUsed < 198000);
+//     });
 
   //   it('should allow to have epoch length of 128', async () => {
   //     const token128 = await SimpleToken.new();
@@ -396,5 +396,5 @@ contract('Parsec', (accounts) => {
   //     b128[129] = blockHash(b128[128], 129, empty, v, r, s);
   //     assert(receipt.receipt.gasUsed < 282000);
   //   });
-  // });
+//   });
 });
