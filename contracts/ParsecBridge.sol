@@ -50,7 +50,7 @@ contract ParsecBridge {
 
   struct Block {
     bytes32 parent; // the id of the parent node
-    uint64 height;  // the hight this block is stored at
+    uint64 height;  // the height this block is stored at
     uint32 parentIndex; //  the position of this node in the Parent's children list
     address operator; // the operator that submitted the block
     bytes32[] children; // unordered list of children below this node
@@ -61,17 +61,17 @@ contract ParsecBridge {
   uint32 public parentBlockInterval; // how often plasma blocks can be submitted max
   uint64 public lastParentBlock; // last ethereum block when plasma block submitted
   uint32 public operatorCount; // number of staked operators
-  uint32 public epochLength; // length of 1 epoche in child blocks
+  uint32 public epochLength; // length of 1 epoch in child blocks
   uint64 public blockReward; // reward per single block
   uint32 public stakePeriod;
   uint256 public totalStake;
-  bytes32 public tipHash;    // hash of first block that has extended chain to some hight
+  bytes32 public tipHash;    // hash of first block that has extended chain to some height
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
     // once operator requested leave joinedAt set to block height when requested exit
     uint64 joinedAt; 
-    uint64 claimedUntil; // the epoche until which all reward claims have been processed
+    uint64 claimedUntil; // the epoch until which all reward claims have been processed
     uint256 stakeAmount; // amount of staken tokens
   }
   mapping(address => Operator) public operators;
@@ -154,7 +154,9 @@ contract ParsecBridge {
     if (op.stakeAmount > 0) {
       // operator that has requested leave
       require(op.joinedAt <= chain[tipHash].height - (2 * epochLength));
-      token.transfer(signerAddr, op.stakeAmount);
+      uint stake = op.stakeAmount;
+      op.stakeAmount = 0;
+      token.transfer(signerAddr, stake);
     }
     delete operators[signerAddr];
     operatorCount--;
@@ -186,6 +188,10 @@ contract ParsecBridge {
     }
   }
 
+
+  event Flag(string comment);
+  event DebugEvent(bytes32 value);
+
   /*
    * submit a new block
    *
@@ -202,7 +208,7 @@ contract ParsecBridge {
     // TODO recover operator address and check membership
     bytes32 sigHash = keccak256(prevHash, newHeight, root);
     address operatorAddr = ecrecover(sigHash, v, r, s);
-    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
+//    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
     // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
@@ -220,15 +226,15 @@ contract ParsecBridge {
         // iterate backwards for 1 epoche
         bytes32 nextParent = chain[prevHash].parent;
         while(chain[nextParent].height > newHeight - epochLength) {
-          nextParent = chain[nextParent].parent;        
+          nextParent = chain[nextParent].parent;
         }
-        // prune chain 
+        // prune chain
         prune(nextParent);
       }
       lastParentBlock = uint64(block.number);
       NewHeight(newHeight, root);
     }
-    // store the block 
+    // store the block
     Block memory newBlock;
     newBlock.parent = prevHash;
     newBlock.height = newHeight;
@@ -339,7 +345,7 @@ contract ParsecBridge {
     token.transfer(msg.sender, blockReward);
   }
 
-  function buildMap(bytes32[] _data, uint256 _offset) public constant returns (uint256[] map) {
+  function buildMap(bytes32[] _data, uint256 _offset) internal constant returns (uint256[] map) {
     map = new uint256[](epochLength + 1);
     for (uint i = 1; i < _data.length - 2; i++) {
       uint256 stake = (operators[address(_data[i])].stakeAmount * epochLength) / totalStake;
@@ -358,7 +364,7 @@ contract ParsecBridge {
     }
   }
   
-  function getWeight(bytes32[] _data, bytes32 nodeHash, uint256[] _map) public constant returns (uint256 weight, uint256 i, bytes32 prevHash) {
+  function getWeight(bytes32[] _data, bytes32 nodeHash, uint256[] _map) internal constant returns (uint256 weight, uint256 i, bytes32 prevHash) {
     // check heavy path to common fork
     i = 0;
     bytes32 previous;
@@ -377,7 +383,7 @@ contract ParsecBridge {
     }      
   }
  
-  function isLightBranch(bytes32[] _data) constant public returns (bool isLight, bytes32 prevHash) {
+  function isLightBranch(bytes32[] _data) constant internal returns (bool isLight, bytes32 prevHash) {
     require(_data.length < epochLength + 3);
     
     // build heavy-branch mapping
@@ -420,6 +426,7 @@ contract ParsecBridge {
     return _leaf;
   }
 
+  //validate that transaction is included to the block (merkle proof)
   function validateProof(uint256 offset, bytes32[] _proof) view internal returns (uint64 txPos, bytes32 txHash) {
     uint256 txLength = uint16(_proof[3] >> 224);
     //uint256 startPos = uint8(_proof[3] >> 248);
@@ -508,7 +515,7 @@ contract ParsecBridge {
     deleteBlock(_proof[0]);
     // EVENT
     // slash operator
-    // slashOperator(b.operator, 10 * blockReward);
+     slashOperator(b.operator, 10 * blockReward);
     // reward 1 block reward
     token.transfer(msg.sender, blockReward);
   }
@@ -613,7 +620,6 @@ contract ParsecBridge {
     });
     NewDeposit(depositCount, msg.sender);
   }
-
 
 
   function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
