@@ -50,7 +50,7 @@ contract ParsecBridge {
 
   struct Block {
     bytes32 parent; // the id of the parent node
-    uint64 height;  // the hight this block is stored at
+    uint64 height;  // the height this block is stored at
     uint32 parentIndex; //  the position of this node in the Parent's children list
     address operator; // the operator that submitted the block
     bytes32[] children; // unordered list of children below this node
@@ -61,17 +61,17 @@ contract ParsecBridge {
   uint32 public parentBlockInterval; // how often plasma blocks can be submitted max
   uint64 public lastParentBlock; // last ethereum block when plasma block submitted
   uint32 public operatorCount; // number of staked operators
-  uint32 public epochLength; // length of 1 epoche in child blocks
+  uint32 public epochLength; // length of 1 epoch in child blocks
   uint64 public blockReward; // reward per single block
   uint32 public stakePeriod;
   uint256 public totalStake;
-  bytes32 public tipHash;    // hash of first block that has extended chain to some hight
+  bytes32 public tipHash;    // hash of first block that has extended chain to some height
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
     // once operator requested leave joinedAt set to block height when requested exit
     uint64 joinedAt; 
-    uint64 claimedUntil; // the epoche until which all reward claims have been processed
+    uint64 claimedUntil; // the epoch until which all reward claims have been processed
     uint256 stakeAmount; // amount of staken tokens
   }
   mapping(address => Operator) public operators;
@@ -188,6 +188,10 @@ contract ParsecBridge {
     }
   }
 
+
+  event Flag(string comment);
+  event DebugEvent(bytes32 value);
+
   /*
    * submit a new block
    *
@@ -204,7 +208,7 @@ contract ParsecBridge {
     // TODO recover operator address and check membership
     bytes32 sigHash = keccak256(prevHash, newHeight, root);
     address operatorAddr = ecrecover(sigHash, v, r, s);
-    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
+//    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
     // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
@@ -222,15 +226,15 @@ contract ParsecBridge {
         // iterate backwards for 1 epoche
         bytes32 nextParent = chain[prevHash].parent;
         while(chain[nextParent].height > newHeight - epochLength) {
-          nextParent = chain[nextParent].parent;        
+          nextParent = chain[nextParent].parent;
         }
-        // prune chain 
+        // prune chain
         prune(nextParent);
       }
       lastParentBlock = uint64(block.number);
       NewHeight(newHeight, root);
     }
-    // store the block 
+    // store the block
     Block memory newBlock;
     newBlock.parent = prevHash;
     newBlock.height = newHeight;
