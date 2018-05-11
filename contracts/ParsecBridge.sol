@@ -117,7 +117,6 @@ contract ParsecBridge {
    */
   function join(uint256 amount) public {
     require(amount >= (totalStake + amount) / epochLength);
-    require(token.allowance(msg.sender, this) >= amount);
     require(operatorCount < epochLength);
 
     token.transferFrom(msg.sender, this, amount);
@@ -610,7 +609,6 @@ contract ParsecBridge {
    * Add funds
    */
   function deposit(uint256 amount) public {
-    require(token.allowance(msg.sender, this) >= amount);
     token.transferFrom(msg.sender, this, amount);
     depositCount++;
     deposits[depositCount] = Deposit({
