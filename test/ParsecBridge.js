@@ -345,12 +345,13 @@ contract('Parsec', (accounts) => {
        let root
 
        for(let i = 1; i < 65; i++) {
-         console.log(i)
+         process.stdout.write('Submitting block: ' + i + ' of 64\r');
          block = new Block(b64[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b64[i] = block.hash()
          await parsec64.submitBlock(b64[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
        assert.equal(b64[64], await parsec64.tipHash());
 
        // test submitting a block that checks for pruning
@@ -362,12 +363,13 @@ contract('Parsec', (accounts) => {
        assert(receipt.receipt.gasUsed < 220000);
 
        for(let i = 66; i < 193; i++) {
-         console.log(i)
+         process.stdout.write('Submitting block: ' + i + ' of 192\r');
          block = new Block(b64[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b64[i] = block.hash()
          await parsec64.submitBlock(b64[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
 
        assert.equal(b64[192], await parsec64.tipHash());
 
@@ -392,14 +394,14 @@ contract('Parsec', (accounts) => {
        let block = new Block(b128[0], 1);
        let sig
        let root
-
-       for(let i = 1; i < 129; i++) {
-       console.log(i)
+       for (let i = 1; i < 129; i++) {
+         process.stdout.write('Submitting block: ' + i + ' of 128\r');
          block = new Block(b128[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b128[i] = block.hash()
          await parsec128.submitBlock(b128[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
        assert.equal(b128[128], await parsec128.tipHash());
 
        // test submitting a block that checks for pruning
@@ -407,7 +409,7 @@ contract('Parsec', (accounts) => {
        sig = block.sign(cPriv);
        b128[129] = block.hash()
        let receipt = await parsec128.submitBlock(b128[128], block.merkleRoot(), ...sig);
-
+       console.log(assert);
        //the same, used 282713
        assert(receipt.receipt.gasUsed < 282000);
      });
