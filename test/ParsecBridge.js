@@ -409,7 +409,7 @@ contract('Parsec', (accounts) => {
        sig = block.sign(cPriv);
        b128[129] = block.hash()
        let receipt = await parsec128.submitBlock(b128[128], block.merkleRoot(), ...sig);
-       console.log(assert);
+       
        //the same, used 282713
        assert(receipt.receipt.gasUsed < 282000);
      });
