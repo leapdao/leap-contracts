@@ -13,7 +13,7 @@ contract('Parsec', (accounts) => {
   const dPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const e = accounts[2];  // operator eric,    stake: 3 * ts / epochLength
   const ePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
-  
+
   let parsec;
   let token;
   let epochLength;
@@ -33,7 +33,7 @@ contract('Parsec', (accounts) => {
     totalSupply = await token.totalSupply();
     token.transfer(accounts[1], totalSupply.div(epochLength));
     token.transfer(accounts[2], totalSupply.div(epochLength).mul(3));
-  });  
+  });
 
   //
   // b[0] -> b[1,c]
@@ -77,7 +77,7 @@ contract('Parsec', (accounts) => {
     block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, c));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(cPriv));
     b[4] = block.hash();
-    
+
     block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, d));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(dPriv));
     b[5] = block.hash();
@@ -111,7 +111,7 @@ contract('Parsec', (accounts) => {
     block = new Block(b[6], 5).addTx(transfer);
     await parsec.submitBlock(b[6], block.merkleRoot(), ...block.sign(cPriv));
     const proof = block.proof(transfer.buf(), 0, [empty]);
-    
+
     // submit proof and get block deleted
     const bal1 = await token.balanceOf(c);
     const rsp = await parsec.reportDoubleSpend(proof, prevProof, {from: c});
