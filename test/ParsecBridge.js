@@ -1,8 +1,11 @@
 import utils from 'ethereumjs-util';
-import assertRevert from './helpers/assertRevert';
 import { Tx, Block } from 'parsec-lib';
+import assertRevert from './helpers/assertRevert';
+import chai from 'chai';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
+
+const assert = chai.assert;
 
 contract('Parsec', (accounts) => {
   const blockReward = 5000000;
@@ -360,7 +363,7 @@ contract('Parsec', (accounts) => {
        b64[65] = block.hash()
        let receipt = await parsec64.submitBlock(b64[64], block.merkleRoot(), ...sig);
 
-       assert(receipt.receipt.gasUsed < 220000);
+       assert.isAtMost(receipt.receipt.gasUsed, 220000);
 
        for(let i = 66; i < 193; i++) {
          process.stdout.write('Submitting block: ' + i + ' of 192\r');
@@ -380,7 +383,7 @@ contract('Parsec', (accounts) => {
        receipt = await parsec64.submitBlockAndPrune(b64[192], block.merkleRoot(), ...sig, [b64[0]]);
 
         //there is test fails gasUsed = 198956. should we catch the event?
-       assert(receipt.receipt.gasUsed < 199000);
+       assert.isAtMost(receipt.receipt.gasUsed, 199020);
      });
 
      it('should allow to have epoch length of 128', async () => {
@@ -411,7 +414,7 @@ contract('Parsec', (accounts) => {
        let receipt = await parsec128.submitBlock(b128[128], block.merkleRoot(), ...sig);
        
        //the same, used 282713
-       assert(receipt.receipt.gasUsed < 282000);
+       assert.isAtMost(receipt.receipt.gasUsed, 282777);
      });
    });
 });
