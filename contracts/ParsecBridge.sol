@@ -1,7 +1,7 @@
 pragma solidity ^0.4.19;
 
-import "zeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract ParsecBridge {
   using SafeMath for uint256;
@@ -128,7 +128,7 @@ contract ParsecBridge {
       claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoche
       stakeAmount: amount
     });
-    OperatorJoin(msg.sender, chain[tipHash].height);
+    emit OperatorJoin(msg.sender, chain[tipHash].height);
   }
 
   /*
@@ -159,7 +159,7 @@ contract ParsecBridge {
     }
     delete operators[signerAddr];
     operatorCount--;
-    OperatorLeave(signerAddr, chain[tipHash].height);
+    emit OperatorLeave(signerAddr, chain[tipHash].height);
   }
 
   function submitBlockAndPrune(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s, bytes32[] orphans) public {
@@ -172,7 +172,7 @@ contract ParsecBridge {
         uint256 tmp = chain[tipHash].height;
         // if block is behind archive horizon
         if (tmp >= (3 * epochLength) && orphan.height <= tmp  - (3 * epochLength)) {
-          ArchiveBlock(orphan.height, orphans[i]);
+          emit ArchiveBlock(orphan.height, orphans[i]);
           tmp = 0; // mark delete
         }
         // if block is orphaned
@@ -231,7 +231,7 @@ contract ParsecBridge {
         prune(nextParent);
       }
       lastParentBlock = uint64(block.number);
-      NewHeight(newHeight, root);
+      emit NewHeight(newHeight, root);
     }
     // store the block
     Block memory newBlock;
@@ -616,7 +616,7 @@ contract ParsecBridge {
       owner: msg.sender,
       amount: amount
     });
-    NewDeposit(depositCount, msg.sender);
+    emit NewDeposit(depositCount, msg.sender);
   }
 
 

@@ -1,6 +1,6 @@
 pragma solidity ^0.4.19;
 
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 
 contract PriorityQueue {
@@ -78,7 +78,7 @@ contract PriorityQueue {
   function percUp(uint256 s)
     private
   {
-    var i = s;
+    uint256 i = s;
     while (i.div(2) > 0) {
       if (heapList[i] < heapList[i.div(2)]) {
         uint256 tmp = heapList[i.div(2)];
@@ -92,7 +92,7 @@ contract PriorityQueue {
   function percDown(uint256 s)
     private
   {
-    var i = s;
+    uint256 i = s;
     while (i.mul(2) <= currentSize) {
       uint256 mc = minChild(i);
       if (heapList[i] > heapList[mc]) {
