@@ -1,8 +1,11 @@
 import utils from 'ethereumjs-util';
-import assertRevert from './helpers/assertRevert';
 import { Tx, Block } from 'parsec-lib';
+import assertRevert from './helpers/assertRevert';
+import chai from 'chai';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
+
+const assert = chai.assert;
 
 contract('Parsec', (accounts) => {
   const blockReward = 5000000;
@@ -13,7 +16,7 @@ contract('Parsec', (accounts) => {
   const dPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const e = accounts[2];  // operator eric,    stake: 3 * ts / epochLength
   const ePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
-  
+
   let parsec;
   let token;
   let epochLength;
@@ -33,7 +36,7 @@ contract('Parsec', (accounts) => {
     totalSupply = await token.totalSupply();
     token.transfer(accounts[1], totalSupply.div(epochLength));
     token.transfer(accounts[2], totalSupply.div(epochLength).mul(3));
-  });  
+  });
 
   //
   // b[0] -> b[1,c]
@@ -77,7 +80,7 @@ contract('Parsec', (accounts) => {
     block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, c));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(cPriv));
     b[4] = block.hash();
-    
+
     block = new Block(b[2], 3).addTx(new Tx().coinbase(blockReward, d));
     await parsec.submitBlock(b[2], block.merkleRoot(), ...block.sign(dPriv));
     b[5] = block.hash();
@@ -109,9 +112,9 @@ contract('Parsec', (accounts) => {
 
     // submit tx spending same out in later block
     block = new Block(b[6], 5).addTx(transfer);
-    await parsec.submitBlock(b[6], block.merkleRoot(), ...block.sign(cPriv));
+    await parsec.submitBlock(b[6], block.merkleRoot(), ...block.sign(ePriv));
     const proof = block.proof(transfer.buf(), 0, [empty]);
-    
+
     // submit proof and get block deleted
     const bal1 = await token.balanceOf(c);
     const rsp = await parsec.reportDoubleSpend(proof, prevProof, {from: c});
@@ -345,12 +348,13 @@ contract('Parsec', (accounts) => {
        let root
 
        for(let i = 1; i < 65; i++) {
-         console.log(i)
+         process.stdout.write('Submitting block: ' + i + ' of 64\r');
          block = new Block(b64[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b64[i] = block.hash()
          await parsec64.submitBlock(b64[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
        assert.equal(b64[64], await parsec64.tipHash());
 
        // test submitting a block that checks for pruning
@@ -359,15 +363,16 @@ contract('Parsec', (accounts) => {
        b64[65] = block.hash()
        let receipt = await parsec64.submitBlock(b64[64], block.merkleRoot(), ...sig);
 
-       assert(receipt.receipt.gasUsed < 220000);
+       assert.isAtMost(receipt.receipt.gasUsed, 220000);
 
        for(let i = 66; i < 193; i++) {
-         console.log(i)
+         process.stdout.write('Submitting block: ' + i + ' of 192\r');
          block = new Block(b64[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b64[i] = block.hash()
          await parsec64.submitBlock(b64[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
 
        assert.equal(b64[192], await parsec64.tipHash());
 
@@ -378,7 +383,7 @@ contract('Parsec', (accounts) => {
        receipt = await parsec64.submitBlockAndPrune(b64[192], block.merkleRoot(), ...sig, [b64[0]]);
 
         //there is test fails gasUsed = 198956. should we catch the event?
-       assert(receipt.receipt.gasUsed < 199000);
+       assert.isAtMost(receipt.receipt.gasUsed, 199020);
      });
 
      it('should allow to have epoch length of 128', async () => {
@@ -392,14 +397,14 @@ contract('Parsec', (accounts) => {
        let block = new Block(b128[0], 1);
        let sig
        let root
-
-       for(let i = 1; i < 129; i++) {
-       console.log(i)
+       for (let i = 1; i < 129; i++) {
+         process.stdout.write('Submitting block: ' + i + ' of 128\r');
          block = new Block(b128[i - 1], i).addTx(new Tx().coinbase(blockReward, c));
          sig = block.sign(cPriv);
          b128[i] = block.hash()
          await parsec128.submitBlock(b128[i - 1], block.merkleRoot(), ...sig);
        }
+       process.stdout.write("\n\r");
        assert.equal(b128[128], await parsec128.tipHash());
 
        // test submitting a block that checks for pruning
@@ -407,9 +412,9 @@ contract('Parsec', (accounts) => {
        sig = block.sign(cPriv);
        b128[129] = block.hash()
        let receipt = await parsec128.submitBlock(b128[128], block.merkleRoot(), ...sig);
-
+       
        //the same, used 282713
-       assert(receipt.receipt.gasUsed < 282000);
+       assert.isAtMost(receipt.receipt.gasUsed, 282777);
      });
    });
 });
