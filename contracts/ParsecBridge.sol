@@ -187,10 +187,6 @@ contract ParsecBridge {
     }
   }
 
-
-  event Flag(string comment);
-  event DebugEvent(bytes32 value);
-
   /*
    * submit a new block
    *
@@ -207,7 +203,7 @@ contract ParsecBridge {
     // TODO recover operator address and check membership
     bytes32 sigHash = keccak256(prevHash, newHeight, root);
     address operatorAddr = ecrecover(sigHash, v, r, s);
-//    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
+    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
     // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
