@@ -92,7 +92,7 @@ contract ParsecBridge {
   mapping(bytes32 => Exit) public exits;
 
 
-  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
+  constructor(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;

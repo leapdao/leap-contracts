@@ -21,9 +21,7 @@ contract PriorityQueue {
   uint256[] heapList;
   uint256 public currentSize;
 
-  function PriorityQueue()
-    public
-  {
+  constructor() public {
     owner = msg.sender;
     heapList = [0];
     currentSize = 0;
