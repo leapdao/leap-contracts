@@ -264,6 +264,7 @@ contract ParsecBridge {
     if (i < parent.children.length - 1) {
       // swap with last child
       parent.children[i] = parent.children[parent.children.length - 1];
+      chain[parent.children[i]].parentIndex = uint32(i);
     }
     parent.children.length--;
     if (hash == tipHash) {
@@ -510,7 +511,7 @@ contract ParsecBridge {
     deleteBlock(_proof[0]);
     // EVENT
     // slash operator
-     slashOperator(b.operator, 10 * blockReward);
+    slashOperator(b.operator, 10 * blockReward);
     // reward 1 block reward
     token.transfer(msg.sender, blockReward);
   }
