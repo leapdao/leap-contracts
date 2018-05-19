@@ -58,10 +58,20 @@ contract StakingAuction {
         if (slot.newStake > 0) {
             token.transfer(slot.newOwner, slot.newStake);
         }
-        slot.newOwner = msg.sender;
-        slot.newSigner = _signerAddr;
-        slot.newStake = uint64(_value);
-        slot.activationEpoch = uint32(currentEpoch.add(2));
+        // auction
+        if (slot.stake > 0) {
+            slot.newOwner = msg.sender;
+            slot.newSigner = _signerAddr;
+            slot.newStake = uint64(_value);
+            slot.activationEpoch = uint32(currentEpoch.add(2));
+        }
+        // new purchase
+        else {
+            slot.owner = msg.sender;
+            slot.signer = _signerAddr;
+            slot.stake = uint64(_value);
+            slot.activationEpoch = 0;
+        }
     }
     
     function activate(uint256 _slotId) public {

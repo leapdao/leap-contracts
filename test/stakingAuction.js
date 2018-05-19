@@ -31,19 +31,9 @@ contract('StakingAuction', (accounts) => {
     await auction.submitBlock(0, alice).should.be.rejectedWith(EVMRevert);
   });
 
-  it('should allow to buy slot', async () => {
+  it('should allow to buy slot and submit block', async () => {
     await token.approve(auction.address, totalSupply, {from: alice});
     await auction.buy(0, 100, alice, {from: alice}).should.be.fulfilled;
-  });
-
-  it('should prevent submission when slot waiting', async () => {
-    await auction.submitBlock(0, alice).should.be.rejectedWith(EVMRevert);
-  });
-
-  it('should allow to activate and submit', async () => {
-    await auction.incrementEpoch();
-    await auction.incrementEpoch();
-    await auction.activate(0);
     await auction.submitBlock(0, alice).should.be.fulfilled;
   });
 
