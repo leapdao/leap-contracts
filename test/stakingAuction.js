@@ -1,5 +1,6 @@
 import utils from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
+import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
 import assertRevert from './helpers/assertRevert';
 import chai from 'chai';
 const StakingAuction = artifacts.require('./StakingAuction.sol');
@@ -13,8 +14,12 @@ const empty = '0x000000000000000000000000000000000000000000000000000000000000000
 
 contract('StakingAuction', (accounts) => {
   const alice = accounts[0];
+  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
+  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
+  const charliePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+
   let auction;
   let token;
   let totalSupply;
@@ -70,6 +75,43 @@ contract('StakingAuction', (accounts) => {
     await auction.bet(1, 100, charlie, {from: charlie}).should.be.fulfilled;
   });
 
+  it('should allow to slash doublespend', async () => {
+    // create some tx spending an output
+    const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
+    const value = 99000000;
+    let transfer = Tx.transfer(
+      6,
+      [new Input(new Outpoint(prevTx, 0))],
+      [new Output(value, alice)]
+    );
+    transfer = transfer.sign([alicePriv]);
+
+    // submit that tx
+    let block = new Block(p[2], 4);
+    block.addTx(transfer);
+    block.addTx(Tx.deposit(12, value, alice));
+    block.sign(alicePriv);
+    let period = new Period([block]);
+    await auction.submitPeriod(1, p[2], period.merkleRoot(), {from: charlie}).should.be.fulfilled;
+    p[3] = await auction.tipHash();
+    const prevProof = period.proof(transfer);
+    prevProof[0] = period.merkleRoot();
+
+    // submit tx spending same out in later block
+    block = new Block(p[2], 5).addTx(transfer);
+    block.sign(bobPriv);
+    period = new Period([block]);
+    await auction.submitPeriod(1, p[3], period.merkleRoot(), {from: charlie}).should.be.fulfilled;
+    const proof = period.proof(transfer);
+    proof[0] = period.merkleRoot();
+
+    // submit proof and get block deleted
+    const bal1 = (await auction.getSlot(1))[1];
+    await auction.reportDoubleSpend(proof, prevProof, {from: alice});
+    const bal2 = (await auction.getSlot(1))[1];
+    assert(bal1.toNumber() > bal2.toNumber());
+  });
+
   it('should allow to activate auctioned slot and submit', async () => {
     // increment Epoch
     await auction.submitPeriod(1, p[2], '0x03', {from: charlie}).should.be.fulfilled;
@@ -114,12 +156,12 @@ contract('StakingAuction', (accounts) => {
     await auction.activate(0);
     const bal2 = await token.balanceOf(bob);
     assert.equal(bal1.add(120).toNumber(), bal2.toNumber());
-    // we have submiteed 11 blocks in total
+    // we have submiteed 11 periods in total
     // epoch 1: period 0 - 2
     // epoch 2: period 3 - 5
     // epoch 3: period 6 - 8
     // epoch 4: period 9 - 11
-    // => in addition to genesis we should be in epoch 5
+    // => in addition to genesis period, now we should be in epoch 5
     const lastEpoch = await auction.lastCompleteEpoch();
     assert.equal(lastEpoch.toNumber(), 4);
     const height = await auction.chain(p[11]);

@@ -152,6 +152,83 @@ contract StakingAuction {
       lastEpochBlockHeight = newHeight;
     }
   }
+
+  function deletePeriod(bytes32 hash) internal {
+    Period storage parent = chain[chain[hash].parent];
+    uint256 i = chain[hash].parentIndex;
+    if (i < parent.children.length - 1) {
+      // swap with last child
+      parent.children[i] = parent.children[parent.children.length - 1];
+    }
+    parent.children.length--;
+    if (hash == tipHash) {
+      tipHash = chain[hash].parent;
+    }
+    delete chain[hash];
+  }
+
+  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+    for (uint256 i = _offset; i < _proof.length; i++) {
+      // solhint-disable-next-line no-inline-assembly
+      if (_index % 2 == 0) {
+        _leaf = keccak256(_leaf, _proof[i]);
+      } else {
+        _leaf = keccak256(_proof[i], _leaf);
+      }
+      _index = _index / 2;
+    }
+    return _leaf;
+  }
+
+  //validate that transaction is included to the block (merkle proof)
+  function validateProof(uint256 offset, bytes32[] _proof) view internal returns (uint64 txPos, bytes32 txHash) {
+    uint256 txLength = uint16(_proof[3] >> 224);
+    bytes memory txData = new bytes(txLength);
+    assembly {
+      calldatacopy(add(txData, 0x20), add(178, offset), txLength)
+    }
+    txHash = keccak256(txData);
+    txPos = uint64(_proof[3] >> 160);
+    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[3] >> 240), _proof);
+    require(root == _proof[0]);
+  }
+
+
+  function reportDoubleSpend(bytes32[] _proof, bytes32[] _prevProof) public {
+    // make sure block can still be slashed
+    Period memory p = chain[_proof[0]];
+
+    // validate proofs
+    uint256 offset = 32 * (_proof.length + 2);
+    uint64 txPos1;
+    (txPos1, ) = validateProof(offset + 10, _prevProof);
+
+    uint64 txPos2;
+    (txPos2, ) = validateProof(42, _proof);
+
+    // make sure transactions are different
+    require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
+
+    // get iputs and validate
+    bytes32 prevHash1;
+    bytes32 prevHash2;
+    uint8 outPos1;
+    uint8 outPos2;
+    assembly {
+      prevHash1 := calldataload(add(198, 32))
+      outPos1 := calldataload(add(230, 32))
+      prevHash2 := calldataload(add(198, offset))
+      outPos2 := calldataload(add(230, offset))
+    }
+
+    // check that spending same outputs
+    require(prevHash1 == prevHash2 && outPos1 == outPos2);
+    // delete invalid period
+    deletePeriod(_proof[0]);
+    // EVENT
+    // slash operator
+     slash(p.slot, 50);
+  }
   
   function slash(uint256 _slotId, uint256 _value) public {
     require(_slotId < epochLength);
