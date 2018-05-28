@@ -13,9 +13,10 @@ contract StakingAuction {
   
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 epochLength;       // length of epoch in periods (32 blocks)
-  uint256 lastCompleteEpoch; // height at which last epoch was completed
-  uint32 public parentBlockInterval; // how often epochs can be submitted max
-  uint64 public lastParentBlock; // last ethereum block when epoch was submitted
+  uint256 public lastCompleteEpoch; // height at which last epoch was completed
+  uint256 lastEpochBlockHeight;
+  uint32 parentBlockInterval; // how often epochs can be submitted max
+  uint64 lastParentBlock; // last ethereum block when epoch was submitted
   bytes32 public tipHash;    // hash of first period that has extended chain to some height
   ERC20 token;
   
@@ -48,6 +49,7 @@ contract StakingAuction {
 
     Period memory genPeriod;
     genPeriod.parent = genesis;
+    genPeriod.height = 32;
     tipHash = genesis;
     chain[tipHash] = genPeriod;
 
@@ -124,10 +126,6 @@ contract StakingAuction {
     require(chain[_prevHash].parent > 0);
     // calculate height
     uint256 newHeight = chain[_prevHash].height + 32;
-    // check if epoch completed
-    if (newHeight >= lastCompleteEpoch.add(epochLength.mul(32))) {
-      lastCompleteEpoch++;
-    }
     // do some magic if chain extended
     if (newHeight > chain[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
@@ -147,6 +145,11 @@ contract StakingAuction {
     if (slot.activationEpoch > 0) {
       // if slot not active, prevent submission
       require(lastCompleteEpoch.add(2) < slot.activationEpoch);
+    }
+    // check if epoch completed
+    if (newHeight >= lastEpochBlockHeight.add(epochLength.mul(32))) {
+      lastCompleteEpoch++;
+      lastEpochBlockHeight = newHeight;
     }
   }
   

@@ -95,7 +95,7 @@ contract('StakingAuction', (accounts) => {
     // increment epoch
     await auction.submitPeriod(1, p[6], '0x07', {from: charlie}).should.be.fulfilled;
     p[7] = await auction.tipHash();
-    await auction.submitPeriod(1, p[4], '0x08', {from: charlie}).should.be.fulfilled;
+    await auction.submitPeriod(1, p[7], '0x08', {from: charlie}).should.be.fulfilled;
     p[8] = await auction.tipHash();
     // try to submit when logged out
     await auction.submitPeriod(0, p[8], '0x09', {from: bob}).should.be.rejectedWith(EVMRevert);
@@ -106,11 +106,25 @@ contract('StakingAuction', (accounts) => {
     await auction.submitPeriod(1, p[8], '0x09', {from: charlie}).should.be.fulfilled;
     p[9] = await auction.tipHash();
     await auction.submitPeriod(1, p[9], '0x0a', {from: charlie}).should.be.fulfilled;
+    p[10] = await auction.tipHash();
+    await auction.submitPeriod(1, p[10], '0x0b', {from: charlie}).should.be.fulfilled;
+    p[11] = await auction.tipHash();
     // activate logout
     const bal1 = await token.balanceOf(bob);
     await auction.activate(0);
     const bal2 = await token.balanceOf(bob);
     assert.equal(bal1.add(120).toNumber(), bal2.toNumber());
+    // we have submiteed 11 blocks in total
+    // epoch 1: period 0 - 2
+    // epoch 2: period 3 - 5
+    // epoch 3: period 6 - 8
+    // epoch 4: period 9 - 11
+    // => in addition to genesis we should be in epoch 5
+    const lastEpoch = await auction.lastCompleteEpoch();
+    assert.equal(lastEpoch.toNumber(), 4);
+    const height = await auction.chain(p[11]);
+    // we should have 12 * 32 => 384 blocks at this time
+    assert.equal(height[1].toNumber(), 384);
   });
 
 });
