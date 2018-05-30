@@ -10,3 +10,5 @@ devdb/*
 !devdb/.gitkeep
 testrpc-db/*
 !testrpc-db/.gitkeep
+
+package-lock.json

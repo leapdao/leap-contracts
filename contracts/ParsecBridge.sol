@@ -52,6 +52,7 @@ contract ParsecBridge {
     bytes32 parent; // the id of the parent node
     uint64 height;  // the height this block is stored at
     uint32 parentIndex; //  the position of this node in the Parent's children list
+    uint32 gasPrice; // the gas price of transaction with block submission
     address operator; // the operator that submitted the block
     bytes32[] children; // unordered list of children below this node
     // more node attributes here
@@ -66,6 +67,9 @@ contract ParsecBridge {
   uint32 public stakePeriod;
   uint256 public totalStake;
   bytes32 public tipHash;    // hash of first block that has extended chain to some height
+
+  //todo remove after tests
+  uint256 averageGasPrice;
 
   struct Operator {
     // joinedAt is unix timestamp while operator active.
@@ -92,12 +96,42 @@ contract ParsecBridge {
   mapping(bytes32 => Exit) public exits;
 
 
-  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
+  // todo - test function that averages gas price of last 20 submitted blocks
+  // fuction will be called every block submission
+  // need to check are there 20 block in chain
+//   check gasLeft
+  // todo tests
+
+  /* todo - 2 variant: create storage variable, that should be calculate and set on each block submission
+    then getter should be just view func */
+
+  event DebugEvent(uint value);
+
+  function getAverageGasPrice() view returns (uint256 gasPrice) {
+    emit DebugEvent(gasleft());
+    Block storage b = chain[tipHash];
+    uint256 gasSum = 0;
+    for (uint256 i = 0; i < (b.height < 20 ? b.height : 20); i++) {
+      gasSum += b.gasPrice;
+      b = chain[chain[tipHash].parent];
+    }
+    gasPrice /= 20;
+    emit DebugEvent(gasleft());
+  }
+
+  function testAverageToStorage() {
+    emit DebugEvent(gasleft());
+    averageGasPrice = averageGasPrice - averageGasPrice / 15 + tx.gasprice / 15;
+    emit DebugEvent(gasleft());
+  }
+
+  constructor(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;
     genBlock.operator = msg.sender;
-    genBlock.parent = genesis; 
+    genBlock.parent = genesis;
+    genBlock.gasPrice = 1;
     tipHash = genesis;
     chain[tipHash] = genBlock;
     parentBlockInterval = _parentBlockInterval;
@@ -105,6 +139,7 @@ contract ParsecBridge {
     lastParentBlock = uint64(block.number);
     blockReward = _blockReward;
     stakePeriod = _stakePeriod;
+    emit DebugEvent(tx.gasprice);
   }
   
   modifier mint() {
@@ -126,7 +161,7 @@ contract ParsecBridge {
     
     operators[msg.sender] = Operator({
       joinedAt: uint32(now),
-      claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoche
+      claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoch
       stakeAmount: amount
     });
     OperatorJoin(msg.sender, chain[tipHash].height);
@@ -239,6 +274,7 @@ contract ParsecBridge {
     newBlock.parent = prevHash;
     newBlock.height = newHeight;
     newBlock.operator = operatorAddr;
+    newBlock.gasPrice = uint32((tx.gasprice).div(10 ** 11));
     newBlock.parentIndex = uint32(chain[prevHash].children.push(newHash) - 1);
     chain[newHash] = newBlock;
   }
