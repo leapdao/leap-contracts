@@ -65,6 +65,61 @@ contract StakingAuction {
     Slot memory slot = slots[_slotId];
     return (slot.owner, slot.stake, slot.signer, slot.activationEpoch, slot.newOwner, slot. newStake, slot.newSigner);
   }
+
+
+  // data = [winnerHash, claimCountTotal, operator, operator ...]
+  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
+  function dfs(bytes32[] _data, bytes32 _nodeHash) internal constant returns(bytes32[] data) {
+    Period memory node = chain[_nodeHash];
+    // visit this node
+    data = new bytes32[](_data.length);
+    for (uint256 i = 1; i < _data.length; i++) {
+      data[i] = _data[i];
+    }
+    // find the operator that mined this block
+    i = node.slot + 2;
+    // if operator can claim rewards, assign
+    if (uint256(data[i]) == 0) {
+      data[i] = bytes32(1);
+      data[1] = bytes32(uint256(data[1]) + (1 << 128));
+      data[0] = _nodeHash;
+    }
+    // more of tree to walk
+    if (node.children.length > 0) {
+      bytes32[][] memory options = new bytes32[][](data.length);
+      for (i = 0; i < node.children.length; i++) {
+        options[i] = dfs(data, node.children[i]);
+      }
+      for (i = 0; i < node.children.length; i++) {
+        // compare options, return the best
+        if (uint256(options[i][1]) > uint256(data[1])) {
+          data[0] = options[i][0];
+          data[1] = options[i][1];
+        }
+      }
+    }
+    else {
+      data[0] = _nodeHash;
+      data[1] = bytes32(uint256(data[1]) + 1);
+    }
+    // else - reached a tip
+    // return data
+  }
+
+  function getTip() public constant returns (bytes32, uint256) {
+    // find consensus horizon
+    bytes32 consensusHorizon = chain[tipHash].parent;
+    uint256 depth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
+    while(chain[consensusHorizon].height > depth) {
+      consensusHorizon = chain[consensusHorizon].parent;
+    }
+    // create data structure for depth first search
+    bytes32[] memory data = new bytes32[](epochLength + 2);
+    // run search
+    bytes32[] memory rsp = dfs(data, consensusHorizon);
+    // return result
+    return (rsp[0], uint256(rsp[1]) >> 128);
+  }
   
   function bet(uint256 _slotId, uint256 _value, address _signerAddr) public {
     require(_slotId < epochLength);

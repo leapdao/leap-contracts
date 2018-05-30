@@ -93,7 +93,9 @@ contract('StakingAuction', (accounts) => {
     block.sign(alicePriv);
     let period = new Period([block]);
     await auction.submitPeriod(1, p[2], period.merkleRoot(), {from: charlie}).should.be.fulfilled;
+    let tip = await auction.getTip();
     p[3] = await auction.tipHash();
+    assert.equal(p[3], tip[0]);
     const prevProof = period.proof(transfer);
     prevProof[0] = period.merkleRoot();
 
@@ -102,31 +104,37 @@ contract('StakingAuction', (accounts) => {
     block.sign(bobPriv);
     period = new Period([block]);
     await auction.submitPeriod(1, p[3], period.merkleRoot(), {from: charlie}).should.be.fulfilled;
+    tip = await auction.getTip();
+    assert.equal(tip[0], period.merkleRoot());
     const proof = period.proof(transfer);
     proof[0] = period.merkleRoot();
 
     // submit proof and get block deleted
     const bal1 = (await auction.getSlot(1))[1];
     await auction.reportDoubleSpend(proof, prevProof, {from: alice});
+    tip = await auction.getTip();
+    assert.equal(p[3], tip[0]);
     const bal2 = (await auction.getSlot(1))[1];
     assert(bal1.toNumber() > bal2.toNumber());
   });
 
   it('should allow to activate auctioned slot and submit', async () => {
     // increment Epoch
-    await auction.submitPeriod(1, p[2], '0x03', {from: charlie}).should.be.fulfilled;
-    p[3] = await auction.tipHash();
     await auction.submitPeriod(1, p[3], '0x04', {from: charlie}).should.be.fulfilled;
     p[4] = await auction.tipHash();
     await auction.submitPeriod(1, p[4], '0x05', {from: charlie}).should.be.fulfilled;
     p[5] = await auction.tipHash();
+    let tip = await auction.getTip();
+    assert.equal(p[5], tip[0]);
+    await auction.submitPeriod(1, p[5], '0x06', {from: charlie}).should.be.fulfilled;
+    p[6] = await auction.tipHash();
     // activate and submit by bob
     const bal1 = await token.balanceOf(alice);
     await auction.activate(0);
     const bal2 = await token.balanceOf(alice);
     assert.equal(bal1.add(180).toNumber(), bal2.toNumber());
-    await auction.submitPeriod(0, p[5], '0x06', {from: bob}).should.be.fulfilled;
-    p[6] = await auction.tipHash();
+    await auction.submitPeriod(0, p[6], '0x07', {from: bob}).should.be.fulfilled;
+    p[7] = await auction.tipHash();
   });
 
   it('should allow to logout', async () => {
@@ -135,8 +143,6 @@ contract('StakingAuction', (accounts) => {
 
   it('should prevent submission by logged-out slot in later epoch', async () => {
     // increment epoch
-    await auction.submitPeriod(1, p[6], '0x07', {from: charlie}).should.be.fulfilled;
-    p[7] = await auction.tipHash();
     await auction.submitPeriod(1, p[7], '0x08', {from: charlie}).should.be.fulfilled;
     p[8] = await auction.tipHash();
     // try to submit when logged out
