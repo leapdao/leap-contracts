@@ -1,17 +1,17 @@
 pragma solidity ^0.4.19;
 
-import "zeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract ParsecBridge {
   using SafeMath for uint256;
-  
+
   /*
-   *  an epoch describes a sections in block height. 
+   *  an epoch describes a sections in block height.
    *
    *       genesis/archive epoch             payout epoch                consensus window
-   *                ↓                             ↓                              ↓               
-   *    0*EL ->    ...    -> 1*EL-1   2*EL ->    ...    -> 3*EL-1    3*EL ->    ...    -> 4*EL-x 
+   *                ↓                             ↓                              ↓
+   *    0*EL ->    ...    -> 1*EL-1   2*EL ->    ...    -> 3*EL-1    3*EL ->    ...    -> 4*EL-x
    *  |-----------------------------|------------------------------|-----------------------------
    *  |                             |                              |
    *  |                             |                              |      /-> b[3*EL+y]
@@ -27,9 +27,9 @@ contract ParsecBridge {
    *                  Blocks can be submitted at chain-height or height + 1. The block submission
    *                  prunes all branches at (height - epoch-length), leving only a trunk of blocks
    *                  on the valid chain in storage after the consensus window.
-   * 
-   * Payout Epoch: This epoch starts at a distance of x * EL from the genesis block. It is the youngest 
-   * ------------ epoch that has more than epoch-length distance from the tip. Hence, it contains 
+   *
+   * Payout Epoch: This epoch starts at a distance of x * EL from the genesis block. It is the youngest
+   * ------------ epoch that has more than epoch-length distance from the tip. Hence, it contains
    *              a trunk of epoch-length blocks. Operators claim rewards from blocks in the payout
    *              epoch. The blocks in the payout epoch are on the longest chain and final, determined
    *              by pruning and clipping during the consensus window.
@@ -38,7 +38,7 @@ contract ParsecBridge {
    * -------------- until the payout epoch. In these epochs the block data is not needed any more.
    *                Blocks are archived by deletion and replaced by log-entlies of block-hash and height.
    */
-  
+
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   ERC20 public token;
 
@@ -52,6 +52,7 @@ contract ParsecBridge {
     bytes32 parent; // the id of the parent node
     uint64 height;  // the height this block is stored at
     uint32 parentIndex; //  the position of this node in the Parent's children list
+    uint32 gasPrice; // the gas price of transaction with block submission
     address operator; // the operator that submitted the block
     bytes32[] children; // unordered list of children below this node
     // more node attributes here
@@ -67,17 +68,20 @@ contract ParsecBridge {
   uint256 public totalStake;
   bytes32 public tipHash;    // hash of first block that has extended chain to some height
 
+  //todo remove after tests
+  uint256 averageGasPrice;
+
   struct Operator {
     // joinedAt is unix timestamp while operator active.
     // once operator requested leave joinedAt set to block height when requested exit
-    uint64 joinedAt; 
+    uint64 joinedAt;
     uint64 claimedUntil; // the epoch until which all reward claims have been processed
     uint256 stakeAmount; // amount of staken tokens
   }
   mapping(address => Operator) public operators;
 
   struct Deposit {
-    uint64 height; 
+    uint64 height;
     address owner;
     uint256 amount;
   }
@@ -92,12 +96,42 @@ contract ParsecBridge {
   mapping(bytes32 => Exit) public exits;
 
 
-  function ParsecBridge(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
+  // todo - test function that averages gas price of last 20 submitted blocks
+  // fuction will be called every block submission
+  // need to check are there 20 block in chain
+//   check gasLeft
+  // todo tests
+
+  /* todo - 2 variant: create storage variable, that should be calculate and set on each block submission
+    then getter should be just view func */
+
+  event DebugEvent(uint value);
+
+  function getAverageGasPrice() view returns (uint256 gasPrice) {
+    emit DebugEvent(gasleft());
+    Block storage b = chain[tipHash];
+    uint256 gasSum = 0;
+    for (uint256 i = 0; i < (b.height < 20 ? b.height : 20); i++) {
+      gasSum += b.gasPrice;
+      b = chain[chain[tipHash].parent];
+    }
+    gasPrice /= 20;
+    emit DebugEvent(gasleft());
+  }
+
+  function testAverageToStorage() {
+    emit DebugEvent(gasleft());
+    averageGasPrice = averageGasPrice - averageGasPrice / 15 + tx.gasprice / 15;
+    emit DebugEvent(gasleft());
+  }
+
+  constructor(ERC20 _token, uint32 _parentBlockInterval, uint32 _epochLength, uint64 _blockReward, uint32 _stakePeriod) public {
     require(_token != address(0));
     token = _token;
     Block memory genBlock;
     genBlock.operator = msg.sender;
-    genBlock.parent = genesis; 
+    genBlock.parent = genesis;
+    genBlock.gasPrice = 1;
     tipHash = genesis;
     chain[tipHash] = genBlock;
     parentBlockInterval = _parentBlockInterval;
@@ -105,8 +139,9 @@ contract ParsecBridge {
     lastParentBlock = uint64(block.number);
     blockReward = _blockReward;
     stakePeriod = _stakePeriod;
+    emit DebugEvent(tx.gasprice);
   }
-  
+
   modifier mint() {
     // todo: mine some tokens, if needed
     _;
@@ -117,19 +152,18 @@ contract ParsecBridge {
    */
   function join(uint256 amount) public {
     require(amount >= (totalStake + amount) / epochLength);
-    require(token.allowance(msg.sender, this) >= amount);
     require(operatorCount < epochLength);
 
     token.transferFrom(msg.sender, this, amount);
     totalStake += amount;
     operatorCount++;
-    
+
     operators[msg.sender] = Operator({
       joinedAt: uint32(now),
-      claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoche
+      claimedUntil: ((chain[tipHash].height / epochLength) * epochLength), // most recent epoch
       stakeAmount: amount
     });
-    OperatorJoin(msg.sender, chain[tipHash].height);
+    emit OperatorJoin(msg.sender, chain[tipHash].height);
   }
 
   /*
@@ -160,7 +194,7 @@ contract ParsecBridge {
     }
     delete operators[signerAddr];
     operatorCount--;
-    OperatorLeave(signerAddr, chain[tipHash].height);
+    emit OperatorLeave(signerAddr, chain[tipHash].height);
   }
 
   function submitBlockAndPrune(bytes32 prevHash, bytes32 root, uint8 v, bytes32 r, bytes32 s, bytes32[] orphans) public {
@@ -173,11 +207,11 @@ contract ParsecBridge {
         uint256 tmp = chain[tipHash].height;
         // if block is behind archive horizon
         if (tmp >= (3 * epochLength) && orphan.height <= tmp  - (3 * epochLength)) {
-          ArchiveBlock(orphan.height, orphans[i]);
+          emit ArchiveBlock(orphan.height, orphans[i]);
           tmp = 0; // mark delete
         }
         // if block is orphaned
-        else if (chain[orphan.parent].parent == 0) {          
+        else if (chain[orphan.parent].parent == 0) {
           tmp = 0; // mark delete
         }
         // if marked, then delete
@@ -208,7 +242,7 @@ contract ParsecBridge {
     // TODO recover operator address and check membership
     bytes32 sigHash = keccak256(prevHash, newHeight, root);
     address operatorAddr = ecrecover(sigHash, v, r, s);
-//    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
+    require(operators[operatorAddr].joinedAt > 1409184000); // Aug 28, 2014 - Harold Thomas Finney II
     // make sure block is placed in consensus window
     uint256 maxDepth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     require(maxDepth <= newHeight && newHeight <= chain[tipHash].height + 1);
@@ -232,13 +266,14 @@ contract ParsecBridge {
         prune(nextParent);
       }
       lastParentBlock = uint64(block.number);
-      NewHeight(newHeight, root);
+      emit NewHeight(newHeight, root);
     }
     // store the block
     Block memory newBlock;
     newBlock.parent = prevHash;
     newBlock.height = newHeight;
     newBlock.operator = operatorAddr;
+    newBlock.gasPrice = uint32((tx.gasprice).div(10 ** 11));
     newBlock.parentIndex = uint32(chain[prevHash].children.push(newHash) - 1);
     chain[newHash] = newBlock;
   }
@@ -269,6 +304,7 @@ contract ParsecBridge {
     if (i < parent.children.length - 1) {
       // swap with last child
       parent.children[i] = parent.children[parent.children.length - 1];
+      chain[parent.children[i]].parentIndex = uint32(i);
     }
     parent.children.length--;
     if (hash == tipHash) {
@@ -308,13 +344,13 @@ contract ParsecBridge {
    * will then be "clipped off", by deleting the first node after the fork on the light branch.
    *
    * Example:
-   *   epochLength = 6 
+   *   epochLength = 6
    *   stake: a = 2, b = 2, c = 2
    *
    *                   /-> b[2,b] -> b[3,b] -> b[4,b] -> b[5,b]   <- rewards = 3, light branch
    *   b[0,a] -> b[1,b] -> b[2,c] -> b[3,a] -> b[4,b]             <- rewards = 5, heavy branch
    *
-   * clipping conditions: 
+   * clipping conditions:
    * - a branch covers >= 2/3 of epochLength
    * - filling up the light branch with reward blocks will not outweight heavy branch
    *
@@ -363,7 +399,7 @@ contract ParsecBridge {
       require(claimCount <= stake);
     }
   }
-  
+
   function getWeight(bytes32[] _data, bytes32 nodeHash, uint256[] _map) internal constant returns (uint256 weight, uint256 i, bytes32 prevHash) {
     // check heavy path to common fork
     i = 0;
@@ -380,12 +416,12 @@ contract ParsecBridge {
       prevHash = previous;
       previous = nodeHash;
       nodeHash = chain[nodeHash].parent;
-    }      
+    }
   }
- 
+
   function isLightBranch(bytes32[] _data) constant internal returns (bool isLight, bytes32 prevHash) {
     require(_data.length < epochLength + 3);
-    
+
     // build heavy-branch mapping
     uint256[] memory map = buildMap(_data, 160);
 
@@ -450,7 +486,7 @@ contract ParsecBridge {
    *
    * # 2 Deposit TX (33b)
    *   1b type
-   *     4b depositId 
+   *     4b depositId
    *     8b value, 20b address
    *
    */
@@ -515,11 +551,11 @@ contract ParsecBridge {
     deleteBlock(_proof[0]);
     // EVENT
     // slash operator
-     slashOperator(b.operator, 10 * blockReward);
+    slashOperator(b.operator, 10 * blockReward);
     // reward 1 block reward
     token.transfer(msg.sender, blockReward);
   }
-  
+
   function getBranchCount(bytes32 nodeId) public constant returns(uint childCount) {
     return(chain[nodeId].children.length);
   }
@@ -530,7 +566,7 @@ contract ParsecBridge {
 
   /*
    * todo
-   */    
+   */
   function getHighest() public constant returns (bytes32, uint64, uint32, address) {
     return (chain[tipHash].parent, chain[tipHash].height, chain[tipHash].parentIndex, chain[tipHash].operator);
   }
@@ -585,7 +621,7 @@ contract ParsecBridge {
     bytes32 consensusHorizon = chain[tipHash].parent;
     uint256 depth = (chain[tipHash].height < epochLength) ? 0 : chain[tipHash].height - epochLength;
     while(chain[consensusHorizon].height > depth) {
-      consensusHorizon = chain[consensusHorizon].parent;        
+      consensusHorizon = chain[consensusHorizon].parent;
     }
 
     // create data structure for depth first search
@@ -598,7 +634,7 @@ contract ParsecBridge {
     // return result
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
-  
+
   function getBlock(uint256 height) public view returns (bytes32 root, address operator) {
     require(height <= chain[tipHash].height);
     return (bytes32(height),0);
@@ -610,7 +646,6 @@ contract ParsecBridge {
    * Add funds
    */
   function deposit(uint256 amount) public {
-    require(token.allowance(msg.sender, this) >= amount);
     token.transferFrom(msg.sender, this, amount);
     depositCount++;
     deposits[depositCount] = Deposit({
@@ -618,7 +653,7 @@ contract ParsecBridge {
       owner: msg.sender,
       amount: amount
     });
-    NewDeposit(depositCount, msg.sender);
+    emit NewDeposit(depositCount, msg.sender);
   }
 
 
