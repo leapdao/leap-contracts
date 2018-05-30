@@ -17,6 +17,7 @@ contract StakingAuction {
   uint256 lastEpochBlockHeight;
   uint32 parentBlockInterval; // how often epochs can be submitted max
   uint64 lastParentBlock; // last ethereum block when epoch was submitted
+  uint256 maxBlockReward;    // max block reward
   bytes32 public tipHash;    // hash of first period that has extended chain to some height
   ERC20 token;
   
@@ -43,7 +44,7 @@ contract StakingAuction {
   }
   mapping(bytes32 => Period) public chain;
     
-  constructor(ERC20 _token, uint256 _slotCount) public {
+  constructor(ERC20 _token, uint256 _slotCount, uint256 _maxBlockReward) public {
     require(_slotCount < 256);
     require(_slotCount >= 2);
 
@@ -56,6 +57,7 @@ contract StakingAuction {
     epochLength = _slotCount;
     require(_token != address(0));
     token = _token;
+    maxBlockReward = _maxBlockReward;
   }
 
   function getSlot(uint256 _slotId) constant public returns (address, uint64, address, uint32, address, uint64, address) {
@@ -118,12 +120,19 @@ contract StakingAuction {
   }
   
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
+    // check parent node exists
+    require(chain[_prevHash].parent > 0);
+    // check that same root not submitted yet
+    require(chain[_root].height == 0);
+    // check slot
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender);
+    if (slot.activationEpoch > 0) {
+      // if slot not active, prevent submission
+      require(lastCompleteEpoch.add(2) < slot.activationEpoch);
+    }
 
-    // check parent node exists
-    require(chain[_prevHash].parent > 0);
     // calculate height
     uint256 newHeight = chain[_prevHash].height + 32;
     // do some magic if chain extended
@@ -142,10 +151,18 @@ contract StakingAuction {
     newPeriod.parentIndex = uint32(chain[_prevHash].children.push(_root) - 1);
     chain[_root] = newPeriod;
 
-    if (slot.activationEpoch > 0) {
-      // if slot not active, prevent submission
-      require(lastCompleteEpoch.add(2) < slot.activationEpoch);
+    // distribute rewards
+    uint256 totalSupply = token.totalSupply();
+    uint256 stakedSupply = token.balanceOf(this);
+    uint256 reward = maxBlockReward;
+    if (stakedSupply >= totalSupply.div(2)) {
+      // 4 x br x as x (ts - as)
+      // -----------------------
+      //        ts x ts
+      reward = totalSupply.sub(stakedSupply).mul(stakedSupply).mul(maxBlockReward).mul(4).div(totalSupply.mul(totalSupply));
     }
+    slot.stake += uint64(reward);
+
     // check if epoch completed
     if (newHeight >= lastEpochBlockHeight.add(epochLength.mul(32))) {
       lastCompleteEpoch++;
@@ -181,7 +198,7 @@ contract StakingAuction {
   }
 
   //validate that transaction is included to the block (merkle proof)
-  function validateProof(uint256 offset, bytes32[] _proof) view internal returns (uint64 txPos, bytes32 txHash) {
+  function validateProof(uint256 offset, bytes32[] _proof) pure internal returns (uint64 txPos, bytes32 txHash) {
     uint256 txLength = uint16(_proof[3] >> 224);
     bytes memory txData = new bytes(txLength);
     assembly {

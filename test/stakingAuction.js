@@ -28,7 +28,7 @@ contract('StakingAuction', (accounts) => {
   before(async () => {
     token = await SimpleToken.new();
     // initialize contract
-    auction = await StakingAuction.new(token.address, 3);
+    auction = await StakingAuction.new(token.address, 3, 50);
     p[0] = await auction.tipHash();
     totalSupply = await token.totalSupply();
     token.transfer(bob, totalSupply.div(3));
@@ -48,8 +48,8 @@ contract('StakingAuction', (accounts) => {
 
   it('should prevent auctining for lower price', async () => {
     await token.approve(auction.address, totalSupply, {from: bob});
-    await auction.bet(0, 99, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
-    await auction.bet(0, 101, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
+    await auction.bet(0, 129, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
+    await auction.bet(0, 131, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
   });
 
   it('should allow to be slashed',  async () => {
@@ -57,7 +57,7 @@ contract('StakingAuction', (accounts) => {
   });
 
   it('should allow to auction for higer price',  async () => {
-    await auction.bet(0, 120, bob, {from: bob}).should.be.fulfilled;
+    await auction.bet(0, 150, bob, {from: bob}).should.be.fulfilled;
   });
 
   it('should allow submission when slot auctioned in same epoch', async () => {
@@ -124,7 +124,7 @@ contract('StakingAuction', (accounts) => {
     const bal1 = await token.balanceOf(alice);
     await auction.activate(0);
     const bal2 = await token.balanceOf(alice);
-    assert.equal(bal1.add(80).toNumber(), bal2.toNumber());
+    assert.equal(bal1.add(180).toNumber(), bal2.toNumber());
     await auction.submitPeriod(0, p[5], '0x06', {from: bob}).should.be.fulfilled;
     p[6] = await auction.tipHash();
   });
@@ -152,10 +152,11 @@ contract('StakingAuction', (accounts) => {
     await auction.submitPeriod(1, p[10], '0x0b', {from: charlie}).should.be.fulfilled;
     p[11] = await auction.tipHash();
     // activate logout
+    token.transfer(auction.address, 2000);
     const bal1 = await token.balanceOf(bob);
     await auction.activate(0);
     const bal2 = await token.balanceOf(bob);
-    assert.equal(bal1.add(120).toNumber(), bal2.toNumber());
+    assert.equal(bal1.add(200).toNumber(), bal2.toNumber());
     // we have submiteed 11 periods in total
     // epoch 1: period 0 - 2
     // epoch 2: period 3 - 5
