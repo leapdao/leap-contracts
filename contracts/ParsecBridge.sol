@@ -271,6 +271,7 @@ contract ParsecBridge {
     if (i < parent.children.length - 1) {
       // swap with last child
       parent.children[i] = parent.children[parent.children.length - 1];
+      chain[parent.children[i]].parentIndex = uint32(i);
     }
     parent.children.length--;
     if (hash == tipHash) {
