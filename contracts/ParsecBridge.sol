@@ -19,6 +19,7 @@ contract ParsecBridge {
   uint256 parentBlockInterval; // how often epochs can be submitted max
   uint64 lastParentBlock; // last ethereum block when epoch was submitted
   uint256 maxReward;    // max reward per period
+  uint256 averageGasPrice;   
   bytes32 public tipHash;    // hash of first period that has extended chain to some height
   ERC20 token;
   
@@ -197,6 +198,9 @@ contract ParsecBridge {
     emit ValidatorJoin(slot.signer, lastCompleteEpoch + 1);
   }
 
+  function recordGas() internal {
+    averageGasPrice = averageGasPrice - (averageGasPrice / 15) + (tx.gasprice / 15);
+  }
 
   function submitAndPrune(uint256 _slotId, bytes32 _prevHash, bytes32 _root, bytes32[] orphans) public {
     submitPeriod(_slotId, _prevHash, _root);
@@ -246,6 +250,9 @@ contract ParsecBridge {
     newPeriod.parentIndex = uint32(periods[_prevHash].children.push(_root) - 1);
     periods[_root] = newPeriod;
 
+    // record gas
+    recordGas();
+
     // distribute rewards
     uint256 totalSupply = token.totalSupply();
     uint256 stakedSupply = token.balanceOf(this);
@@ -271,7 +278,6 @@ contract ParsecBridge {
     if (i < parent.children.length - 1) {
       // swap with last child
       parent.children[i] = parent.children[parent.children.length - 1];
-      chain[parent.children[i]].parentIndex = uint32(i);
     }
     parent.children.length--;
     if (hash == tipHash) {
