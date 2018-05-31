@@ -25,7 +25,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 3, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 3, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -140,7 +140,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -284,7 +284,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       // alice auctions slot
       await token.approve(parsec.address, 1000, {from: alice});
@@ -311,8 +311,7 @@ contract('Parsec', (accounts) => {
       });
     });
     describe('Exit', function() {
-      it('should allow to exit', async () => {
-        // more blocks
+      it('should allow to exit burned funds', async () => {
         const coinbase = Tx.coinbase(50, alice);
         let transfer = Tx.transfer(
           64,
@@ -335,6 +334,30 @@ contract('Parsec', (accounts) => {
         const bal2 = await token.balanceOf(alice);
         assert(bal1.toNumber() < bal2.toNumber());
       });
+      it('should allow to exit valid utxo', async () => {
+        const coinbase = Tx.coinbase(50, alice);
+        let transfer = Tx.transfer(
+          92,
+          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Output(50, bob)]
+        );
+
+        transfer = transfer.sign([alicePriv]);
+        let block = new Block(p[1], 92).addTx(coinbase).addTx(transfer);
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[2] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
+        const proof = period.proof(transfer);
+        proof[0] = period.merkleRoot();
+
+        // withdraw output
+        const event = await parsec.startExit(proof);
+        const bal1 = await token.balanceOf(bob);
+        await parsec.finalizeExits();
+        const bal2 = await token.balanceOf(bob);
+        assert(bal1.toNumber() < bal2.toNumber());
+      });
     });
   });
 
@@ -345,7 +368,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       await token.approve(parsec.address, 1000, {from: alice});
       await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;

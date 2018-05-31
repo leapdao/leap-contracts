@@ -23,6 +23,7 @@ contract ParsecBridge is PriorityQueue {
   uint64 lastParentBlock; // last ethereum block when epoch was submitted
   uint256 maxReward;    // max reward per period
   uint256 averageGasPrice;   
+  uint256 exitDuration;
   bytes32 public tipHash;    // hash of first period that has extended chain to some height
   ERC20 token;
   
@@ -64,7 +65,7 @@ contract ParsecBridge is PriorityQueue {
   mapping(uint256 => Exit) public exits;
 
     
-  constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval) public {
+  constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // set token contract
     require(_token != address(0));
     token = _token;
@@ -84,6 +85,7 @@ contract ParsecBridge is PriorityQueue {
     // parent block settings
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
+    exitDuration = _exitDuration;
   }
 
   function getSlot(uint256 _slotId) constant public returns (address, uint64, address, uint32, address, uint64, address) {
@@ -499,7 +501,7 @@ contract ParsecBridge is PriorityQueue {
 
   // Priority is a given utxos position in the exit priority queue
   function addExitToQueue(uint256 utxoPos, address exitor, uint64 amount, uint256 created_at) internal {
-    uint256 exitable_at = Math.max256(created_at + 2 weeks, block.timestamp + 1 weeks);
+    uint256 exitable_at = Math.max256(created_at + (2 * exitDuration), block.timestamp + exitDuration);
     uint256 priority = exitable_at << 128 | utxoPos;
     require(amount > 0);
     require(exits[utxoPos].amount == 0);
@@ -527,7 +529,7 @@ contract ParsecBridge is PriorityQueue {
     (utxoPos, exitable_at) = getNextExit();
 
     Exit memory currentExit = exits[utxoPos];
-    while (exitable_at < block.timestamp && currentSize > 0) {
+    while (exitable_at <= block.timestamp && currentSize > 0) {
       currentExit = exits[utxoPos];
       token.transfer(currentExit.owner, currentExit.amount);
       delMin();
