@@ -2,13 +2,16 @@ pragma solidity ^0.4.19;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/math/Math.sol";
+import "./PriorityQueue.sol";
 
-contract ParsecBridge {
+contract ParsecBridge is PriorityQueue {
   using SafeMath for uint256;
 
   event Epoch(uint256 epoch);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address depositor);
+  event ExitStarted(address indexed exitor, uint256 indexed utxoPos, uint256 amount);
   event ValidatorJoin(address indexed signerAddr, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 epoch);
   
@@ -40,7 +43,7 @@ contract ParsecBridge {
     uint32 height;  // the height of last block in period
     uint32 parentIndex; //  the position of this node in the Parent's children list
     uint8 slot;
-    uint32 gasPrice;
+    uint32 timestamp;
     uint64 reward;
     bytes32[] children; // unordered list of children below this node
   }
@@ -56,10 +59,9 @@ contract ParsecBridge {
 
   struct Exit {
     uint64 amount;
-    uint32 opened;
     address owner;
   }
-  mapping(bytes32 => Exit) public exits;
+  mapping(uint256 => Exit) public exits;
 
     
   constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval) public {
@@ -70,6 +72,7 @@ contract ParsecBridge {
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
     genesisPeriod.height = 32;
+    genesisPeriod.timestamp = uint32(block.timestamp);
     tipHash = genesis;
     periods[tipHash] = genesisPeriod;
     // epochLength and at the same time number of validator slots
@@ -247,6 +250,7 @@ contract ParsecBridge {
     newPeriod.parent = _prevHash;
     newPeriod.height = uint32(newHeight);
     newPeriod.slot = uint8(_slotId);
+    newPeriod.timestamp = uint32(block.timestamp);
     newPeriod.parentIndex = uint32(periods[_prevHash].children.push(_root) - 1);
     periods[_root] = newPeriod;
 
@@ -364,6 +368,7 @@ contract ParsecBridge {
     uint8 outPos1;
     uint8 outPos2;
     assembly {
+      //TODO: allow other than first inputId
       prevHash1 := calldataload(add(198, 32))
       outPos1 := calldataload(add(230, 32))
       prevHash2 := calldataload(add(198, offset))
@@ -442,16 +447,20 @@ contract ParsecBridge {
     // require(p.height < periods[tipHash].height - (epochLength * 32));
 
     // validate proof
-    bytes32 txHash;
-    ( , txHash) = validateProof(10, _proof);
+    uint256 txPos;
+    (txPos, ) = validateProof(10, _proof);
+    uint256 blknum = periods[_proof[0]].height;
+    uint256 oindex = 0; // TODO:  enable other outputs
+    uint256 utxoPos = (1000000000 * blknum) + (txPos * 10000) + oindex;
 
     // check not withdrawn yet
-    require(exits[txHash].amount == 0);
+    require(exits[utxoPos].amount == 0);
 
     address dest;
     uint64 amount;
     assembly {
       // first output
+      // TODO: enable other outputs
       amount := calldataload(272)
       dest := calldataload(292)
     }
@@ -460,14 +469,83 @@ contract ParsecBridge {
     // recover signer
     dest = recoverTxSigner(10, _proof);
 
-    exits[txHash] = Exit({
+    exits[utxoPos] = Exit({
       amount: amount,
-      opened: uint32(now - 4 days),
       owner: dest
     });
 
     // EVENT
     token.transfer(dest, amount);
+  }
+
+  function startExit(bytes32[] _proof) public {
+    // validate proof
+    uint256 txPos;
+    (txPos, ) = validateProof(10, _proof);
+    uint256 blknum = periods[_proof[0]].height;
+    uint256 oindex = 0; // TODO:  enable other outputs
+    uint256 utxoPos = (1000000000 * blknum) + (txPos * 10000) + oindex;
+
+    address dest;
+    uint64 amount;
+    assembly {
+      // first output
+      // TODO: enable other outputs
+      amount := calldataload(272)
+      dest := calldataload(292)
+    }
+    addExitToQueue(utxoPos, dest, amount, periods[_proof[0]].timestamp);
+  }
+
+  // Priority is a given utxos position in the exit priority queue
+  function addExitToQueue(uint256 utxoPos, address exitor, uint64 amount, uint256 created_at) internal {
+    uint256 exitable_at = Math.max256(created_at + 2 weeks, block.timestamp + 1 weeks);
+    uint256 priority = exitable_at << 128 | utxoPos;
+    require(amount > 0);
+    require(exits[utxoPos].amount == 0);
+    insert(priority);
+    exits[utxoPos] = Exit({
+      owner: exitor,
+      amount: amount
+    });
+    emit ExitStarted(msg.sender, utxoPos, amount);
+  }
+
+  //function challengeExit(uint256 cUtxoPos, uint256 eUtxoIndex, bytes txBytes, bytes proof, bytes sigs, bytes confirmationSig) public {
+    // check proofs
+    // check second tx is spending the first
+    // construct utxoPos of spend tx
+    // look it up, if existing, delete
+    //   delete exits[eUtxoPos].owner;
+  //}
+
+  // @dev Loops through the priority queue of exits, settling the ones whose challenge
+  // @dev challenge period has ended
+  function finalizeExits() public {
+    uint256 utxoPos;
+    uint256 exitable_at;
+    (utxoPos, exitable_at) = getNextExit();
+
+    Exit memory currentExit = exits[utxoPos];
+    while (exitable_at < block.timestamp && currentSize > 0) {
+      currentExit = exits[utxoPos];
+      token.transfer(currentExit.owner, currentExit.amount);
+      delMin();
+      delete exits[utxoPos].owner;
+
+      if (currentSize > 0) {
+        (utxoPos, exitable_at) = getNextExit();
+      } else {
+        return;
+      }
+    }
+  }
+
+  function getNextExit() internal view returns (uint256, uint256) {
+    uint256 priority = getMin();
+    uint256 utxoPos = uint256(uint128(priority));
+    uint256 exitable_at = priority >> 128;
+    return (utxoPos, exitable_at);
   }
 
 }
