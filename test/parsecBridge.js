@@ -326,7 +326,6 @@ contract('Parsec', (accounts) => {
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
 
         // withdraw burned output
         const bal1 = await token.balanceOf(alice);
@@ -350,7 +349,6 @@ contract('Parsec', (accounts) => {
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
 
         // withdraw output
         const event = await parsec.startExit(proof);
@@ -383,9 +381,7 @@ contract('Parsec', (accounts) => {
         p[3] = period.merkleRoot();
         await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
         const spendProof = period.proof(spend);
-        spendProof[0] = period.merkleRoot();
 
         // withdraw output
         const event = await parsec.startExit(proof);
@@ -444,7 +440,6 @@ contract('Parsec', (accounts) => {
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(1, p[0], p[1], {from: charlie}).should.be.fulfilled;
         const prevProof = period.proof(transfer);
-        prevProof[0] = period.merkleRoot();
 
         // submit tx spending same out in later block
         block = new Block(p[1], 64).addTx(transfer);
@@ -453,7 +448,6 @@ contract('Parsec', (accounts) => {
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(2, p[1], p[2], {from: charlie}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
 
         // check tip
         let tip = await parsec.getTip();
@@ -484,7 +478,6 @@ contract('Parsec', (accounts) => {
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
         const proof = period.proof(deposit);
-        proof[0] = period.merkleRoot();
 
         // complain, if deposit tx wrong
         const bal1 = (await parsec.getSlot(0))[1];

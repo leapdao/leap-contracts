@@ -314,7 +314,7 @@ contract ParsecBridge is PriorityQueue {
     }
     txHash = keccak256(txData);
     txPos = uint64(_proof[1] >> 160);
-    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240)-2, _proof);
+    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
     require(root == _proof[0]);
   }
 
