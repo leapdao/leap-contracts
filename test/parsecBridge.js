@@ -334,16 +334,17 @@ contract('Parsec', (accounts) => {
         const bal2 = await token.balanceOf(alice);
         assert(bal1.toNumber() < bal2.toNumber());
       });
+
       it('should allow to exit valid utxo', async () => {
         const coinbase = Tx.coinbase(50, alice);
         let transfer = Tx.transfer(
-          92,
+          96,
           [new Input(new Outpoint(coinbase.hash(), 0))],
           [new Output(50, bob)]
         );
 
         transfer = transfer.sign([alicePriv]);
-        let block = new Block(p[1], 92).addTx(coinbase).addTx(transfer);
+        let block = new Block(p[1], 96).addTx(coinbase).addTx(transfer);
         block.sign(alicePriv);
         let period = new Period([block]);
         p[2] = period.merkleRoot();
@@ -357,6 +358,45 @@ contract('Parsec', (accounts) => {
         await parsec.finalizeExits();
         const bal2 = await token.balanceOf(bob);
         assert(bal1.toNumber() < bal2.toNumber());
+      });
+
+      it('should allow to challenge exit', async () => {
+        const coinbase = Tx.coinbase(50, alice);
+        // utxo that will try exit
+        let transfer = Tx.transfer(
+          128,
+          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Output(50, bob)]
+        );
+        transfer = transfer.sign([alicePriv]);
+        // utxo that will have spend exit utxo
+        let spend = Tx.transfer(
+          128,
+          [new Input(new Outpoint(transfer.hash(), 0))],
+          [new Output(50, charlie)]
+        );
+        spend = spend.sign([bobPriv]);
+        // submit period and get proofs
+        let block = new Block(p[2], 128).addTx(coinbase).addTx(transfer).addTx(spend);
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[3] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
+        const proof = period.proof(transfer);
+        proof[0] = period.merkleRoot();
+        const spendProof = period.proof(spend);
+        spendProof[0] = period.merkleRoot();
+
+        // withdraw output
+        const event = await parsec.startExit(proof);
+        const utxoPos = event.logs[0].args.utxoPos.toNumber();
+
+        // challenge exit and make sure exit is removed
+        let exit = await parsec.exits(utxoPos);
+        assert(exit[1] == bob);
+        await parsec.challengeExit(spendProof, proof);
+        exit = await parsec.exits(utxoPos);
+        assert(exit[1] == '0x0000000000000000000000000000000000000000');
       });
     });
   });

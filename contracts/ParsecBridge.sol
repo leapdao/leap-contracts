@@ -522,24 +522,25 @@ contract ParsecBridge is PriorityQueue {
     uint256 blknum = periods[_prevProof[0]].height;
     uint256 oindex = 0; // TODO:  enable other outputs
     uint256 utxoPos = (1000000000 * blknum) + (txPos1 * 10000) + oindex;
-
+    
     require(exits[utxoPos].amount > 0);
 
     // validate spending tx
     validateProof(42, _proof);
 
-
     // get iputs and validate
-    bytes32 prevHash2;
-    uint8 outPos2;
+    bytes32 prevHash1;
+    uint8 outPos1;
     assembly {
       //TODO: allow other than first inputId
-      prevHash2 := calldataload(add(198, offset))
-      outPos2 := calldataload(add(230, offset))
+      prevHash1 := calldataload(add(198, 32))
+      outPos1 := calldataload(add(230, 32))
     }
 
     // make sure one is spending the other one
-    require(txHash1 == prevHash2 && outPos2 == oindex);
+    require(txHash1 == prevHash1);
+    // TODO: fix outpos position check
+    //require(outPos1 == oindex);
 
     // delete invalid exit
     delete exits[utxoPos].owner;
