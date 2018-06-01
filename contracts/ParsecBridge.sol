@@ -307,14 +307,14 @@ contract ParsecBridge is PriorityQueue {
 
   //validate that transaction is included to the period (merkle proof)
   function validateProof(uint256 offset, bytes32[] _proof) pure internal returns (uint64 txPos, bytes32 txHash) {
-    uint256 txLength = uint16(_proof[3] >> 224);
+    uint256 txLength = uint16(_proof[1] >> 224);
     bytes memory txData = new bytes(txLength);
     assembly {
-      calldatacopy(add(txData, 0x20), add(178, offset), txLength)
+      calldatacopy(add(txData, 0x20), add(114, offset), txLength)
     }
     txHash = keccak256(txData);
-    txPos = uint64(_proof[3] >> 160);
-    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[3] >> 240), _proof);
+    txPos = uint64(_proof[1] >> 160);
+    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240)-2, _proof);
     require(root == _proof[0]);
   }
 
@@ -336,10 +336,10 @@ contract ParsecBridge is PriorityQueue {
     validateProof(17, _txData);
 
     // check deposit values
-    uint32 depositId = uint32(_txData[4] >> 224);
-    uint64 value = uint64(_txData[4] >> 160);
+    uint32 depositId = uint32(_txData[2] >> 224);
+    uint64 value = uint64(_txData[2] >> 160);
     Deposit memory dep = deposits[depositId];
-    require(value != dep.amount || address(_txData[4]) != dep.owner);
+    require(value != dep.amount || address(_txData[2]) != dep.owner);
 
     // delete invalid period
     deletePeriod(_txData[0]);
@@ -371,10 +371,10 @@ contract ParsecBridge is PriorityQueue {
     uint8 outPos2;
     assembly {
       //TODO: allow other than first inputId
-      prevHash1 := calldataload(add(198, 32))
-      outPos1 := calldataload(add(230, 32))
-      prevHash2 := calldataload(add(198, offset))
-      outPos2 := calldataload(add(230, offset))
+      prevHash1 := calldataload(add(134, 32))
+      outPos1 := calldataload(add(166, 32))
+      prevHash2 := calldataload(add(134, offset))
+      outPos2 := calldataload(add(166, offset))
     }
 
     // check that spending same outputs
@@ -424,17 +424,17 @@ contract ParsecBridge is PriorityQueue {
 
 
   function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
-    uint16 txLength = uint16(_proof[3] >> 224);
+    uint16 txLength = uint16(_proof[1] >> 224);
     bytes memory txData = new bytes(txLength);
     bytes32 r;
     bytes32 s;
     uint8 v;
     assembly {
-      calldatacopy(add(txData, 32), add(178, offset), 43)
-      r := calldataload(add(221, offset))
-      s := calldataload(add(253, offset))
-      v := calldataload(add(254, offset))
-      calldatacopy(add(txData, 140), add(286, offset), 28) // 32 + 43 + 65
+      calldatacopy(add(txData, 32), add(114, offset), 43)
+      r := calldataload(add(157, offset))
+      s := calldataload(add(189, offset))
+      v := calldataload(add(190, offset))
+      calldatacopy(add(txData, 140), add(222, offset), 28) // 32 + 43 + 65
     }
     dest = ecrecover(keccak256(txData), v, r, s);
   }
@@ -462,8 +462,8 @@ contract ParsecBridge is PriorityQueue {
     assembly {
       // first output
       // TODO: enable other outputs
-      amount := calldataload(272)
-      dest := calldataload(292)
+      amount := calldataload(208)
+      dest := calldataload(228)
     }
     require(dest == address(this));
 
@@ -490,8 +490,8 @@ contract ParsecBridge is PriorityQueue {
     assembly {
       // first output
       // TODO: enable other outputs
-      amount := calldataload(272)
-      dest := calldataload(292)
+      amount := calldataload(208)
+      dest := calldataload(228)
     }
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash));
@@ -524,8 +524,8 @@ contract ParsecBridge is PriorityQueue {
     uint8 outPos1;
     assembly {
       //TODO: allow other than first inputId
-      prevHash1 := calldataload(add(198, 32))
-      outPos1 := calldataload(add(230, 32))
+      prevHash1 := calldataload(add(134, 32))
+      outPos1 := calldataload(add(166, 32))
     }
 
     // make sure one is spending the other one
