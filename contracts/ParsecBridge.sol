@@ -513,13 +513,37 @@ contract ParsecBridge is PriorityQueue {
     emit ExitStarted(msg.sender, utxoPos, amount);
   }
 
-  //function challengeExit(uint256 cUtxoPos, uint256 eUtxoIndex, bytes txBytes, bytes proof, bytes sigs, bytes confirmationSig) public {
-    // check proofs
-    // check second tx is spending the first
-    // construct utxoPos of spend tx
-    // look it up, if existing, delete
-    //   delete exits[eUtxoPos].owner;
-  //}
+  function challengeExit(bytes32[] _proof, bytes32[] _prevProof) public {
+    // validate exiting tx
+    uint256 offset = 32 * (_proof.length + 2);
+    uint64 txPos1;
+    bytes32 txHash1;
+    (txPos1, txHash1) = validateProof(offset + 10, _prevProof);
+    uint256 blknum = periods[_prevProof[0]].height;
+    uint256 oindex = 0; // TODO:  enable other outputs
+    uint256 utxoPos = (1000000000 * blknum) + (txPos1 * 10000) + oindex;
+
+    require(exits[utxoPos].amount > 0);
+
+    // validate spending tx
+    validateProof(42, _proof);
+
+
+    // get iputs and validate
+    bytes32 prevHash2;
+    uint8 outPos2;
+    assembly {
+      //TODO: allow other than first inputId
+      prevHash2 := calldataload(add(198, offset))
+      outPos2 := calldataload(add(230, offset))
+    }
+
+    // make sure one is spending the other one
+    require(txHash1 == prevHash2 && outPos2 == oindex);
+
+    // delete invalid exit
+    delete exits[utxoPos].owner;
+  }
 
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
   // @dev challenge period has ended
