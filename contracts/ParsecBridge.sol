@@ -11,7 +11,7 @@ contract ParsecBridge is PriorityQueue {
   event Epoch(uint256 epoch);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address depositor);
-  event ExitStarted(address indexed exitor, uint256 indexed utxoPos, uint256 amount);
+  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, address exitor, uint256 amount);
   event ValidatorJoin(address indexed signerAddr, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 epoch);
   
@@ -62,7 +62,7 @@ contract ParsecBridge is PriorityQueue {
     uint64 amount;
     address owner;
   }
-  mapping(uint256 => Exit) public exits;
+  mapping(bytes32 => Exit) public exits;
 
     
   constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
@@ -449,14 +449,13 @@ contract ParsecBridge is PriorityQueue {
     // require(p.height < periods[tipHash].height - (epochLength * 32));
 
     // validate proof
-    uint256 txPos;
-    (txPos, ) = validateProof(10, _proof);
-    uint256 blknum = periods[_proof[0]].height;
+    bytes32 txHash;
+    (, txHash) = validateProof(10, _proof);
     uint256 oindex = 0; // TODO:  enable other outputs
-    uint256 utxoPos = (1000000000 * blknum) + (txPos * 10000) + oindex;
+    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash));
 
     // check not withdrawn yet
-    require(exits[utxoPos].amount == 0);
+    require(exits[utxoId].amount == 0);
 
     address dest;
     uint64 amount;
@@ -471,7 +470,7 @@ contract ParsecBridge is PriorityQueue {
     // recover signer
     dest = recoverTxSigner(10, _proof);
 
-    exits[utxoPos] = Exit({
+    exits[utxoId] = Exit({
       amount: amount,
       owner: dest
     });
@@ -482,11 +481,9 @@ contract ParsecBridge is PriorityQueue {
 
   function startExit(bytes32[] _proof) public {
     // validate proof
-    uint256 txPos;
-    (txPos, ) = validateProof(10, _proof);
-    uint256 blknum = periods[_proof[0]].height;
+    bytes32 txHash;
+    ( , txHash) = validateProof(10, _proof);
     uint256 oindex = 0; // TODO:  enable other outputs
-    uint256 utxoPos = (1000000000 * blknum) + (txPos * 10000) + oindex;
 
     address dest;
     uint64 amount;
@@ -496,34 +493,28 @@ contract ParsecBridge is PriorityQueue {
       amount := calldataload(272)
       dest := calldataload(292)
     }
-    addExitToQueue(utxoPos, dest, amount, periods[_proof[0]].timestamp);
-  }
-
-  // Priority is a given utxos position in the exit priority queue
-  function addExitToQueue(uint256 utxoPos, address exitor, uint64 amount, uint256 created_at) internal {
-    uint256 exitable_at = Math.max256(created_at + (2 * exitDuration), block.timestamp + exitDuration);
-    uint256 priority = exitable_at << 128 | utxoPos;
+    uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash));
+    uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(amount > 0);
-    require(exits[utxoPos].amount == 0);
+    require(exits[utxoId].amount == 0);
     insert(priority);
-    exits[utxoPos] = Exit({
-      owner: exitor,
+    exits[utxoId] = Exit({
+      owner: dest,
       amount: amount
     });
-    emit ExitStarted(msg.sender, utxoPos, amount);
+    emit ExitStarted(txHash, oindex, dest, amount);
   }
 
   function challengeExit(bytes32[] _proof, bytes32[] _prevProof) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
-    uint64 txPos1;
     bytes32 txHash1;
-    (txPos1, txHash1) = validateProof(offset + 10, _prevProof);
-    uint256 blknum = periods[_prevProof[0]].height;
+    ( , txHash1) = validateProof(offset + 10, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
-    uint256 utxoPos = (1000000000 * blknum) + (txPos1 * 10000) + oindex;
+    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
     
-    require(exits[utxoPos].amount > 0);
+    require(exits[utxoId].amount > 0);
 
     // validate spending tx
     validateProof(42, _proof);
@@ -543,36 +534,35 @@ contract ParsecBridge is PriorityQueue {
     //require(outPos1 == oindex);
 
     // delete invalid exit
-    delete exits[utxoPos].owner;
+    delete exits[utxoId].owner;
   }
 
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
   // @dev challenge period has ended
   function finalizeExits() public {
-    uint256 utxoPos;
+    bytes32 utxoId;
     uint256 exitable_at;
-    (utxoPos, exitable_at) = getNextExit();
+    (utxoId, exitable_at) = getNextExit();
 
-    Exit memory currentExit = exits[utxoPos];
+    Exit memory currentExit = exits[utxoId];
     while (exitable_at <= block.timestamp && currentSize > 0) {
-      currentExit = exits[utxoPos];
+      currentExit = exits[utxoId];
       token.transfer(currentExit.owner, currentExit.amount);
       delMin();
-      delete exits[utxoPos].owner;
+      delete exits[utxoId].owner;
 
       if (currentSize > 0) {
-        (utxoPos, exitable_at) = getNextExit();
+        (utxoId, exitable_at) = getNextExit();
       } else {
         return;
       }
     }
   }
 
-  function getNextExit() internal view returns (uint256, uint256) {
+  function getNextExit() internal view returns (bytes32 utxoId, uint256 exitable_at) {
     uint256 priority = getMin();
-    uint256 utxoPos = uint256(uint128(priority));
-    uint256 exitable_at = priority >> 128;
-    return (utxoPos, exitable_at);
+    utxoId = bytes32(uint128(priority));
+    exitable_at = priority >> 128;
   }
 
 }

@@ -389,14 +389,19 @@ contract('Parsec', (accounts) => {
 
         // withdraw output
         const event = await parsec.startExit(proof);
-        const utxoPos = event.logs[0].args.utxoPos.toNumber();
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+
 
         // challenge exit and make sure exit is removed
-        let exit = await parsec.exits(utxoPos);
-        assert(exit[1] == bob);
+        let exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal(exit[1], bob);
         await parsec.challengeExit(spendProof, proof);
-        exit = await parsec.exits(utxoPos);
-        assert(exit[1] == '0x0000000000000000000000000000000000000000');
+        exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal(exit[1], '0x0000000000000000000000000000000000000000');
       });
     });
   });
