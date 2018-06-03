@@ -245,6 +245,8 @@ contract ParsecBridge is PriorityQueue {
       require(block.number >= lastParentBlock + parentBlockInterval);
       tipHash = _root;
       lastParentBlock = uint64(block.number);
+	  // record gas
+	  recordGas();
       emit NewHeight(newHeight, _root);
     }
     // store the period
@@ -256,8 +258,7 @@ contract ParsecBridge is PriorityQueue {
     newPeriod.parentIndex = uint32(periods[_prevHash].children.push(_root) - 1);
     periods[_root] = newPeriod;
 
-    // record gas
-    recordGas();
+
 
     // distribute rewards
     uint256 totalSupply = token.totalSupply();
