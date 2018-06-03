@@ -25,7 +25,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 3, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 3, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -140,7 +140,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -151,7 +151,7 @@ contract('Parsec', (accounts) => {
       // p0[] -> p1[s0] -> p2[s4]
       //
       it('should allow to extend chain', async () => {
-        await token.approve(parsec.address, 1000, {from: alice}).should.be.fulfilled;
+        await token.approve(parsec.address, 10000, {from: alice}).should.be.fulfilled;
         await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(1, 100, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(2, 100, alice, {from: alice}).should.be.fulfilled;
@@ -185,7 +185,7 @@ contract('Parsec', (accounts) => {
         await parsec.bet(6, 100, charlie, {from: charlie}).should.be.fulfilled;
         await parsec.bet(7, 100, charlie, {from: charlie}).should.be.fulfilled;
 
-        // 3 blocks in paralel
+        // 3 blocks in parallel
         let block = new Block(p[2], 96).addTx(Tx.coinbase(300, charlie));
         block.sign(charliePriv);
         let period = new Period([block]);
@@ -216,7 +216,7 @@ contract('Parsec', (accounts) => {
       // p0[] -> p1[s0] -> p2[s4] -> p4[s1]  <- 3 rewards
       //                         \-> p5[s4] -> p6[s2] -> p7[s3]  <- 4 rewards
       it('should allow build longer chain', async () => {
-        // submit new hight, but same rewards as other tips
+        // submit new height, but same rewards as other tips
         let block = new Block(p[5], 128).addTx(Tx.coinbase(400, alice));
         block.sign(alicePriv);
         let period = new Period([block]);
@@ -275,6 +275,37 @@ contract('Parsec', (accounts) => {
       //                           \-> xxxxxx -> b[6,c] -> b[16,c]
       it('should allow to prune');
     });
+
+    describe('Block submission', function() {
+      it('should properly change avg gas price', async () => {
+        let lowGas = 10 ** 11;
+        let highGas = 50 * (10 ** 11);
+
+        let initialAvg = await parsec.averageGasPrice.call();
+
+        let block = new Block(p[10], 224).addTx(Tx.coinbase(700, alice));
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[11] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[10], p[11], {from: alice, gasPrice: highGas}).should.be.fulfilled;
+
+        let incrAvg = await parsec.averageGasPrice.call();
+        assert(incrAvg > initialAvg);
+        let reqValue1 = Math.ceil(initialAvg.toNumber() - initialAvg.toNumber() / 15 + highGas / 15);
+        assert.equal(incrAvg.toNumber(), reqValue1);
+
+        block = new Block(p[11], 256).addTx(Tx.coinbase(800, alice));
+        block.sign(alicePriv);
+        period = new Period([block]);
+        p[12] = period.merkleRoot();
+        await parsec.submitPeriod(1, p[11], p[12], {from: alice, gasPrice: lowGas}).should.be.fulfilled;
+
+        let decrAvg = await parsec.averageGasPrice.call();
+        assert(decrAvg < incrAvg);
+        let reqValue2 = Math.ceil(incrAvg.toNumber() - incrAvg.toNumber() / 15 + lowGas / 15);
+        assert.equal(decrAvg.toNumber(), reqValue2);
+      })
+    });
   });
 
   describe('Deposits and Exits', function() {
@@ -284,7 +315,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       // alice auctions slot
       await token.approve(parsec.address, 1000, {from: alice});
@@ -311,8 +342,7 @@ contract('Parsec', (accounts) => {
       });
     });
     describe('Exit', function() {
-      it('should allow to exit', async () => {
-        // more blocks
+      it('should allow to exit burned funds', async () => {
         const coinbase = Tx.coinbase(50, alice);
         let transfer = Tx.transfer(
           64,
@@ -327,13 +357,78 @@ contract('Parsec', (accounts) => {
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
 
         // withdraw burned output
         const bal1 = await token.balanceOf(alice);
         await parsec.withdrawBurn(proof);
         const bal2 = await token.balanceOf(alice);
         assert(bal1.toNumber() < bal2.toNumber());
+      });
+
+      it('should allow to exit valid utxo', async () => {
+        const coinbase = Tx.coinbase(50, alice);
+        let transfer = Tx.transfer(
+          96,
+          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Output(50, bob)]
+        );
+
+        transfer = transfer.sign([alicePriv]);
+        let block = new Block(p[1], 96).addTx(coinbase).addTx(transfer);
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[2] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
+        const proof = period.proof(transfer);
+
+        // withdraw output
+        const event = await parsec.startExit(proof);
+        const bal1 = await token.balanceOf(bob);
+        await parsec.finalizeExits();
+        const bal2 = await token.balanceOf(bob);
+        assert(bal1.toNumber() < bal2.toNumber());
+      });
+
+      it('should allow to challenge exit', async () => {
+        const coinbase = Tx.coinbase(50, alice);
+        // utxo that will try exit
+        let transfer = Tx.transfer(
+          128,
+          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Output(50, bob)]
+        );
+        transfer = transfer.sign([alicePriv]);
+        // utxo that will have spend exit utxo
+        let spend = Tx.transfer(
+          128,
+          [new Input(new Outpoint(transfer.hash(), 0))],
+          [new Output(50, charlie)]
+        );
+        spend = spend.sign([bobPriv]);
+        // submit period and get proofs
+        let block = new Block(p[2], 128).addTx(coinbase).addTx(transfer).addTx(spend);
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[3] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
+        const proof = period.proof(transfer);
+        const spendProof = period.proof(spend);
+
+        // withdraw output
+        const event = await parsec.startExit(proof);
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+
+
+        // challenge exit and make sure exit is removed
+        let exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal(exit[1], bob);
+        await parsec.challengeExit(spendProof, proof);
+        exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal(exit[1], '0x0000000000000000000000000000000000000000');
       });
     });
   });
@@ -345,7 +440,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0);
+      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       await token.approve(parsec.address, 1000, {from: alice});
       await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
@@ -376,7 +471,6 @@ contract('Parsec', (accounts) => {
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(1, p[0], p[1], {from: charlie}).should.be.fulfilled;
         const prevProof = period.proof(transfer);
-        prevProof[0] = period.merkleRoot();
 
         // submit tx spending same out in later block
         block = new Block(p[1], 64).addTx(transfer);
@@ -385,7 +479,6 @@ contract('Parsec', (accounts) => {
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(2, p[1], p[2], {from: charlie}).should.be.fulfilled;
         const proof = period.proof(transfer);
-        proof[0] = period.merkleRoot();
 
         // check tip
         let tip = await parsec.getTip();
@@ -416,7 +509,6 @@ contract('Parsec', (accounts) => {
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
         const proof = period.proof(deposit);
-        proof[0] = period.merkleRoot();
 
         // complain, if deposit tx wrong
         const bal1 = (await parsec.getSlot(0))[1];
