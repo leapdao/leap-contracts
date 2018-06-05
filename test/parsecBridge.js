@@ -151,7 +151,7 @@ contract('Parsec', (accounts) => {
       // p0[] -> p1[s0] -> p2[s4]
       //
       it('should allow to extend chain', async () => {
-        await token.approve(parsec.address, 1000, {from: alice}).should.be.fulfilled;
+        await token.approve(parsec.address, 10000, {from: alice}).should.be.fulfilled;
         await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(1, 100, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(2, 100, alice, {from: alice}).should.be.fulfilled;
@@ -185,7 +185,7 @@ contract('Parsec', (accounts) => {
         await parsec.bet(6, 100, charlie, {from: charlie}).should.be.fulfilled;
         await parsec.bet(7, 100, charlie, {from: charlie}).should.be.fulfilled;
 
-        // 3 blocks in paralel
+        // 3 blocks in parallel
         let block = new Block(p[2], 96).addTx(Tx.coinbase(300, charlie));
         block.sign(charliePriv);
         let period = new Period([block]);
@@ -216,7 +216,7 @@ contract('Parsec', (accounts) => {
       // p0[] -> p1[s0] -> p2[s4] -> p4[s1]  <- 3 rewards
       //                         \-> p5[s4] -> p6[s2] -> p7[s3]  <- 4 rewards
       it('should allow build longer chain', async () => {
-        // submit new hight, but same rewards as other tips
+        // submit new height, but same rewards as other tips
         let block = new Block(p[5], 128).addTx(Tx.coinbase(400, alice));
         block.sign(alicePriv);
         let period = new Period([block]);
@@ -274,6 +274,37 @@ contract('Parsec', (accounts) => {
       // b[0,c] -> b[1,c] -> b[2,d] -> b[4,c] -> b[7,e] -> b[8,e] -> ... -> b[15]
       //                           \-> xxxxxx -> b[6,c] -> b[16,c]
       it('should allow to prune');
+    });
+
+    describe('Block submission', function() {
+      it('should properly change avg gas price', async () => {
+        let lowGas = 10 ** 11;
+        let highGas = 50 * (10 ** 11);
+
+        let initialAvg = await parsec.averageGasPrice.call();
+
+        let block = new Block(p[10], 224).addTx(Tx.coinbase(700, alice));
+        block.sign(alicePriv);
+        let period = new Period([block]);
+        p[11] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[10], p[11], {from: alice, gasPrice: highGas}).should.be.fulfilled;
+
+        let incrAvg = await parsec.averageGasPrice.call();
+        assert(incrAvg > initialAvg);
+        let reqValue1 = Math.ceil(initialAvg.toNumber() - initialAvg.toNumber() / 15 + highGas / 15);
+        assert.equal(incrAvg.toNumber(), reqValue1);
+
+        block = new Block(p[11], 256).addTx(Tx.coinbase(800, alice));
+        block.sign(alicePriv);
+        period = new Period([block]);
+        p[12] = period.merkleRoot();
+        await parsec.submitPeriod(1, p[11], p[12], {from: alice, gasPrice: lowGas}).should.be.fulfilled;
+
+        let decrAvg = await parsec.averageGasPrice.call();
+        assert(decrAvg < incrAvg);
+        let reqValue2 = Math.ceil(incrAvg.toNumber() - incrAvg.toNumber() / 15 + lowGas / 15);
+        assert.equal(decrAvg.toNumber(), reqValue2);
+      })
     });
   });
 
