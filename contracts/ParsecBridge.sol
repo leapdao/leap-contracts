@@ -16,7 +16,7 @@ contract ParsecBridge is PriorityQueue {
   event ValidatorLeave(address indexed signerAddr, uint256 epoch);
   
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
-  uint256 epochLength;       // length of epoch in periods (32 blocks)
+  uint256 public epochLength;       // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
   uint256 lastEpochBlockHeight;
   uint256 parentBlockInterval; // how often epochs can be submitted max
@@ -37,7 +37,7 @@ contract ParsecBridge is PriorityQueue {
     address newSigner;
   }
   
-  mapping(uint256 => Slot) slots;
+  mapping(uint256 => Slot) public slots;
 
   struct Period {
     bytes32 parent; // the id of the parent node
