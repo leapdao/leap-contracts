@@ -12,8 +12,9 @@ contract ParsecBridge is PriorityQueue {
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address depositor);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, address exitor, uint256 amount);
-  event ValidatorJoin(address indexed signerAddr, uint256 epoch);
-  event ValidatorLeave(address indexed signerAddr, uint256 epoch);
+  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, uint256 epoch);
+  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, uint256 epoch);
+  event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, uint256 epoch);
   
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 public epochLength;       // length of epoch in periods (32 blocks)
@@ -156,6 +157,7 @@ contract ParsecBridge is PriorityQueue {
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
+      emit ValidatorLogout(slot.signer, _slotId, lastCompleteEpoch + 3);
       return;
     }
     uint required = slot.stake;
@@ -174,6 +176,7 @@ contract ParsecBridge is PriorityQueue {
       slot.newSigner = _signerAddr;
       slot.newStake = uint64(_value);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
+      emit ValidatorLogout(slot.signer, _slotId, lastCompleteEpoch + 3);
     }
     // new purchase
     else {
@@ -181,7 +184,7 @@ contract ParsecBridge is PriorityQueue {
       slot.signer = _signerAddr;
       slot.stake = uint64(_value);
       slot.activationEpoch = 0;
-      emit ValidatorJoin(slot.signer, lastCompleteEpoch + 1);
+      emit ValidatorJoin(slot.signer, _slotId, lastCompleteEpoch + 1);
     }
   }
   
@@ -191,7 +194,7 @@ contract ParsecBridge is PriorityQueue {
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
     if (slot.stake > 0) {
       token.transfer(slot.owner, slot.stake);
-      emit ValidatorLeave(slot.signer, lastCompleteEpoch + 1);
+      emit ValidatorLeave(slot.signer, _slotId, lastCompleteEpoch + 1);
     }
     slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
@@ -200,7 +203,7 @@ contract ParsecBridge is PriorityQueue {
     slot.newOwner = 0;
     slot.newSigner = 0;
     slot.newStake = 0;
-    emit ValidatorJoin(slot.signer, lastCompleteEpoch + 1);
+    emit ValidatorJoin(slot.signer, _slotId, lastCompleteEpoch + 1);
   }
 
   function recordGas() internal {
@@ -395,7 +398,7 @@ contract ParsecBridge is PriorityQueue {
     slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
     // if slot became empty by slashing
     if (prevStake > 0 && slot.stake == 0) {
-      emit ValidatorLeave(slot.signer, lastCompleteEpoch + 1);
+      emit ValidatorLeave(slot.signer, _slotId, lastCompleteEpoch + 1);
       slot.activationEpoch = 0;
       if (slot.newStake > 0) {
         // someone in queue
