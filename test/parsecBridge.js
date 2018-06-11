@@ -37,15 +37,15 @@ contract('Parsec', (accounts) => {
 
       it('should allow to auction slot and submit block', async () => {
         await token.approve(parsec.address, 1000, {from: alice});
-        await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
+        await parsec.bet(0, 100, alice, alice, {from: alice}).should.be.fulfilled;
         await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.fulfilled;
         p[1] = await parsec.tipHash();
       });
 
       it('should prevent auctining for lower price', async () => {
         await token.approve(parsec.address, 1000, {from: bob});
-        await parsec.bet(0, 129, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
-        await parsec.bet(0, 131, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await parsec.bet(0, 129, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await parsec.bet(0, 131, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to be slashed',  async () => {
@@ -53,7 +53,7 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to auction for higer price',  async () => {
-        await parsec.bet(0, 150, bob, {from: bob}).should.be.fulfilled;
+        await parsec.bet(0, 150, bob, bob, {from: bob}).should.be.fulfilled;
       });
 
       it('should allow submission when slot auctioned in same epoch', async () => {
@@ -68,7 +68,7 @@ contract('Parsec', (accounts) => {
 
       it('allow to auction another slot', async () => {
         await token.approve(parsec.address, 1000, {from: charlie});
-        await parsec.bet(1, 100, charlie, {from: charlie}).should.be.fulfilled;
+        await parsec.bet(1, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
       });
 
       it('should allow to activate auctioned slot and submit', async () => {
@@ -93,7 +93,7 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to logout', async () => {
-        await parsec.bet(0, 0, bob, {from: bob}).should.be.fulfilled;
+        await parsec.bet(0, 0, bob, bob, {from: bob}).should.be.fulfilled;
       });
 
       it('should prevent submission by logged-out slot in later epoch', async () => {
@@ -152,10 +152,10 @@ contract('Parsec', (accounts) => {
       //
       it('should allow to extend chain', async () => {
         await token.approve(parsec.address, 10000, {from: alice}).should.be.fulfilled;
-        await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
-        await parsec.bet(1, 100, alice, {from: alice}).should.be.fulfilled;
-        await parsec.bet(2, 100, alice, {from: alice}).should.be.fulfilled;
-        await parsec.bet(3, 100, alice, {from: alice}).should.be.fulfilled;
+        await parsec.bet(0, 100, alice, alice, {from: alice}).should.be.fulfilled;
+        await parsec.bet(1, 100, alice, alice, {from: alice}).should.be.fulfilled;
+        await parsec.bet(2, 100, alice, alice, {from: alice}).should.be.fulfilled;
+        await parsec.bet(3, 100, alice, alice, {from: alice}).should.be.fulfilled;
 
         let block = new Block(p[0], 32).addTx(Tx.coinbase(100, alice));
         block.sign(alicePriv);
@@ -166,7 +166,7 @@ contract('Parsec', (accounts) => {
         assert.equal(p[1], tip[0]);
 
         await token.approve(parsec.address, 1000, {from: bob}).should.be.fulfilled;
-        await parsec.bet(4, 100, bob, {from: bob}).should.be.fulfilled;
+        await parsec.bet(4, 100, bob, bob, {from: bob}).should.be.fulfilled;
 
         block = new Block(p[1], 64).addTx(Tx.coinbase(200, bob));
         block.sign(bobPriv);
@@ -181,9 +181,9 @@ contract('Parsec', (accounts) => {
       //                         \-> p5[s4]  <- 2 rewards
       it('should allow to branch', async () => {
         await token.approve(parsec.address, 1000, {from: charlie}).should.be.fulfilled;
-        await parsec.bet(5, 100, charlie, {from: charlie}).should.be.fulfilled;
-        await parsec.bet(6, 100, charlie, {from: charlie}).should.be.fulfilled;
-        await parsec.bet(7, 100, charlie, {from: charlie}).should.be.fulfilled;
+        await parsec.bet(5, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
+        await parsec.bet(6, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
+        await parsec.bet(7, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
 
         // 3 blocks in parallel
         let block = new Block(p[2], 96).addTx(Tx.coinbase(300, charlie));
@@ -319,15 +319,15 @@ contract('Parsec', (accounts) => {
       p[0] = await parsec.tipHash();
       // alice auctions slot
       await token.approve(parsec.address, 1000, {from: alice});
-      await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
+      await parsec.bet(0, 100, alice, alice, {from: alice}).should.be.fulfilled;
       // bob auctions slot
       token.transfer(bob, 1000);
       await token.approve(parsec.address, 1000, {from: bob});
-      await parsec.bet(1, 100, bob, {from: bob}).should.be.fulfilled;
+      await parsec.bet(1, 100, bob, bob, {from: bob}).should.be.fulfilled;
       // charlie auctions slot
       token.transfer(charlie, 1000);
       await token.approve(parsec.address, 1000, {from: charlie});
-      await parsec.bet(2, 100, charlie, {from: charlie}).should.be.fulfilled;
+      await parsec.bet(2, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
     });
 
     describe('Deposit', function() {
@@ -443,11 +443,11 @@ contract('Parsec', (accounts) => {
       parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       await token.approve(parsec.address, 1000, {from: alice});
-      await parsec.bet(0, 100, alice, {from: alice}).should.be.fulfilled;
+      await parsec.bet(0, 100, alice, alice, {from: alice}).should.be.fulfilled;
       token.transfer(charlie, 1000);
       await token.approve(parsec.address, 1000, {from: charlie});
-      await parsec.bet(1, 100, charlie, {from: charlie}).should.be.fulfilled;
-      await parsec.bet(2, 100, charlie, {from: charlie}).should.be.fulfilled;
+      await parsec.bet(1, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
+      await parsec.bet(2, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
     });
 
     describe('Double Spend', function() {
