@@ -163,6 +163,7 @@ contract ParsecBridge is PriorityQueue {
       emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
       return;
     }
+    // check min stake
     uint required = slot.stake;
     if (slot.newStake > required) {
       required = slot.newStake;
@@ -170,11 +171,8 @@ contract ParsecBridge is PriorityQueue {
     required = required.mul(105).div(100);
     require(required < _value);
 
-    if (slot.newStake > 0) {
-      token.transfer(slot.newOwner, slot.newStake);
-    }
     // new purchase or update
-    if (slot.stake == 0 || slot.owner == msg.sender && slot.newStake == 0) {
+    if (slot.stake == 0 || (slot.owner == msg.sender && slot.newStake == 0)) {
       uint64 stake = slot.stake;
       token.transferFrom(msg.sender, this, _value - slot.stake);
       slot.owner = msg.sender;
@@ -187,8 +185,12 @@ contract ParsecBridge is PriorityQueue {
       } else {
         emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr);
       }
+    }
     // auction
-    } else {
+    else {
+      if (slot.newStake > 0) {
+        token.transfer(slot.newOwner, slot.newStake);
+      }
       token.transferFrom(msg.sender, this, _value);
       slot.newOwner = msg.sender;
       slot.newSigner = _signerAddr;
