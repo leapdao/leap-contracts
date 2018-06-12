@@ -169,35 +169,33 @@ contract ParsecBridge is PriorityQueue {
     }
     required = required.mul(105).div(100);
     require(required < _value);
-    token.transferFrom(msg.sender, this, _value);
+
     if (slot.newStake > 0) {
       token.transfer(slot.newOwner, slot.newStake);
     }
-    if (slot.stake > 0) {
-      // update slot
-      if (slot.owner == msg.sender && slot.newStake == 0) {
-        slot.signer = _signerAddr;
-        slot.tendermint = _tenderAddr;
-        slot.stake = uint64(_value);
-        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr);
-      // auction
-      } else {
-        slot.newOwner = msg.sender;
-        slot.newSigner = _signerAddr;
-        slot.newTendermint = _tenderAddr;
-        slot.newStake = uint64(_value);
-        slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
-        emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
-      }
-    }
-    // new purchase
-    else {
+    // new purchase or update
+    if (slot.stake == 0 || slot.owner == msg.sender && slot.newStake == 0) {
+      uint64 stake = slot.stake;
+      token.transferFrom(msg.sender, this, _value - slot.stake);
       slot.owner = msg.sender;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
       slot.stake = uint64(_value);
       slot.activationEpoch = 0;
-      emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 1);
+      if (stake == 0) {
+        emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 1);
+      } else {
+        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr);
+      }
+    // auction
+    } else {
+      token.transferFrom(msg.sender, this, _value);
+      slot.newOwner = msg.sender;
+      slot.newSigner = _signerAddr;
+      slot.newTendermint = _tenderAddr;
+      slot.newStake = uint64(_value);
+      slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
+      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
     }
   }
 
