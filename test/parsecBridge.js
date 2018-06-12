@@ -43,11 +43,15 @@ contract('Parsec', (accounts) => {
       });
 
       it('should update slot instead of auction for same owner', async () => {
+        const bal1 = await token.balanceOf(alice);
         await parsec.bet(2, 10, alice, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(2, 30, alice, alice, {from: alice}).should.be.fulfilled;
+        const bal2 = await token.balanceOf(alice);
         const slot = await parsec.slots(2);
         assert.equal(Number(slot[1]), 30); // stake === 30
         assert.equal(Number(slot[6]), 0); // newStake === 0
+        // all token missing in balance should be accounted in slot
+        assert.equal(bal1.sub(bal2).toNumber(), Number(slot[1]));
       });
 
       it('should prevent auctining for lower price', async () => {
