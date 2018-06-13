@@ -20,10 +20,10 @@ contract ParsecBridge is PriorityQueue {
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 amount);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, address exitor, uint256 amount);
-  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
-  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
-  event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
-  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr);
+  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
+  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
+  event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
+  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr);
 
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 public epochLength;       // length of epoch in periods (32 blocks)
@@ -41,12 +41,12 @@ contract ParsecBridge is PriorityQueue {
     address owner;
     uint64 stake;
     address signer;
-    address tendermint;
+    bytes32 tendermint;
     uint32 activationEpoch;
     address newOwner;
     uint64 newStake;
     address newSigner;
-    address newTendermint;
+    bytes32 newTendermint;
   }
 
   mapping(uint256 => Slot) public slots;
@@ -100,7 +100,7 @@ contract ParsecBridge is PriorityQueue {
     exitDuration = _exitDuration;
   }
 
-  function getSlot(uint256 _slotId) constant public returns (address, uint64, address, address, uint32, address, uint64, address, address) {
+  function getSlot(uint256 _slotId) constant public returns (address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
     require(_slotId < epochLength);
     Slot memory slot = slots[_slotId];
     return (slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot. newStake, slot.newSigner, slot.newTendermint);
@@ -162,7 +162,7 @@ contract ParsecBridge is PriorityQueue {
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
 
-  function bet(uint256 _slotId, uint256 _value, address _signerAddr, address _tenderAddr, address _owner) public {
+  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr, address _owner) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     // take care of logout
@@ -224,7 +224,7 @@ contract ParsecBridge is PriorityQueue {
     slot.activationEpoch = 0;
     slot.newOwner = 0;
     slot.newSigner = 0;
-    slot.newTendermint = 0;
+    slot.newTendermint = 0x0;
     slot.newStake = 0;
     emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
   }
@@ -430,7 +430,7 @@ contract ParsecBridge is PriorityQueue {
         // clean out account
         slot.owner = 0;
         slot.signer = 0;
-        slot.tendermint = 0;
+        slot.tendermint = 0x0;
         slot.stake = 0;
       }
     }
