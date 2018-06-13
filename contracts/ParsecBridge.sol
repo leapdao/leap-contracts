@@ -15,7 +15,8 @@ contract ParsecBridge is PriorityQueue {
   event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
   event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr, uint256 epoch);
-  
+  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, address indexed tenderAddr);
+
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 public epochLength;       // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
@@ -27,7 +28,7 @@ contract ParsecBridge is PriorityQueue {
   uint256 exitDuration;
   bytes32 public tipHash;    // hash of first period that has extended chain to some height
   ERC20 token;
-  
+
   struct Slot {
     address owner;
     uint64 stake;
@@ -39,7 +40,7 @@ contract ParsecBridge is PriorityQueue {
     address newSigner;
     address newTendermint;
   }
-  
+
   mapping(uint256 => Slot) public slots;
 
   struct Period {
@@ -67,7 +68,7 @@ contract ParsecBridge is PriorityQueue {
   }
   mapping(bytes32 => Exit) public exits;
 
-    
+
   constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // set token contract
     require(_token != address(0));
@@ -152,7 +153,7 @@ contract ParsecBridge is PriorityQueue {
     // return result
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
-  
+
   function bet(uint256 _slotId, uint256 _value, address _signerAddr, address _tenderAddr) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
@@ -162,18 +163,35 @@ contract ParsecBridge is PriorityQueue {
       emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
       return;
     }
+    // check min stake
     uint required = slot.stake;
     if (slot.newStake > required) {
       required = slot.newStake;
     }
     required = required.mul(105).div(100);
     require(required < _value);
-    token.transferFrom(msg.sender, this, _value);
-    if (slot.newStake > 0) {
-      token.transfer(slot.newOwner, slot.newStake);
+
+    // new purchase or update
+    if (slot.stake == 0 || (slot.owner == msg.sender && slot.newStake == 0)) {
+      uint64 stake = slot.stake;
+      token.transferFrom(msg.sender, this, _value - slot.stake);
+      slot.owner = msg.sender;
+      slot.signer = _signerAddr;
+      slot.tendermint = _tenderAddr;
+      slot.stake = uint64(_value);
+      slot.activationEpoch = 0;
+      if (stake == 0) {
+        emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 1);
+      } else {
+        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr);
+      }
     }
     // auction
-    if (slot.stake > 0) {
+    else {
+      if (slot.newStake > 0) {
+        token.transfer(slot.newOwner, slot.newStake);
+      }
+      token.transferFrom(msg.sender, this, _value);
       slot.newOwner = msg.sender;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
@@ -181,17 +199,8 @@ contract ParsecBridge is PriorityQueue {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
     }
-    // new purchase
-    else {
-      slot.owner = msg.sender;
-      slot.signer = _signerAddr;
-      slot.tendermint = _tenderAddr;
-      slot.stake = uint64(_value);
-      slot.activationEpoch = 0;
-      emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 1);
-    }
   }
-  
+
   function activate(uint256 _slotId) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
@@ -231,7 +240,7 @@ contract ParsecBridge is PriorityQueue {
       }
     }
   }
-  
+
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
     // check parent node exists
     require(periods[_prevHash].parent > 0);
@@ -395,7 +404,7 @@ contract ParsecBridge is PriorityQueue {
     // slash operator
     slash(p.slot, 50);
   }
-  
+
   function slash(uint256 _slotId, uint256 _value) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
@@ -524,7 +533,7 @@ contract ParsecBridge is PriorityQueue {
     ( , txHash1) = validateProof(offset + 10, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
-    
+
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
