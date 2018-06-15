@@ -1,6 +1,8 @@
 require('babel-register')
 require('babel-polyfill')
 
+var HDWalletProvider = require('truffle-hdwallet-provider')
+
 module.exports = {
   // See <http://truffleframework.com/docs/advanced/configuration>
   // to customize your Truffle configuration!
@@ -9,6 +11,18 @@ module.exports = {
       host: 'localhost',
       port: 8545,
       network_id: '*' // match any network
+    },
+    rinkeby: {
+      provider: function() {
+        return new HDWalletProvider(
+          process.env.RINKEBY_MNEMONIC,
+          'https://rinkeby.infura.io',
+          process.env.RINKEBY_ACCOUNT_INDEX || 0
+        )
+      },
+      gasPrice: 10000000000, // 10 gwei
+      gas: 7000000,
+      network_id: 4
     },
     ganache: {
       host: 'localhost',
