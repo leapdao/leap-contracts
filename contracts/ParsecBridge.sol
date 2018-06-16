@@ -10,7 +10,7 @@ contract ParsecBridge is PriorityQueue {
 
   event Epoch(uint256 epoch);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
-  event NewDeposit(uint32 indexed depositId, address depositor);
+  event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 amount);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, address exitor, uint256 amount);
   event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
   event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
@@ -154,7 +154,7 @@ contract ParsecBridge is PriorityQueue {
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
 
-  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr) public {
+  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr, address _owner) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     // take care of logout
@@ -172,10 +172,10 @@ contract ParsecBridge is PriorityQueue {
     require(required < _value);
 
     // new purchase or update
-    if (slot.stake == 0 || (slot.owner == msg.sender && slot.newStake == 0)) {
+    if (slot.stake == 0 || (slot.owner == _owner && slot.newStake == 0)) {
       uint64 stake = slot.stake;
-      token.transferFrom(msg.sender, this, _value - slot.stake);
-      slot.owner = msg.sender;
+      token.transferFrom(_owner, this, _value - slot.stake);
+      slot.owner = _owner;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
       slot.stake = uint64(_value);
@@ -191,8 +191,8 @@ contract ParsecBridge is PriorityQueue {
       if (slot.newStake > 0) {
         token.transfer(slot.newOwner, slot.newStake);
       }
-      token.transferFrom(msg.sender, this, _value);
-      slot.newOwner = msg.sender;
+      token.transferFrom(_owner, this, _value);
+      slot.newOwner = _owner;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
       slot.newStake = uint64(_value);
@@ -431,17 +431,16 @@ contract ParsecBridge is PriorityQueue {
   /*
    * Add funds
    */
-  function deposit(uint256 amount) public {
-    token.transferFrom(msg.sender, this, amount);
+  function deposit(address _owner, uint256 _amount) public {
+    token.transferFrom(_owner, this, _amount);
     depositCount++;
     deposits[depositCount] = Deposit({
       height: periods[tipHash].height,
-      owner: msg.sender,
-      amount: amount
+      owner: _owner,
+      amount: _amount
     });
-    emit NewDeposit(depositCount, msg.sender);
+    emit NewDeposit(depositCount, _owner, _amount);
   }
-
 
   function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
     uint16 txLength = uint16(_proof[1] >> 224);
