@@ -1,6 +1,7 @@
 pragma solidity ^0.4.19;
 
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-solidity/contracts/token/ERC827/ERC827Token.sol";
 
 /**
  * @title SimpleToken
@@ -8,7 +9,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
  * Note they can later distribute these tokens as they wish using `transfer` and other
  * `StandardToken` functions.
  */
-contract SimpleToken is StandardToken {
+contract SimpleToken is StandardToken, ERC827Token {
 
   string public constant name = "SimpleToken"; // solium-disable-line uppercase
   string public constant symbol = "SIM"; // solium-disable-line uppercase
