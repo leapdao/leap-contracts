@@ -1,3 +1,11 @@
+
+/**
+ * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ *
+ * This source code is licensed under the Mozilla Public License, version 2,
+ * found in the LICENSE file in the root directory of this source tree.
+ */
+ 
 pragma solidity ^0.4.18;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";

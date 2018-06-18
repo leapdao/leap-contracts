@@ -1,3 +1,11 @@
+
+/**
+ * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ *
+ * This source code is licensed under the Mozilla Public License, version 2,
+ * found in the LICENSE file in the root directory of this source tree.
+ */
+
 import utils from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
@@ -37,6 +45,7 @@ contract('Parsec', (accounts) => {
 
       it('should allow to auction slot and submit block', async () => {
         const data = parsec.contract.bet.getData(0, 100, alice, alice, alice);
+        console.log(data);
         await token.approveAndCall(parsec.address, 1000, data, {from: alice});
         await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.fulfilled;
         p[1] = await parsec.tipHash();

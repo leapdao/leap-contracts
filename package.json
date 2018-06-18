@@ -1,7 +1,6 @@
 {
-  "name": "plasma",
-  "version": "1.0.0",
-  "private": "true",
+  "name": "parsec-contracts",
+  "version": "0.1.0",
   "description": "",
   "main": "truffle-config.js",
   "scripts": {
@@ -21,8 +20,8 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "client": "CHAIN_DB=./client-db babel-node src/client/"
   },
-  "author": "",
-  "license": "MIT",
+  "author": "Parsec Labs",
+  "license": "MPLv2",
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-eslint": "^8.2.1",
