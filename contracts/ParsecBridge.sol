@@ -26,16 +26,16 @@ contract ParsecBridge is PriorityQueue {
   event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr);
 
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
-  uint256 public epochLength;       // length of epoch in periods (32 blocks)
+  uint256 public epochLength; // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
   uint256 lastEpochBlockHeight;
   uint256 parentBlockInterval; // how often epochs can be submitted max
   uint64 lastParentBlock; // last ethereum block when epoch was submitted
-  uint256 maxReward;    // max reward per period
+  uint256 maxReward; // max reward per period
   uint256 public averageGasPrice; // collected gas price for last submitted blocks
   uint256 exitDuration;
-  bytes32 public tipHash;    // hash of first period that has extended chain to some height
-  ERC20 token;
+  bytes32 public tipHash; // hash of first period that has extended chain to some height
+  ERC20 public token;
 
   struct Slot {
     address owner;
