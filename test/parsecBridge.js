@@ -90,7 +90,7 @@ contract('Parsec', (accounts) => {
       it('allow to auction another slot', async () => {
         const data = parsec.contract.bet.getData(1, 100, charlie, charlie, charlie);
         await token.approveAndCall(parsec.address, 1000, data, {from: charlie});
-        
+
       });
 
       it('should allow to activate auctioned slot and submit', async () => {
@@ -179,7 +179,7 @@ contract('Parsec', (accounts) => {
         await parsec.bet(2, 100, alice, alice, alice, {from: alice}).should.be.fulfilled;
         await parsec.bet(3, 100, alice, alice, alice, {from: alice}).should.be.fulfilled;
 
-        let block = new Block(32, [Tx.coinbase(100, alice)]);
+        let block = new Block(32).addTx(Tx.deposit(111, 100, alice, 1337));
         let period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
@@ -189,7 +189,7 @@ contract('Parsec', (accounts) => {
         await token.approve(parsec.address, 1000, {from: bob}).should.be.fulfilled;
         await parsec.bet(4, 100, bob, bob, bob, {from: bob}).should.be.fulfilled;
 
-        block = new Block(64).addTx(Tx.coinbase(200, bob));
+        block = new Block(64).addTx(Tx.deposit(112, 100, bob, 1337));
         period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(4, p[1], p[2], {from: bob}).should.be.fulfilled;
@@ -206,19 +206,19 @@ contract('Parsec', (accounts) => {
         await parsec.bet(7, 100, charlie, charlie, charlie, {from: charlie}).should.be.fulfilled;
 
         // 3 blocks in parallel
-        let block = new Block(96).addTx(Tx.coinbase(300, charlie));
+        let block = new Block(96).addTx(Tx.deposit(113, 300, charlie, 1337));
         let period = new Period(p[2], [block]);
         p[3] = period.merkleRoot();
         await parsec.submitPeriod(5, p[2], p[3], {from: charlie}).should.be.fulfilled;
         let tip = await parsec.getTip();
         assert.equal(p[3], (await parsec.getTip())[0]);
 
-        block = new Block(96).addTx(Tx.coinbase(300, alice));
+        block = new Block(96).addTx(Tx.deposit(114, 300, alice, 1337));
         period = new Period(p[3], [block]);
         p[4] = period.merkleRoot();
         await parsec.submitPeriod(1, p[2], p[4], {from: alice}).should.be.fulfilled;
 
-        block = new Block(96).addTx(Tx.coinbase(300, bob));
+        block = new Block(96).addTx(Tx.deposit(115, 300, bob, 1337));
         period = new Period(p[4], [block]);
         p[5] = period.merkleRoot();
         await parsec.submitPeriod(4, p[2], p[5], {from: bob}).should.be.fulfilled;
@@ -234,7 +234,7 @@ contract('Parsec', (accounts) => {
       //                         \-> p5[s4] -> p6[s2] -> p7[s3]  <- 4 rewards
       it('should allow build longer chain', async () => {
         // submit new height, but same rewards as other tips
-        let block = new Block(128).addTx(Tx.coinbase(400, alice));
+        let block = new Block(128).addTx(Tx.deposit(6, 400, alice, 1337));
         let period = new Period(p[5], [block]);
         p[6] = period.merkleRoot();
         await parsec.submitPeriod(2, p[5], p[6], {from: alice}).should.be.fulfilled;
@@ -244,7 +244,7 @@ contract('Parsec', (accounts) => {
         assert.equal(3, tip[1].toNumber());
 
         // submit tip with most rewards
-        block = new Block(160).addTx(Tx.coinbase(500, alice));
+        block = new Block(160).addTx(Tx.deposit(7, 500, alice, 1337));
         period = new Period(p[6], [block]);
         p[7] = period.merkleRoot();
         await parsec.submitPeriod(3, p[6], p[7], {from: alice}).should.be.fulfilled;
@@ -259,17 +259,17 @@ contract('Parsec', (accounts) => {
       //                         \-> p5[s4] -> p6[s2] -> p7[s3]  <- 4 rewards
       it('should allow to extend other branch', async () => {
 
-        let block = new Block(128).addTx(Tx.coinbase(400, charlie));
+        let block = new Block(128).addTx(Tx.deposit(8, 400, charlie, 1337));
         let period = new Period(p[7], [block]);
         p[8] = period.merkleRoot();
         await parsec.submitPeriod(6, p[4], p[8], {from: charlie}).should.be.fulfilled;
 
-        block = new Block(160).addTx(Tx.coinbase(500, charlie));
+        block = new Block(160).addTx(Tx.deposit(9, 500, charlie, 1337));
         period = new Period(p[8], [block]);
         p[9] = period.merkleRoot();
         await parsec.submitPeriod(7, p[8], p[9], {from: charlie}).should.be.fulfilled;
 
-        block = new Block(192).addTx(Tx.coinbase(600, alice));
+        block = new Block(192).addTx(Tx.deposit(10, 600, alice, 1337));
         period = new Period(p[9], [block]);
         p[10] = period.merkleRoot();
         await parsec.submitPeriod(2, p[9], p[10], {from: alice}).should.be.fulfilled;
@@ -295,7 +295,7 @@ contract('Parsec', (accounts) => {
 
         let initialAvg = await parsec.averageGasPrice.call();
 
-        let block = new Block(224).addTx(Tx.coinbase(700, alice));
+        let block = new Block(224).addTx(Tx.deposit(11, 700, alice, 1337));
         let period = new Period(p[10], [block]);
         p[11] = period.merkleRoot();
         await parsec.submitPeriod(0, p[10], p[11], {from: alice, gasPrice: highGas}).should.be.fulfilled;
@@ -305,7 +305,7 @@ contract('Parsec', (accounts) => {
         let reqValue1 = Math.ceil(initialAvg.toNumber() - initialAvg.toNumber() / 15 + highGas / 15);
         assert.equal(incrAvg.toNumber(), reqValue1);
 
-        block = new Block(256).addTx(Tx.coinbase(800, alice));
+        block = new Block(256).addTx(Tx.deposit(12, 800, alice, 1337));
         period = new Period(p[11], [block]);
         p[12] = period.merkleRoot();
         await parsec.submitPeriod(1, p[11], p[12], {from: alice, gasPrice: lowGas}).should.be.fulfilled;
@@ -354,15 +354,15 @@ contract('Parsec', (accounts) => {
     });
     describe('Exit', function() {
       it('should allow to exit burned funds', async () => {
-        const coinbase = Tx.coinbase(50, alice);
+        const deposit = Tx.deposit(113, 50, alice, 1337);
         let transfer = Tx.transfer(
           64,
-          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, parsec.address)]
         );
 
         transfer = transfer.sign([alicePriv]);
-        let block = new Block(64).addTx(coinbase).addTx(transfer);
+        let block = new Block(64).addTx(deposit).addTx(transfer);
         let period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
         await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
@@ -376,15 +376,15 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to exit valid utxo', async () => {
-        const coinbase = Tx.coinbase(50, alice);
+        const deposit = Tx.deposit(14, 50, alice, 1337);
         let transfer = Tx.transfer(
           96,
-          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, bob)]
         );
 
         transfer = transfer.sign([alicePriv]);
-        let block = new Block(96).addTx(coinbase).addTx(transfer);
+        let block = new Block(96).addTx(deposit).addTx(transfer);
         let period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
@@ -399,11 +399,11 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to challenge exit', async () => {
-        const coinbase = Tx.coinbase(50, alice);
+        const deposit = Tx.deposit(15, 50, alice, 1337);
         // utxo that will try exit
         let transfer = Tx.transfer(
           128,
-          [new Input(new Outpoint(coinbase.hash(), 0))],
+          [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, bob)]
         );
         transfer = transfer.sign([alicePriv]);
@@ -415,7 +415,7 @@ contract('Parsec', (accounts) => {
         );
         spend = spend.sign([bobPriv]);
         // submit period and get proofs
-        let block = new Block(128).addTx(coinbase).addTx(transfer).addTx(spend);
+        let block = new Block(128).addTx(deposit).addTx(transfer).addTx(spend);
         let period = new Period(p[2], [block]);
         p[3] = period.merkleRoot();
         await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
