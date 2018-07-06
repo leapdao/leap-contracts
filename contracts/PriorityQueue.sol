@@ -9,37 +9,33 @@
 pragma solidity ^0.4.18;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title PriorityQueue
  * @dev A priority queue implementation
  */
 
-contract PriorityQueue {
+library PriorityQueue {
   using SafeMath for uint256;
 
-  /* 
-   *  Storage
-   */
-  uint256[] heapList;
-  uint256 currentSize;
-
-  constructor() public {
-    heapList = [0];
-    currentSize = 0;
+  struct Token {
+    ERC20 addr;
+    uint256[] heapList;
+    uint256 currentSize;
   }
 
-  function insert(uint256 k) internal {
-    heapList.push(k);
-    currentSize = currentSize.add(1);
-    percUp(currentSize);
+  function insert(Token storage self, uint256 k) public {
+    self.heapList.push(k);
+    self.currentSize = self.currentSize.add(1);
+    percUp(self, self.currentSize);
   }
 
-  function minChild(uint256 i) internal view returns (uint256) {
-    if (i.mul(2).add(1) > currentSize) {
+  function minChild(Token storage self, uint256 i) public view returns (uint256) {
+    if (i.mul(2).add(1) > self.currentSize) {
       return i.mul(2);
     } else {
-      if (heapList[i.mul(2)] < heapList[i.mul(2).add(1)]) {
+      if (self.heapList[i.mul(2)] < self.heapList[i.mul(2).add(1)]) {
         return i.mul(2);
       } else {
         return i.mul(2).add(1);
@@ -47,40 +43,40 @@ contract PriorityQueue {
     }
   }
 
-  function getMin() internal view returns (uint256) {
-    return heapList[1];
+  function getMin(Token storage self) public view returns (uint256) {
+    return self.heapList[1];
   }
 
-  function delMin() internal returns (uint256) {
-    uint256 retVal = heapList[1];
-    heapList[1] = heapList[currentSize];
-    delete heapList[currentSize];
-    currentSize = currentSize.sub(1);
-    percDown(1);
-    heapList.length = heapList.length.sub(1);
+  function delMin(Token storage self) public returns (uint256) {
+    uint256 retVal = self.heapList[1];
+    self.heapList[1] = self.heapList[self.currentSize];
+    delete self.heapList[self.currentSize];
+    self.currentSize = self.currentSize.sub(1);
+    percDown(self, 1);
+    self.heapList.length = self.heapList.length.sub(1);
     return retVal;
   }
 
-  function percUp(uint256 i) private {
+  function percUp(Token storage self, uint256 i) private {
     uint256 j = i;
-    uint256 newVal = heapList[i];
-    while (newVal < heapList[i.div(2)]) {
-      heapList[i] = heapList[i.div(2)];
+    uint256 newVal = self.heapList[i];
+    while (newVal < self.heapList[i.div(2)]) {
+      self.heapList[i] = self.heapList[i.div(2)];
       i = i.div(2);
     }
-    if (i != j) heapList[i] = newVal;
+    if (i != j) self.heapList[i] = newVal;
   }
 
-  function percDown(uint256 i) private {
+  function percDown(Token storage self, uint256 i) private {
     uint256 j = i;
-    uint256 newVal = heapList[i];
-    uint256 mc = minChild(i);
-    while (mc <= currentSize && newVal > heapList[mc]) {
-      heapList[i] = heapList[mc];
+    uint256 newVal = self.heapList[i];
+    uint256 mc = minChild(self, i);
+    while (mc <= self.currentSize && newVal > self.heapList[mc]) {
+      self.heapList[i] = self.heapList[mc];
       i = mc;
-      mc = minChild(i);
+      mc = minChild(self, i);
     }
-    if (i != j) heapList[i] = newVal;
+    if (i != j) self.heapList[i] = newVal;
   }
 
 }

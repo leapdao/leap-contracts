@@ -11,6 +11,7 @@ import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
 import chai from 'chai';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
+const PriorityQueue = artifacts.require('./PriorityQueue.sol');
 const SimpleToken = artifacts.require('SimpleToken');
 
 const should = chai
@@ -32,6 +33,8 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
+      const pqLib = await PriorityQueue.new();
+      ParsecBridge.link('PriorityQueue', pqLib.address);
       parsec = await ParsecBridge.new(token.address, 3, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
@@ -160,6 +163,8 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
+      const pqLib = await PriorityQueue.new();
+      ParsecBridge.link('PriorityQueue', pqLib.address);
       parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
@@ -323,6 +328,8 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
+      const pqLib = await PriorityQueue.new();
+      ParsecBridge.link('PriorityQueue', pqLib.address);
       parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       // alice auctions slot
@@ -341,10 +348,10 @@ contract('Parsec', (accounts) => {
     describe('Deposit', function() {
       it('should allow to deposit', async () => {
         // deposit 1
-        let receipt = await parsec.deposit(bob, 200, { from: bob });
+        let receipt = await parsec.deposit(bob, 200, 0, { from: bob });
         const depositId1 = receipt.logs[0].args.depositId.toNumber();
         // deposit 2 - here we use directDeposit without transfer
-        const data = parsec.contract.deposit.getData(alice, 300);
+        const data = parsec.contract.deposit.getData(alice, 300, 0);
         receipt = await token.approveAndCall(parsec.address, 300, data, {from: alice}).should.be.fulfilled;
         const depositId2 = Buffer.from(receipt.receipt.logs[1].topics[1].replace('0x', ''), 'hex').readUInt32BE(28);
         assert(depositId1 < depositId2);
@@ -354,11 +361,11 @@ contract('Parsec', (accounts) => {
 
 
       it('should allow to exit valid utxo', async () => {
-        const deposit = Tx.deposit(114, 50, alice, 1337);
+        const deposit = Tx.deposit(114, 50, alice);
         let transfer = Tx.transfer(
           96,
           [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob, 1337)]
+          [new Output(50, bob)]
         );
 
         transfer = transfer.sign([alicePriv]);
@@ -371,13 +378,13 @@ contract('Parsec', (accounts) => {
         // withdraw output
         const event = await parsec.startExit(proof);
         const bal1 = await token.balanceOf(bob);
-        await parsec.finalizeExits();
+        await parsec.finalizeExits(0);
         const bal2 = await token.balanceOf(bob);
         assert(bal1.toNumber() < bal2.toNumber());
       });
 
       it('should allow to challenge exit', async () => {
-        const deposit = Tx.deposit(15, 50, alice, 1337);
+        const deposit = Tx.deposit(15, 50, alice);
         // utxo that will try exit
         let transfer = Tx.transfer(
           128,
@@ -411,10 +418,10 @@ contract('Parsec', (accounts) => {
 
         // challenge exit and make sure exit is removed
         let exit = await parsec.exits(outpoint.getUtxoId());
-        assert.equal(exit[1], bob);
+        assert.equal(exit[2], bob);
         await parsec.challengeExit(spendProof, proof);
         exit = await parsec.exits(outpoint.getUtxoId());
-        assert.equal(exit[1], '0x0000000000000000000000000000000000000000');
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });
     });
   });
@@ -426,6 +433,8 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
+      const pqLib = await PriorityQueue.new();
+      ParsecBridge.link('PriorityQueue', pqLib.address);
       parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
       p[0] = await parsec.tipHash();
       let data = await parsec.contract.bet.getData(0, 100, alice, alice, alice);
@@ -482,7 +491,7 @@ contract('Parsec', (accounts) => {
     describe('Deposit', function() {
       it('should allow to slash invalid deposit', async () => {
         // deposit
-        const receipt = await parsec.deposit(charlie, 50, { from: charlie });
+        const receipt = await parsec.deposit(charlie, 50, 0, { from: charlie });
         const depositId = receipt.logs[0].args.depositId.toNumber();
         const invalidDeposit = Tx.deposit(depositId, 50, alice);
 
