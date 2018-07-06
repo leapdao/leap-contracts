@@ -84,13 +84,7 @@ contract ParsecBridge {
 
   constructor(ERC20 _psc, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // set PSC contract
-    require(_psc != address(0));
-    uint256[] memory arr = new uint256[](1);
-    tokens[tokenCount++] = PriorityQueue.Token({
-      addr: _psc,
-      heapList: arr,
-      currentSize: 0
-    });
+    registerToken(_psc);
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -111,6 +105,7 @@ contract ParsecBridge {
   }
 
   function registerToken(ERC20 _token) public {
+    require(_token != address(0));
     uint256[] memory arr = new uint256[](1);
     tokens[tokenCount++] = PriorityQueue.Token({
       addr: _token,
