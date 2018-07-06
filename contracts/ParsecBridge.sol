@@ -417,10 +417,10 @@ contract ParsecBridge {
     // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
     uint64 txPos1;
-    (txPos1, ) = validateProof(offset + 8, _prevProof);
+    (txPos1, ) = validateProof(offset + 16, _prevProof);
 
     uint64 txPos2;
-    (txPos2, ) = validateProof(40, _proof);
+    (txPos2, ) = validateProof(48, _proof);
 
     // make sure transactions are different
     require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
@@ -505,7 +505,7 @@ contract ParsecBridge {
   function startExit(bytes32[] _proof) public {
     // validate proof
     bytes32 txHash;
-    ( , txHash) = validateProof(8, _proof);
+    ( , txHash) = validateProof(16, _proof);
     uint256 oindex = 0; // TODO:  enable other outputs
 
     address dest;
@@ -536,14 +536,14 @@ contract ParsecBridge {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1) = validateProof(offset + 8, _prevProof);
+    ( , txHash1) = validateProof(offset + 16, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
-    validateProof(40, _proof);
+    validateProof(48, _proof);
 
     // get iputs and validate
     bytes32 prevHash1;

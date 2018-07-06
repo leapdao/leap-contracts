@@ -363,7 +363,6 @@ contract('Parsec', (accounts) => {
       it('should allow to exit valid utxo', async () => {
         const deposit = Tx.deposit(114, 50, alice);
         let transfer = Tx.transfer(
-          96,
           [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, bob)]
         );
@@ -387,14 +386,12 @@ contract('Parsec', (accounts) => {
         const deposit = Tx.deposit(15, 50, alice);
         // utxo that will try exit
         let transfer = Tx.transfer(
-          128,
           [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, bob)]
         );
         transfer = transfer.sign([alicePriv]);
         // utxo that will have spend exit utxo
         let spend = Tx.transfer(
-          128,
           [new Input(new Outpoint(transfer.hash(), 0))],
           [new Output(50, charlie)]
         );
@@ -451,7 +448,6 @@ contract('Parsec', (accounts) => {
         const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
         const value = 99000000;
         let transfer = Tx.transfer(
-          6,
           [new Input(new Outpoint(prevTx, 0))],
           [new Output(value, alice)]
         );
