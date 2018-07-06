@@ -271,8 +271,8 @@ contract ParsecBridge is PriorityQueue {
       require(block.number >= lastParentBlock + parentBlockInterval);
       tipHash = _root;
       lastParentBlock = uint64(block.number);
-	  // record gas
-	  recordGas();
+	    // record gas
+	    recordGas();
       emit NewHeight(newHeight, _root);
     }
     // store the period
@@ -283,8 +283,6 @@ contract ParsecBridge is PriorityQueue {
     newPeriod.timestamp = uint32(block.timestamp);
     newPeriod.parentIndex = uint32(periods[_prevHash].children.push(_root) - 1);
     periods[_root] = newPeriod;
-
-
 
     // distribute rewards
     uint256 totalSupply = token.totalSupply();
@@ -345,13 +343,27 @@ contract ParsecBridge is PriorityQueue {
     require(root == _proof[0]);
   }
 
+
+  function readInvalidDepositProof(
+    bytes32[] _txData
+  ) public pure returns (
+    uint32 depositId,
+    uint64 value,
+    address signer
+  ) {
+    depositId = uint32(_txData[2] >> 240);
+    value = uint64(_txData[2] >> 176);
+    signer = address(_txData[2]);
+  }
+
+
   /*
-   * _txData = [ 32b blockHash, 32b r, 32b s, (1b Proofoffset, 8b pos, 1b v, ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
+   * _txData = [ 32b periodHash, (1b Proofoffset, 8b pos,  ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
    *
    * # 2 Deposit TX (33b)
    *   1b type
    *     4b depositId
-   *     8b value, 20b address
+   *     8b value, 2b color, 20b address
    *
    */
   function reportInvalidDeposit(bytes32[] _txData) public {
@@ -360,13 +372,16 @@ contract ParsecBridge is PriorityQueue {
       require(p.height > periods[tipHash].height - epochLength);
     }
     // check transaction proof
-    validateProof(17, _txData);
+    validateProof(15, _txData);
 
     // check deposit values
-    uint32 depositId = uint32(_txData[2] >> 224);
-    uint64 value = uint64(_txData[2] >> 160);
+    uint32 depositId;
+    uint64 value;
+    address signer;
+    (depositId, value, signer) = readInvalidDepositProof(_txData);
+
     Deposit memory dep = deposits[depositId];
-    require(value != dep.amount || address(_txData[2]) != dep.owner);
+    require(value != dep.amount || signer != dep.owner);
 
     // delete invalid period
     deletePeriod(_txData[0]);
@@ -383,10 +398,10 @@ contract ParsecBridge is PriorityQueue {
     // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
     uint64 txPos1;
-    (txPos1, ) = validateProof(offset + 10, _prevProof);
+    (txPos1, ) = validateProof(offset + 8, _prevProof);
 
     uint64 txPos2;
-    (txPos2, ) = validateProof(42, _proof);
+    (txPos2, ) = validateProof(40, _proof);
 
     // make sure transactions are different
     require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
@@ -466,50 +481,10 @@ contract ParsecBridge is PriorityQueue {
     dest = ecrecover(keccak256(txData), v, r, s);
   }
 
-  /*
-   * Take funds
-   */
-  function withdrawBurn(bytes32[] _proof) public {
-    // make sure block is final
-    // Period memory p = periods[_proof[0]];
-    // require(periods[tipHash].height * 32 > epochLength);
-    // require(p.height < periods[tipHash].height - (epochLength * 32));
-
-    // validate proof
-    bytes32 txHash;
-    (, txHash) = validateProof(10, _proof);
-    uint256 oindex = 0; // TODO:  enable other outputs
-    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash));
-
-    // check not withdrawn yet
-    require(exits[utxoId].amount == 0);
-
-    address dest;
-    uint64 amount;
-    assembly {
-      // first output
-      // TODO: enable other outputs
-      amount := calldataload(208)
-      dest := calldataload(228)
-    }
-    require(dest == address(this));
-
-    // recover signer
-    dest = recoverTxSigner(10, _proof);
-
-    exits[utxoId] = Exit({
-      amount: amount,
-      owner: dest
-    });
-
-    // EVENT
-    token.transfer(dest, amount);
-  }
-
   function startExit(bytes32[] _proof) public {
     // validate proof
     bytes32 txHash;
-    ( , txHash) = validateProof(10, _proof);
+    ( , txHash) = validateProof(8, _proof);
     uint256 oindex = 0; // TODO:  enable other outputs
 
     address dest;
@@ -517,7 +492,7 @@ contract ParsecBridge is PriorityQueue {
     assembly {
       // first output
       // TODO: enable other outputs
-      amount := calldataload(208)
+      amount := calldataload(206)
       dest := calldataload(228)
     }
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
@@ -537,22 +512,22 @@ contract ParsecBridge is PriorityQueue {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1) = validateProof(offset + 10, _prevProof);
+    ( , txHash1) = validateProof(offset + 8, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
-    validateProof(42, _proof);
+    validateProof(40, _proof);
 
     // get iputs and validate
     bytes32 prevHash1;
     uint8 outPos1;
     assembly {
       //TODO: allow other than first inputId
-      prevHash1 := calldataload(add(134, 32))
-      outPos1 := calldataload(add(166, 32))
+      prevHash1 := calldataload(add(132, 32))
+      outPos1 := calldataload(add(164, 32))
     }
 
     // make sure one is spending the other one

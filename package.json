@@ -5,7 +5,7 @@
   "main": "truffle-config.js",
   "scripts": {
     "testrpc": "ganache-cli --db=./testrpc-db --mnemonic='clock radar mass judge dismiss just intact mind resemble fringe diary casino' --gasLimit=13000000",
-    "test": "scripts/ganache-cli.sh && truffle test test/ParsecBridge.js",
+    "test": "scripts/ganache-cli.sh && truffle test test/*.js",
     "ganache-cli:dev": "scripts/ganache-cli.sh",
     "test-ci": "npm run clean && npm run compile && scripts/test.sh",
     "compile": "truffle compile",

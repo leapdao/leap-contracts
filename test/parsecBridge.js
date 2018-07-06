@@ -9,7 +9,6 @@
 import utils from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
-import assertRevert from './helpers/assertRevert';
 import chai from 'chai';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const SimpleToken = artifacts.require('SimpleToken');
@@ -45,7 +44,6 @@ contract('Parsec', (accounts) => {
 
       it('should allow to auction slot and submit block', async () => {
         const data = parsec.contract.bet.getData(0, 100, alice, alice, alice);
-        console.log(data);
         await token.approveAndCall(parsec.address, 1000, data, {from: alice});
         await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.fulfilled;
         p[1] = await parsec.tipHash();
@@ -353,41 +351,21 @@ contract('Parsec', (accounts) => {
       });
     });
     describe('Exit', function() {
-      it('should allow to exit burned funds', async () => {
-        const deposit = Tx.deposit(113, 50, alice, 1337);
-        let transfer = Tx.transfer(
-          64,
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, parsec.address)]
-        );
 
-        transfer = transfer.sign([alicePriv]);
-        let block = new Block(64).addTx(deposit).addTx(transfer);
-        let period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
-        const proof = period.proof(transfer);
-
-        // withdraw burned output
-        const bal1 = await token.balanceOf(alice);
-        await parsec.withdrawBurn(proof);
-        const bal2 = await token.balanceOf(alice);
-        assert(bal1.toNumber() < bal2.toNumber());
-      });
 
       it('should allow to exit valid utxo', async () => {
-        const deposit = Tx.deposit(14, 50, alice, 1337);
+        const deposit = Tx.deposit(114, 50, alice, 1337);
         let transfer = Tx.transfer(
           96,
           [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob)]
+          [new Output(50, bob, 1337)]
         );
 
         transfer = transfer.sign([alicePriv]);
         let block = new Block(96).addTx(deposit).addTx(transfer);
-        let period = new Period(p[1], [block]);
+        let period = new Period(p[0], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
 
         // withdraw output
@@ -506,20 +484,25 @@ contract('Parsec', (accounts) => {
         // deposit
         const receipt = await parsec.deposit(charlie, 50, { from: charlie });
         const depositId = receipt.logs[0].args.depositId.toNumber();
-        const deposit = Tx.deposit(depositId, 50, alice);
+        const invalidDeposit = Tx.deposit(depositId, 50, alice);
 
         // wait until operator included
-        let block = new Block(92).addTx(deposit);
+        let block = new Block(92).addTx(invalidDeposit);
         let period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
-        const proof = period.proof(deposit);
+        const proof = period.proof(invalidDeposit);
 
         // complain, if deposit tx wrong
         const bal1 = (await parsec.getSlot(0))[1];
         await parsec.reportInvalidDeposit(proof, {from: charlie});
         const bal2 = (await parsec.getSlot(0))[1];
         assert(bal1.toNumber() > bal2.toNumber());
+
+        let [ readDepositId, readValue, readSigner ] = await parsec.readInvalidDepositProof(proof);
+        assert.equal(readDepositId.toNumber(), depositId);
+        assert.equal(readValue.toNumber(), 50);
+        assert.equal(readSigner, alice);
       });
       it('should allow to slash double deposit');
     });
