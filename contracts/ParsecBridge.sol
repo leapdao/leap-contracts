@@ -13,13 +13,14 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
 import "./PriorityQueue.sol";
 
-contract ParsecBridge is PriorityQueue {
+contract ParsecBridge {
   using SafeMath for uint256;
+  using PriorityQueue for PriorityQueue.Token;
 
   event Epoch(uint256 epoch);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
-  event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 amount);
-  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, address exitor, uint256 amount);
+  event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
+  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
   event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
   event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
@@ -35,7 +36,9 @@ contract ParsecBridge is PriorityQueue {
   uint256 public averageGasPrice; // collected gas price for last submitted blocks
   uint256 exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
-  ERC20 public token;
+
+  mapping(uint16 => PriorityQueue.Token) public tokens;
+  uint16 tokenCount = 0;
 
   struct Slot {
     address owner;
@@ -64,6 +67,7 @@ contract ParsecBridge is PriorityQueue {
 
   struct Deposit {
     uint64 height;
+    uint16 color;
     address owner;
     uint256 amount;
   }
@@ -72,15 +76,15 @@ contract ParsecBridge is PriorityQueue {
 
   struct Exit {
     uint64 amount;
+    uint16 color;
     address owner;
   }
   mapping(bytes32 => Exit) public exits;
 
 
-  constructor(ERC20 _token, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
-    // set token contract
-    require(_token != address(0));
-    token = _token;
+  constructor(ERC20 _psc, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
+    // set PSC contract
+    registerToken(_psc);
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -98,6 +102,16 @@ contract ParsecBridge is PriorityQueue {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
+  }
+
+  function registerToken(ERC20 _token) public {
+    require(_token != address(0));
+    uint256[] memory arr = new uint256[](1);
+    tokens[tokenCount++] = PriorityQueue.Token({
+      addr: _token,
+      heapList: arr,
+      currentSize: 0
+    });
   }
 
   function getSlot(uint256 _slotId) constant public returns (address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
@@ -182,7 +196,7 @@ contract ParsecBridge is PriorityQueue {
     // new purchase or update
     if (slot.stake == 0 || (slot.owner == _owner && slot.newStake == 0)) {
       uint64 stake = slot.stake;
-      token.transferFrom(_owner, this, _value - slot.stake);
+      tokens[0].addr.transferFrom(_owner, this, _value - slot.stake);
       slot.owner = _owner;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
@@ -197,9 +211,9 @@ contract ParsecBridge is PriorityQueue {
     // auction
     else {
       if (slot.newStake > 0) {
-        token.transfer(slot.newOwner, slot.newStake);
+        tokens[0].addr.transfer(slot.newOwner, slot.newStake);
       }
-      token.transferFrom(_owner, this, _value);
+      tokens[0].addr.transferFrom(_owner, this, _value);
       slot.newOwner = _owner;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
@@ -214,7 +228,7 @@ contract ParsecBridge is PriorityQueue {
     Slot storage slot = slots[_slotId];
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
     if (slot.stake > 0) {
-      token.transfer(slot.owner, slot.stake);
+      tokens[0].addr.transfer(slot.owner, slot.stake);
       emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
     }
     slot.owner = slot.newOwner;
@@ -285,8 +299,8 @@ contract ParsecBridge is PriorityQueue {
     periods[_root] = newPeriod;
 
     // distribute rewards
-    uint256 totalSupply = token.totalSupply();
-    uint256 stakedSupply = token.balanceOf(this);
+    uint256 totalSupply = tokens[0].addr.totalSupply();
+    uint256 stakedSupply = tokens[0].addr.balanceOf(this);
     uint256 reward = maxReward;
     if (stakedSupply >= totalSupply.div(2)) {
       // 4 x br x as x (ts - as)
@@ -389,7 +403,7 @@ contract ParsecBridge is PriorityQueue {
     // slash operator
     slash(p.slot, 10 * maxReward);
     // reward 1 block reward
-    token.transfer(msg.sender, maxReward);
+    tokens[0].addr.transfer(msg.sender, maxReward);
   }
 
   function reportDoubleSpend(bytes32[] _proof, bytes32[] _prevProof) public {
@@ -398,10 +412,10 @@ contract ParsecBridge is PriorityQueue {
     // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
     uint64 txPos1;
-    (txPos1, ) = validateProof(offset + 8, _prevProof);
+    (txPos1, ) = validateProof(offset + 16, _prevProof);
 
     uint64 txPos2;
-    (txPos2, ) = validateProof(40, _proof);
+    (txPos2, ) = validateProof(48, _proof);
 
     // make sure transactions are different
     require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
@@ -454,15 +468,17 @@ contract ParsecBridge is PriorityQueue {
   /*
    * Add funds
    */
-  function deposit(address _owner, uint256 _amount) public {
-    token.transferFrom(_owner, this, _amount);
+  function deposit(address _owner, uint256 _amount, uint16 _color) public {
+    require(_color < tokenCount);
+    tokens[_color].addr.transferFrom(_owner, this, _amount);
     depositCount++;
     deposits[depositCount] = Deposit({
       height: periods[tipHash].height,
       owner: _owner,
+      color: _color,
       amount: _amount
     });
-    emit NewDeposit(depositCount, _owner, _amount);
+    emit NewDeposit(depositCount, _owner, _color, _amount);
   }
 
   function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
@@ -484,15 +500,17 @@ contract ParsecBridge is PriorityQueue {
   function startExit(bytes32[] _proof) public {
     // validate proof
     bytes32 txHash;
-    ( , txHash) = validateProof(8, _proof);
+    ( , txHash) = validateProof(16, _proof);
     uint256 oindex = 0; // TODO:  enable other outputs
 
     address dest;
+    uint16 color;
     uint64 amount;
     assembly {
       // first output
       // TODO: enable other outputs
       amount := calldataload(206)
+      color := calldataload(208)
       dest := calldataload(228)
     }
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
@@ -500,26 +518,27 @@ contract ParsecBridge is PriorityQueue {
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(amount > 0);
     require(exits[utxoId].amount == 0);
-    insert(priority);
+    tokens[color].insert(priority);
     exits[utxoId] = Exit({
       owner: dest,
+      color: color,
       amount: amount
     });
-    emit ExitStarted(txHash, oindex, dest, amount);
+    emit ExitStarted(txHash, oindex, color, dest, amount);
   }
 
   function challengeExit(bytes32[] _proof, bytes32[] _prevProof) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1) = validateProof(offset + 8, _prevProof);
+    ( , txHash1) = validateProof(offset + 16, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
-    validateProof(40, _proof);
+    validateProof(48, _proof);
 
     // get iputs and validate
     bytes32 prevHash1;
@@ -537,32 +556,36 @@ contract ParsecBridge is PriorityQueue {
 
     // delete invalid exit
     delete exits[utxoId].owner;
+    delete exits[utxoId].amount;
   }
 
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
   // @dev challenge period has ended
-  function finalizeExits() public {
+  function finalizeExits(uint16 _color) public {
     bytes32 utxoId;
     uint256 exitable_at;
-    (utxoId, exitable_at) = getNextExit();
+    (utxoId, exitable_at) = getNextExit(_color);
 
     Exit memory currentExit = exits[utxoId];
-    while (exitable_at <= block.timestamp && currentSize > 0) {
+    while (exitable_at <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
       currentExit = exits[utxoId];
-      token.transfer(currentExit.owner, currentExit.amount);
-      delMin();
+      if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
+        tokens[currentExit.color].addr.transfer(currentExit.owner, currentExit.amount);
+      }
+      tokens[currentExit.color].delMin();
       delete exits[utxoId].owner;
+      delete exits[utxoId].amount;
 
-      if (currentSize > 0) {
-        (utxoId, exitable_at) = getNextExit();
+      if (tokens[currentExit.color].currentSize > 0) {
+        (utxoId, exitable_at) = getNextExit(_color);
       } else {
         return;
       }
     }
   }
 
-  function getNextExit() internal view returns (bytes32 utxoId, uint256 exitable_at) {
-    uint256 priority = getMin();
+  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitable_at) {
+    uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
     exitable_at = priority >> 128;
   }
