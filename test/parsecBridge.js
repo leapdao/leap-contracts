@@ -418,6 +418,14 @@ contract('Parsec', (accounts) => {
         assert.equal(exit[2], bob);
         await parsec.challengeExit(spendProof, proof);
         exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal((await parsec.tokens(0))[1], 1);
+        const bal1 = await token.balanceOf(bob);
+        await parsec.finalizeExits(0);
+        const bal2 = await token.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await parsec.tokens(0))[1], 0);
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });
     });

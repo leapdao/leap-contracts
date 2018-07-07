@@ -555,8 +555,8 @@ contract ParsecBridge {
     //require(outPos1 == oindex);
 
     // delete invalid exit
-    // TODO: delete entry from priority queue !!!
     delete exits[utxoId].owner;
+    delete exits[utxoId].amount;
   }
 
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
@@ -569,9 +569,12 @@ contract ParsecBridge {
     Exit memory currentExit = exits[utxoId];
     while (exitable_at <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
       currentExit = exits[utxoId];
-      tokens[currentExit.color].addr.transfer(currentExit.owner, currentExit.amount);
+      if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
+        tokens[currentExit.color].addr.transfer(currentExit.owner, currentExit.amount);
+      }
       tokens[currentExit.color].delMin();
       delete exits[utxoId].owner;
+      delete exits[utxoId].amount;
 
       if (tokens[currentExit.color].currentSize > 0) {
         (utxoId, exitable_at) = getNextExit(_color);
