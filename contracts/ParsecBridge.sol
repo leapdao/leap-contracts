@@ -38,7 +38,7 @@ contract ParsecBridge {
   bytes32 public tipHash; // hash of first period that has extended chain to some height
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
-  uint16 tokenCount = 0;
+  uint16 public tokenCount = 0;
 
   struct Slot {
     address owner;
