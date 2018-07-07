@@ -37,7 +37,7 @@ contract ParsecBridge {
   uint256 exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
 
-  mapping(uint256 => PriorityQueue.Token) public tokens;
+  mapping(uint16 => PriorityQueue.Token) public tokens;
   uint16 tokenCount = 0;
 
   struct Slot {
