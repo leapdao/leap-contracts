@@ -18,6 +18,12 @@ const should = chai
   .use(require('chai-as-promised'))
   .should();
 
+const deployBridge = async (token, periodTime) => {
+  const pqLib = await PriorityQueue.new();
+  ParsecBridge.link('PriorityQueue', pqLib.address);
+  return ParsecBridge.new(token.address, periodTime, 50, 0, 0);
+}
+
 contract('Parsec', (accounts) => {
   const alice = accounts[0];
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
@@ -33,9 +39,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      const pqLib = await PriorityQueue.new();
-      ParsecBridge.link('PriorityQueue', pqLib.address);
-      parsec = await ParsecBridge.new(token.address, 3, 50, 0, 0);
+      parsec = await deployBridge(token, 3);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -163,9 +167,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      const pqLib = await PriorityQueue.new();
-      ParsecBridge.link('PriorityQueue', pqLib.address);
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
+      parsec = await deployBridge(token, 8);
       p[0] = await parsec.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -328,9 +330,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      const pqLib = await PriorityQueue.new();
-      ParsecBridge.link('PriorityQueue', pqLib.address);
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
+      parsec = await deployBridge(token, 8);
       p[0] = await parsec.tipHash();
       // alice auctions slot
       await token.approve(parsec.address, 1000, {from: alice});
@@ -438,9 +438,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      const pqLib = await PriorityQueue.new();
-      ParsecBridge.link('PriorityQueue', pqLib.address);
-      parsec = await ParsecBridge.new(token.address, 8, 50, 0, 0);
+      parsec = await deployBridge(token, 8);
       p[0] = await parsec.tipHash();
       let data = await parsec.contract.bet.getData(0, 100, alice, alice, alice);
       await token.approveAndCall(parsec.address, 1000, data, {from: alice});
@@ -523,4 +521,27 @@ contract('Parsec', (accounts) => {
       it('should allow to slash two periods at same height');
     });
   });
+
+  describe('RegisterToken', function() {
+    let parsec;
+    let token;
+    before(async () => {
+      token = await SimpleToken.new();
+      // initialize contract
+      parsec = await deployBridge(token, 8);
+    });
+
+    it('should register a new token', async () => {
+      const anotherToken = await SimpleToken.new();
+      assert.equal((await parsec.tokens(0))[0], token.address);
+      await parsec.registerToken(anotherToken.address);
+      assert.equal(await parsec.tokenCount(), 2);
+      assert.equal((await parsec.tokens(1))[0], anotherToken.address);
+    });
+
+    it('should fail when registering a same token again', async () => {
+      await parsec.registerToken(token.address).should.be.rejectedWith(EVMRevert);
+    });
+  });
+
 });

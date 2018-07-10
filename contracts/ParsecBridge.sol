@@ -38,6 +38,7 @@ contract ParsecBridge {
   bytes32 public tipHash; // hash of first period that has extended chain to some height
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
+  mapping(address => bool) tokenColors;
   uint16 public tokenCount = 0;
 
   struct Slot {
@@ -106,7 +107,9 @@ contract ParsecBridge {
 
   function registerToken(ERC20 _token) public {
     require(_token != address(0));
+    require(!tokenColors[_token]);
     uint256[] memory arr = new uint256[](1);
+    tokenColors[_token] = true;
     tokens[tokenCount++] = PriorityQueue.Token({
       addr: _token,
       heapList: arr,
