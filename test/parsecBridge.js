@@ -438,7 +438,7 @@ contract('Parsec', (accounts) => {
         // challenge exit and make sure exit is removed
         let exit = await parsec.exits(outpoint.getUtxoId());
         assert.equal(exit[2], bob);
-        await parsec.challengeExit(spendProof, proof);
+        await parsec.challengeExit(spendProof, proof, 0, 0);
         exit = await parsec.exits(outpoint.getUtxoId());
         assert.equal((await parsec.tokens(0))[1], 1);
         const bal1 = await token.balanceOf(bob);

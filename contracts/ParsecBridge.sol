@@ -16,7 +16,7 @@ import "./TxLib.sol";
 
 contract ParsecBridge {
   using SafeMath for uint256;
-  using TxLib for TxLib.Tx;
+  using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
   using PriorityQueue for PriorityQueue.Token;
 
@@ -447,22 +447,6 @@ contract ParsecBridge {
     emit NewDeposit(depositCount, _owner, _color, _amount);
   }
 
-  function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
-    uint16 txLength = uint16(_proof[1] >> 224);
-    bytes memory txData = new bytes(txLength);
-    bytes32 r;
-    bytes32 s;
-    uint8 v;
-    assembly {
-      calldatacopy(add(txData, 32), add(114, offset), 43)
-      r := calldataload(add(157, offset))
-      s := calldataload(add(189, offset))
-      v := calldataload(add(190, offset))
-      calldatacopy(add(txData, 140), add(222, offset), 28) // 32 + 43 + 65
-    }
-    dest = ecrecover(keccak256(txData), v, r, s);
-  }
-
   function startExit(bytes32[] _proof, uint256 _oindex) public {
     // validate proof
     bytes32 txHash;
@@ -484,32 +468,23 @@ contract ParsecBridge {
     emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
   }
 
-  function challengeExit(bytes32[] _proof, bytes32[] _prevProof) public {
+  function challengeExit(bytes32[] _proof, bytes32[] _prevProof, uint256 _oIndex, uint256 _inputIndex) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1, ) = TxLib.validateProof(offset, _prevProof);
-    uint256 oindex = 0; // TODO:  enable other outputs
-    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
+    ( , txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
+    bytes32 utxoId = bytes32((_oIndex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
-    TxLib.validateProof(32, _proof);
-
-    // get iputs and validate
-    bytes32 prevHash1;
-    uint8 outPos1;
-    assembly {
-      //TODO: allow other than first inputId
-      prevHash1 := calldataload(add(132, 32))
-      outPos1 := calldataload(add(164, 32))
-    }
+    bytes memory txData;
+    (, , txData) = TxLib.validateProof(96, _proof);
+    TxLib.Outpoint memory outpoint = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
 
     // make sure one is spending the other one
-    require(txHash1 == prevHash1);
-    // TODO: fix outpos position check
-    //require(outPos1 == oindex);
+    require(txHash1 == outpoint.hash);
+    require(_oIndex == outpoint.pos);
 
     // delete invalid exit
     delete exits[utxoId].owner;

@@ -218,5 +218,22 @@ library TxLib {
     bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
     require(root == _proof[0]);
   }
+
+
+  function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
+    uint16 txLength = uint16(_proof[1] >> 224);
+    bytes memory txData = new bytes(txLength);
+    bytes32 r;
+    bytes32 s;
+    uint8 v;
+    assembly {
+      calldatacopy(add(txData, 32), add(114, offset), 43)
+      r := calldataload(add(157, offset))
+      s := calldataload(add(189, offset))
+      v := calldataload(add(190, offset))
+      calldatacopy(add(txData, 140), add(222, offset), 28) // 32 + 43 + 65
+    }
+    dest = ecrecover(keccak256(txData), v, r, s);
+  }
     
 }
