@@ -20,7 +20,9 @@ const should = chai
 const deployBridge = async (token, periodTime) => {
   const pqLib = await PriorityQueue.new();
   ParsecBridge.link('PriorityQueue', pqLib.address);
-  return ParsecBridge.new(token.address, periodTime, 50, 0, 0);
+  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0);
+  bridge.registerToken(token.address);
+  return bridge;
 }
 
 contract('Parsec', (accounts) => {
@@ -374,10 +376,32 @@ contract('Parsec', (accounts) => {
         const proof = period.proof(transfer);
 
         // withdraw output
-        const event = await parsec.startExit(proof);
+        const event = await parsec.startExit(proof, 0);
         const bal1 = await token.balanceOf(bob);
         await parsec.finalizeExits(0);
         const bal2 = await token.balanceOf(bob);
+        assert(bal1.toNumber() < bal2.toNumber());
+      });
+
+      it('should allow to exit valid utxo at index 2', async () => {
+        const deposit = Tx.deposit(114, 100, alice);
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(50, bob), new Output(50, alice)]
+        );
+
+        transfer = transfer.sign([alicePriv]);
+        let block = new Block(96).addTx(deposit).addTx(transfer);
+        let period = new Period(p[0], [block]);
+        p[2] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
+        const proof = period.proof(transfer);
+
+        // withdraw second output
+        const event = await parsec.startExit(proof, 1);
+        const bal1 = await token.balanceOf(alice);
+        await parsec.finalizeExits(0);
+        const bal2 = await token.balanceOf(alice);
         assert(bal1.toNumber() < bal2.toNumber());
       });
 
@@ -402,9 +426,8 @@ contract('Parsec', (accounts) => {
         await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
         const spendProof = period.proof(spend);
-
         // withdraw output
-        const event = await parsec.startExit(proof);
+        const event = await parsec.startExit(proof, 0);
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()

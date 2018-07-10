@@ -12,9 +12,12 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
 import "./PriorityQueue.sol";
+import "./TxLib.sol";
 
 contract ParsecBridge {
   using SafeMath for uint256;
+  using TxLib for TxLib.Tx;
+  using TxLib for TxLib.Output;
   using PriorityQueue for PriorityQueue.Token;
 
   event Epoch(uint256 epoch);
@@ -84,9 +87,7 @@ contract ParsecBridge {
   mapping(bytes32 => Exit) public exits;
 
 
-  constructor(ERC20 _psc, uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
-    // set PSC contract
-    registerToken(_psc);
+  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -255,22 +256,6 @@ contract ParsecBridge {
     averageGasPrice = averageGasPrice - (averageGasPrice / 15) + (tx.gasprice / 15);
   }
 
-  function submitAndPrune(uint256 _slotId, bytes32 _prevHash, bytes32 _root, bytes32[] orphans) public {
-    submitPeriod(_slotId, _prevHash, _root);
-    // delete all blocks that have non-existing parent
-    for (uint256 i = 0; i < orphans.length; i++) {
-      Period memory orphan = periods[orphans[i]];
-      // if period exists
-      if (orphan.parent > 0) {
-        // if period is orphaned
-        if (periods[orphan.parent].parent == 0) {
-          // delete period
-          delete periods[orphans[i]];
-        }
-      }
-    }
-  }
-
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
     // check parent node exists
     require(periods[_prevHash].parent > 0);
@@ -339,33 +324,6 @@ contract ParsecBridge {
     delete periods[hash];
   }
 
-  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
-    for (uint256 i = _offset; i < _proof.length; i++) {
-      // solhint-disable-next-line no-inline-assembly
-      if (_index % 2 == 0) {
-        _leaf = keccak256(_leaf, _proof[i]);
-      } else {
-        _leaf = keccak256(_proof[i], _leaf);
-      }
-      _index = _index / 2;
-    }
-    return _leaf;
-  }
-
-  //validate that transaction is included to the period (merkle proof)
-  function validateProof(uint256 offset, bytes32[] _proof) pure internal returns (uint64 txPos, bytes32 txHash) {
-    uint256 txLength = uint16(_proof[1] >> 224);
-    bytes memory txData = new bytes(txLength);
-    assembly {
-      calldatacopy(add(txData, 0x20), add(114, offset), txLength)
-    }
-    txHash = keccak256(txData);
-    txPos = uint64(_proof[1] >> 160);
-    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
-    require(root == _proof[0]);
-  }
-
-
   function readInvalidDepositProof(
     bytes32[] _txData
   ) public pure returns (
@@ -394,7 +352,7 @@ contract ParsecBridge {
       require(p.height > periods[tipHash].height - epochLength);
     }
     // check transaction proof
-    validateProof(14, _txData);
+    TxLib.validateProof(0, _txData);
 
     // check deposit values
     uint32 depositId;
@@ -420,10 +378,10 @@ contract ParsecBridge {
     // validate proofs
     uint256 offset = 32 * (_proof.length + 2);
     uint64 txPos1;
-    (txPos1, ) = validateProof(offset + 16, _prevProof);
+    (txPos1, , ) = TxLib.validateProof(offset, _prevProof);
 
     uint64 txPos2;
-    (txPos2, ) = validateProof(48, _proof);
+    (txPos2, , ) = TxLib.validateProof(32, _proof);
 
     // make sure transactions are different
     require(_proof[0] != _prevProof[0] || txPos1 != txPos2);
@@ -505,48 +463,39 @@ contract ParsecBridge {
     dest = ecrecover(keccak256(txData), v, r, s);
   }
 
-  function startExit(bytes32[] _proof) public {
+  function startExit(bytes32[] _proof, uint256 _oindex) public {
     // validate proof
     bytes32 txHash;
-    ( , txHash) = validateProof(16, _proof);
-    uint256 oindex = 0; // TODO:  enable other outputs
-
-    address dest;
-    uint16 color;
-    uint64 amount;
-    assembly {
-      // first output
-      // TODO: enable other outputs
-      amount := calldataload(206)
-      color := calldataload(208)
-      dest := calldataload(228)
-    }
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(32, _proof);
+    // parse tx and use data
+    TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash));
+    bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
-    require(amount > 0);
+    require(out.value > 0);
     require(exits[utxoId].amount == 0);
-    tokens[color].insert(priority);
+    tokens[out.color].insert(priority);
     exits[utxoId] = Exit({
-      owner: dest,
-      color: color,
-      amount: amount
+      owner: out.owner,
+      color: out.color,
+      amount: out.value
     });
-    emit ExitStarted(txHash, oindex, color, dest, amount);
+    emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
   }
 
   function challengeExit(bytes32[] _proof, bytes32[] _prevProof) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1) = validateProof(offset + 16, _prevProof);
+    ( , txHash1, ) = TxLib.validateProof(offset, _prevProof);
     uint256 oindex = 0; // TODO:  enable other outputs
     bytes32 utxoId = bytes32((oindex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
 
     // validate spending tx
-    validateProof(48, _proof);
+    TxLib.validateProof(32, _proof);
 
     // get iputs and validate
     bytes32 prevHash1;
