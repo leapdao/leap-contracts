@@ -19,7 +19,7 @@ contract TxMock {
   using TxLib for TxLib.Tx;
   using TxLib for TxLib.TxType;
 
-  function parse(bytes32[] _proof) public pure returns (uint256 txType, bytes32[] rsp) {
+  function parse(bytes32[] _proof) public pure returns (uint256 txType, bytes32[] rsp, bytes msgData) {
     uint256 offset = uint16(_proof[1] >> 248);
     uint256 txLength = uint16(_proof[1] >> 224);
 
@@ -41,6 +41,9 @@ contract TxMock {
     // output
     for (i = 0; i < txn.outs.length; i++) {
       flattenOutput(txn.outs[i], 2 + txn.ins.length * 5 + i * 5, rsp);
+    }
+    if (txn.txType == TxLib.TxType.CompReq) {
+      msgData = txn.outs[0].msgData;
     }
   }
 

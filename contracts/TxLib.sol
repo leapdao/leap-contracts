@@ -9,6 +9,9 @@
 pragma solidity ^0.4.22;
 
 library TxLib {
+
+  uint constant internal WORD_SIZE = 32;
+  uint constant internal ONES = ~uint(0);
 //   DEPOSIT: 2,
 //   TRANSFER: 3,
 //   CONSOLIDATE: 4,
@@ -79,6 +82,27 @@ library TxLib {
     }
     _ins[_pos] = input;
   }
+
+  // Copies 'len' bytes from 'srcPtr' to 'destPtr'.
+  // NOTE: This function does not check if memory is allocated, it only copies the bytes.
+  function memcopy(uint srcPtr, uint destPtr, uint len) internal pure {
+      uint offset = 0;
+      uint size = len / WORD_SIZE;
+      // Copy word-length chunks while possible.
+      for (uint i = 0; i < size; i++) {
+          offset = i * WORD_SIZE;
+          assembly {
+              mstore(add(destPtr, offset), mload(add(srcPtr, offset)))
+          }
+      }
+      offset = size*WORD_SIZE;
+      uint mask = ONES << 8*(32 - len % WORD_SIZE);
+      assembly {
+          let nSrc := add(srcPtr, offset)
+          let nDest := add(destPtr, offset)
+          mstore(nDest, or(and(mload(nSrc), mask), and(mload(nDest), not(mask))))
+      }
+  }
   
   function parseOutput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs) internal pure returns (uint256 newOffset) {
     uint64 value;
@@ -96,13 +120,24 @@ library TxLib {
     if (_type == TxType.CompReq && _pos == 0) {
         // read gasPrice
         // read length of msgData
-        value = 10;
-        uint32 gasPrice = 1000;
-        // read msgData
-        newOffset = offset + 30 + value;
-        data = new bytes(10);
-        output.msgData = data;
+        uint32 gasPrice;
+        assembly {
+            gasPrice := mload(add(add(offset, 34), _txData))
+            value := mload(add(add(offset, 36), _txData))
+        }
         output.gasPrice = gasPrice;
+        // read msgData
+        value = uint16(value); // using value for length here
+        data = new bytes(value);
+        uint src;
+        uint dest;
+        assembly {
+            src := add(add(add(offset, 36), 0x20), _txData)
+            dest := add(data, 0x20)
+        }
+        memcopy(src, dest, value);
+        output.msgData = data;
+        newOffset = offset + 36 + value;
     } else if (_type == TxType.CompRsp && _pos == 0) {
         // read new stateRoot
         bytes32 stateRoot;

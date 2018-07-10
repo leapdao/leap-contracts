@@ -45,7 +45,7 @@ function checkParse(rsp, txn) {
   for (let i = 0; i < txn.inputs.length; i++) {
     assert.equal(rsp[1][2 + i * 5], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
     assert.equal(toInt(rsp[1][3 + i * 5]), i); // output position
-    if (txn.type == Type.TRANSFER || ((txn.type == Type.COMP_RSP || txn.type == Type.COMP_REQ) && i > 0)) {
+    if (txn.type === Type.TRANSFER || ((txn.type === Type.COMP_RSP || txn.type === Type.COMP_REQ) && i > 0)) {
       assert.equal(rsp[1][4 + i * 5], `0x${txn.inputs[i].r.toString('hex')}`);
       assert.equal(rsp[1][5 + i * 5], `0x${txn.inputs[i].s.toString('hex')}`);
       assert.equal(toInt(rsp[1][6 + i * 5]), txn.inputs[i].v);
@@ -60,93 +60,174 @@ function checkParse(rsp, txn) {
     assert.equal(toInt(rsp[1][2 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].value);
     assert.equal(toInt(rsp[1][3 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].color);
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address);
-    assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-    assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root    
+    if (txn.type === Type.COMP_RSP && i === 0) {
+      assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root    
+    } else if (txn.type === Type.COMP_REQ && i === 0) {
+      assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].gasPrice); // gas price
+      assert.equal(rsp[2], `0x${txn.outputs[i].msgData.toString('hex')}`); // gas price
+    } else {
+      assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root    
+    }
   }
 }
 
-contract('Parsec', (accounts) => {
+contract('TxLib', (accounts) => {
   const alice = accounts[0];
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
+  const charlie = accounts[2];
   const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
   const value = 99000000;
   const color = 1337;
 
-  describe('Transfer', function() {
+  describe('Parser', function() {
     let txLib;
 
     before(async () => {
       txLib = await TxMock.new();
     });
 
-    it('should allow to parse deposit', async () => {
-      const deposit = Tx.deposit(12, value, bob, color);
-      const block = new Block(32);
-      block.addTx(deposit);
-      const proof = block.proof(deposit);
+    describe('Deposit', function() {
 
-      const rsp = await txLib.parse(proof).should.be.fulfilled;
-      checkParse(rsp, deposit);
+      it('should allow to parse deposit', async () => {
+        const deposit = Tx.deposit(12, value, bob, color);
+        const block = new Block(32);
+        block.addTx(deposit);
+        const proof = block.proof(deposit);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, deposit);
+      });
+
     });
 
-    it('should allow to parse transfer with single input and output', async () => {
-      const transfer = Tx.transfer(
-        [new Input(new Outpoint(prevTx, 0))],
-        [new Output(value, bob, color)],
-      );
-      transfer.sign([alicePriv]);
-      const block = new Block(32);
-      block.addTx(transfer);
-      const proof = block.proof(transfer);
+    describe('Transfer', function() {
 
-      const rsp = await txLib.parse(proof).should.be.fulfilled;
-      checkParse(rsp, transfer);
+      it('should parse single input and output', async () => {
+        const transfer = Tx.transfer(
+          [new Input(new Outpoint(prevTx, 0))],
+          [new Output(value, bob, color)],
+        );
+        transfer.sign([alicePriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const proof = block.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);
+      });
+
+      it('should parse 2 inputs and 2 outputs', async () => {
+        const transfer = Tx.transfer([
+          new Input(new Outpoint(prevTx, 0)),
+          new Input(new Outpoint(prevTx, 1)),
+        ],[
+          new Output(value / 2, alice, color),
+          new Output(value / 2, bob, color),
+        ]);
+        transfer.sign([bobPriv, alicePriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const proof = block.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);   
+      });
+
+      it('should parse 1 inputs and 3 outputs', async () => {
+        const transfer = Tx.transfer([
+          new Input(new Outpoint(prevTx, 0)),
+        ],[
+          new Output(value / 3, alice, color),
+          new Output(value / 3, bob, color),
+          new Output(value / 3, charlie, color),
+        ]);
+        transfer.sign([bobPriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const proof = block.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);   
+      });
     });
 
-    it('should allow to parse transfer with two inputs and outputs', async () => {
-      const transfer = Tx.transfer([
-        new Input(new Outpoint(prevTx, 0)),
-        new Input(new Outpoint(prevTx, 1)),
-      ],[
-        new Output(value / 2, alice, color),
-        new Output(value / 2, bob, color),
-      ]);
-      transfer.sign([bobPriv, alicePriv]);
-      const block = new Block(32);
-      block.addTx(transfer);
-      const proof = block.proof(transfer);
+    describe('Consolidate', function() {
 
-      const rsp = await txLib.parse(proof).should.be.fulfilled;
-      checkParse(rsp, transfer);   
+      it('should allow to parse consolidate tx', async () => {
+        const consolidate = Tx.consolidate([
+          new Input(new Outpoint(prevTx, 0)),
+          new Input(new Outpoint(prevTx, 1)),
+        ],
+          new Output(value, alice, color),
+        );
+        const block = new Block(32);
+        block.addTx(consolidate);
+        const proof = block.proof(consolidate);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, consolidate);   
+      });
+
+      it('should fail to validate consolidate with only 1 input', async () => {
+        const consolidate = Tx.consolidate([
+          new Input(new Outpoint(prevTx, 0)),
+        ],
+          new Output(value, alice, color),
+        );
+        const block = new Block(32);
+        block.addTx(consolidate);
+        const proof = block.proof(consolidate);
+        await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
+      });
     });
 
-    it('should allow to parse consolidate tx', async () => {
-      const consolidate = Tx.consolidate([
-        new Input(new Outpoint(prevTx, 0)),
-        new Input(new Outpoint(prevTx, 1)),
-      ],
-        new Output(value, alice, color),
-      );
-      const block = new Block(32);
-      block.addTx(consolidate);
-      const proof = block.proof(consolidate);
+    describe('Computation Request', function() {
+      it('should parse with 1 output', async () => {
+        const compRequest = Tx.compRequest([
+          new Input({
+            prevout: new Outpoint(prevTx, 0),
+          }),
+          new Input(new Outpoint(prevTx, 1)),
+        ],[
+          new Output({
+            value: value / 2,
+            color,
+            address: alice,
+            gasPrice: 123,
+            msgData: '0x1234',
+        })]);
+        compRequest.sign([_, alicePriv]);
+        const block = new Block(32);
+        block.addTx(compRequest);
+        const proof = block.proof(compRequest);
 
-      const rsp = await txLib.parse(proof).should.be.fulfilled;
-      checkParse(rsp, consolidate);   
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, compRequest);
+      });
     });
 
-    it('should fail to validate consolidate with only 1 input', async () => {
-      const consolidate = Tx.consolidate([
-        new Input(new Outpoint(prevTx, 0)),
-      ],
-        new Output(value, alice, color),
-      );
-      const block = new Block(32);
-      block.addTx(consolidate);
-      const proof = block.proof(consolidate);
-      await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
+    describe('Computation Response', function() {
+      it('should parse with 1 output', async () => {
+        const compResponse = Tx.compResponse([
+          new Input(new Outpoint(prevTx, 0)),
+        ],[
+          new Output({
+            value,
+            color,
+            address: alice,
+            storageRoot: alicePriv,
+        })]);
+        const block = new Block(32);
+        block.addTx(compResponse);
+        const proof = block.proof(compResponse);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, compResponse);
+      });
     });
   });
 });
