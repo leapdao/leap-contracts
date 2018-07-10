@@ -96,7 +96,8 @@ contract('TxLib', (accounts) => {
         const deposit = Tx.deposit(12, value, bob, color);
         const block = new Block(32);
         block.addTx(deposit);
-        const proof = block.proof(deposit);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(deposit);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, deposit);
@@ -114,7 +115,8 @@ contract('TxLib', (accounts) => {
         transfer.sign([alicePriv]);
         const block = new Block(32);
         block.addTx(transfer);
-        const proof = block.proof(transfer);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, transfer);
@@ -131,10 +133,11 @@ contract('TxLib', (accounts) => {
         transfer.sign([bobPriv, alicePriv]);
         const block = new Block(32);
         block.addTx(transfer);
-        const proof = block.proof(transfer);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, transfer);   
+        checkParse(rsp, transfer);
       });
 
       it('should parse 1 inputs and 3 outputs', async () => {
@@ -148,7 +151,8 @@ contract('TxLib', (accounts) => {
         transfer.sign([bobPriv]);
         const block = new Block(32);
         block.addTx(transfer);
-        const proof = block.proof(transfer);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, transfer);   
@@ -166,7 +170,8 @@ contract('TxLib', (accounts) => {
         );
         const block = new Block(32);
         block.addTx(consolidate);
-        const proof = block.proof(consolidate);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(consolidate);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, consolidate);   
@@ -180,7 +185,8 @@ contract('TxLib', (accounts) => {
         );
         const block = new Block(32);
         block.addTx(consolidate);
-        const proof = block.proof(consolidate);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(consolidate);
         await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
       });
     });
@@ -203,7 +209,8 @@ contract('TxLib', (accounts) => {
         compRequest.sign([_, alicePriv]);
         const block = new Block(32);
         block.addTx(compRequest);
-        const proof = block.proof(compRequest);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(compRequest);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, compRequest);
@@ -223,7 +230,8 @@ contract('TxLib', (accounts) => {
         })]);
         const block = new Block(32);
         block.addTx(compResponse);
-        const proof = block.proof(compResponse);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(compResponse);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, compResponse);

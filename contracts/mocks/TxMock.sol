@@ -20,13 +20,8 @@ contract TxMock {
   using TxLib for TxLib.TxType;
 
   function parse(bytes32[] _proof) public pure returns (uint256 txType, bytes32[] rsp, bytes msgData) {
-    uint256 offset = uint16(_proof[1] >> 248);
-    uint256 txLength = uint16(_proof[1] >> 224);
-
-    bytes memory txData = new bytes(txLength);
-    assembly {
-      calldatacopy(add(txData, 0x20), add(68, offset), txLength)
-    }
+    bytes memory txData;
+    (, , txData) = TxLib.validateProof(0, _proof);
 
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     

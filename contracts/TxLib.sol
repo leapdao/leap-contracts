@@ -190,5 +190,33 @@ library TxLib {
     }
     txn = Tx(txType, ins, outs);
   }
+
+  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+    for (uint256 i = _offset; i < _proof.length; i++) {
+      // solhint-disable-next-line no-inline-assembly
+      if (_index % 2 == 0) {
+        _leaf = keccak256(_leaf, _proof[i]);
+      } else {
+        _leaf = keccak256(_proof[i], _leaf);
+      }
+      _index = _index / 2;
+    }
+    return _leaf;
+  }
+
+  //validate that transaction is included to the period (merkle proof)
+  function validateProof(uint256 _cdOffset, bytes32[] _proof) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+    uint256 offset = uint16(_proof[1] >> 248);
+    uint256 txLength = uint16(_proof[1] >> 224);
+
+    txData = new bytes(txLength);
+    assembly {
+      calldatacopy(add(txData, 0x20), add(68, add(offset, _cdOffset)), txLength)
+    }
+    txHash = keccak256(txData);
+    txPos = uint64(_proof[1] >> 160);
+    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
+    require(root == _proof[0]);
+  }
     
 }
