@@ -58,10 +58,10 @@ contract('Parsec', (accounts) => {
         await parsec.bet(2, 30, alice, alice, alice, {from: alice}).should.be.fulfilled;
         const bal2 = await token.balanceOf(alice);
         const slot = await parsec.slots(2);
-        assert.equal(Number(slot[1]), 30); // stake === 30
-        assert.equal(Number(slot[6]), 0); // newStake === 0
+        assert.equal(Number(slot[2]), 30); // stake === 30
+        assert.equal(Number(slot[7]), 0); // newStake === 0
         // all token missing in balance should be accounted in slot
-        assert.equal(bal1.sub(bal2).toNumber(), Number(slot[1]));
+        assert.equal(bal1.sub(bal2).toNumber(), Number(slot[2]));
       });
 
       it('should prevent auctining for lower price', async () => {
@@ -482,9 +482,9 @@ contract('Parsec', (accounts) => {
         assert.equal(p[2], tip[0]);
 
         // submit proof and get block deleted
-        const bal1 = (await parsec.getSlot(2))[1];
+        const bal1 = (await parsec.getSlot(2))[2];
         await parsec.reportDoubleSpend(proof, prevProof, {from: alice});
-        const bal2 = (await parsec.getSlot(2))[1];
+        const bal2 = (await parsec.getSlot(2))[2];
         assert(bal1.toNumber() > bal2.toNumber());
 
         // check tip
@@ -507,9 +507,9 @@ contract('Parsec', (accounts) => {
         const proof = period.proof(invalidDeposit);
 
         // complain, if deposit tx wrong
-        const bal1 = (await parsec.getSlot(0))[1];
+        const bal1 = (await parsec.getSlot(0))[2];
         await parsec.reportInvalidDeposit(proof, {from: charlie});
-        const bal2 = (await parsec.getSlot(0))[1];
+        const bal2 = (await parsec.getSlot(0))[2];
         assert(bal1.toNumber() > bal2.toNumber());
 
         let [ readDepositId, readValue, readSigner ] = await parsec.readInvalidDepositProof(proof);

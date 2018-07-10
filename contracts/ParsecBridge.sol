@@ -21,10 +21,10 @@ contract ParsecBridge {
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
-  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
-  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
+  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
+  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
-  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr);
+  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter);
 
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -41,6 +41,7 @@ contract ParsecBridge {
   uint16 public tokenCount = 0;
 
   struct Slot {
+    uint32 eventCounter;
     address owner;
     uint64 stake;
     address signer;
@@ -114,10 +115,10 @@ contract ParsecBridge {
     });
   }
 
-  function getSlot(uint256 _slotId) constant public returns (address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
+  function getSlot(uint256 _slotId) constant public returns (uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
     require(_slotId < epochLength);
     Slot memory slot = slots[_slotId];
-    return (slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot. newStake, slot.newSigner, slot.newTendermint);
+    return (slot.eventCounter, slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot. newStake, slot.newSigner, slot.newTendermint);
   }
 
 
@@ -182,7 +183,8 @@ contract ParsecBridge {
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
+      slot.eventCounter++;
+      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 3);
       return;
     }
     // check min stake
@@ -202,10 +204,11 @@ contract ParsecBridge {
       slot.tendermint = _tenderAddr;
       slot.stake = uint64(_value);
       slot.activationEpoch = 0;
+      slot.eventCounter++;
       if (stake == 0) {
-        emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 1);
+        emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 1);
       } else {
-        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr);
+        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr, slot.eventCounter);
       }
     }
     // auction
@@ -219,7 +222,8 @@ contract ParsecBridge {
       slot.newTendermint = _tenderAddr;
       slot.newStake = uint64(_value);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, lastCompleteEpoch + 3);
+      slot.eventCounter++;
+      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 3);
     }
   }
 
@@ -240,7 +244,8 @@ contract ParsecBridge {
     slot.newSigner = 0;
     slot.newTendermint = 0x0;
     slot.newStake = 0;
-    emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
+    slot.eventCounter++;
+    emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, slot.eventCounter, lastCompleteEpoch + 1);
   }
 
   function recordGas() internal {
@@ -386,7 +391,7 @@ contract ParsecBridge {
       require(p.height > periods[tipHash].height - epochLength);
     }
     // check transaction proof
-    validateProof(15, _txData);
+    validateProof(14, _txData);
 
     // check deposit values
     uint32 depositId;
