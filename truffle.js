@@ -6,6 +6,12 @@ require('dotenv').config();
 var HDWalletProvider = require('truffle-hdwallet-provider')
 
 module.exports = {
+  solc: {
+    optimizer: {
+      enabled: true,
+      runs: 500
+    }
+  },
   // See <http://truffleframework.com/docs/advanced/configuration>
   // to customize your Truffle configuration!
   networks: {
