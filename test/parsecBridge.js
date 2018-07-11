@@ -17,10 +17,10 @@ const should = chai
   .use(require('chai-as-promised'))
   .should();
 
-const deployBridge = async (token, periodTime) => {
+const deployBridge = async (token, epochLength) => {
   const pqLib = await PriorityQueue.new();
   ParsecBridge.link('PriorityQueue', pqLib.address);
-  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0);
+  const bridge = await ParsecBridge.new(epochLength, 50, 0, 0);
   bridge.registerToken(token.address);
   return bridge;
 }
@@ -32,6 +32,7 @@ contract('Parsec', (accounts) => {
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
   const charliePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+  const ALL_SIGS = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
   describe('Slot', function() {
     const p = [];
@@ -47,13 +48,13 @@ contract('Parsec', (accounts) => {
     });
     describe('Auction', function() {
       it('should prevent submission by unbonded validators', async () => {
-        await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
+        await parsec.submitPeriod(0, p[0], '0x01', ALL_SIGS, {from: alice}).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to auction slot and submit block', async () => {
         const data = parsec.contract.bet.getData(0, 100, alice, alice, alice);
         await token.approveAndCall(parsec.address, 1000, data, {from: alice});
-        await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[0], '0x01', ALL_SIGS, {from: alice}).should.be.fulfilled;
         p[1] = await parsec.tipHash();
       });
 
@@ -84,13 +85,13 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow submission when slot auctioned in same epoch', async () => {
-        await parsec.submitPeriod(0, p[1], '0x02', {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[1], '0x02', ALL_SIGS, {from: alice}).should.be.fulfilled;
         p[2] = await parsec.tipHash();
       });
 
       it('should prevent submission by auctioned slot in later epoch', async () => {
-        await parsec.submitPeriod(0, p[2], '0x03', {from: alice}).should.be.rejectedWith(EVMRevert);
-        await parsec.submitPeriod(0, p[2], '0x03', {from: bob}).should.be.rejectedWith(EVMRevert);
+        await parsec.submitPeriod(0, p[2], '0x03', ALL_SIGS, {from: alice}).should.be.rejectedWith(EVMRevert);
+        await parsec.submitPeriod(0, p[2], '0x03', ALL_SIGS, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('allow to auction another slot', async () => {
@@ -101,22 +102,22 @@ contract('Parsec', (accounts) => {
 
       it('should allow to activate auctioned slot and submit', async () => {
         // increment Epoch
-        await parsec.submitPeriod(1, p[2], '0x03', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[2], '0x03', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[3] = await parsec.tipHash();
-        await parsec.submitPeriod(1, p[3], '0x04', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[3], '0x04', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[4] = await parsec.tipHash();
-        await parsec.submitPeriod(1, p[4], '0x05', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[4], '0x05', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[5] = await parsec.tipHash();
         let tip = await parsec.getTip();
         assert.equal(p[5], tip[0]);
-        await parsec.submitPeriod(1, p[5], '0x06', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[5], '0x06', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[6] = await parsec.tipHash();
         // activate and submit by bob
         const bal1 = await token.balanceOf(alice);
         await parsec.activate(0);
         const bal2 = await token.balanceOf(alice);
         assert.equal(bal1.add(180).toNumber(), bal2.toNumber());
-        await parsec.submitPeriod(0, p[6], '0x07', {from: bob}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[6], '0x07', ALL_SIGS, {from: bob}).should.be.fulfilled;
         p[7] = await parsec.tipHash();
       });
 
@@ -126,19 +127,19 @@ contract('Parsec', (accounts) => {
 
       it('should prevent submission by logged-out slot in later epoch', async () => {
         // increment epoch
-        await parsec.submitPeriod(1, p[7], '0x08', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[7], '0x08', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[8] = await parsec.tipHash();
         // try to submit when logged out
-        await parsec.submitPeriod(0, p[8], '0x09', {from: bob}).should.be.rejectedWith(EVMRevert);
+        await parsec.submitPeriod(0, p[8], '0x09', ALL_SIGS, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to withdraw after logout', async () => {
         // increment epoch
-        await parsec.submitPeriod(1, p[8], '0x09', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[8], '0x09', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[9] = await parsec.tipHash();
-        await parsec.submitPeriod(1, p[9], '0x0a', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[9], '0x0a', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[10] = await parsec.tipHash();
-        await parsec.submitPeriod(1, p[10], '0x0b', {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[10], '0x0b', ALL_SIGS, {from: charlie}).should.be.fulfilled;
         p[11] = await parsec.tipHash();
         // activate logout
         token.transfer(parsec.address, 2000);
@@ -188,7 +189,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(32).addTx(Tx.deposit(111, 100, alice, 1337));
         let period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[0], p[1], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[0], p[1], ALL_SIGS, {from: alice}).should.be.fulfilled;
         const tip = await parsec.getTip();
         assert.equal(p[1], tip[0]);
 
@@ -198,7 +199,7 @@ contract('Parsec', (accounts) => {
         block = new Block(64).addTx(Tx.deposit(112, 100, bob, 1337));
         period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(4, p[1], p[2], {from: bob}).should.be.fulfilled;
+        await parsec.submitPeriod(4, p[1], p[2], ALL_SIGS, {from: bob}).should.be.fulfilled;
         assert.equal(p[2], await parsec.tipHash());
       });
 
@@ -215,19 +216,19 @@ contract('Parsec', (accounts) => {
         let block = new Block(96).addTx(Tx.deposit(113, 300, charlie, 1337));
         let period = new Period(p[2], [block]);
         p[3] = period.merkleRoot();
-        await parsec.submitPeriod(5, p[2], p[3], {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(5, p[2], p[3], ALL_SIGS, {from: charlie}).should.be.fulfilled;
         let tip = await parsec.getTip();
         assert.equal(p[3], (await parsec.getTip())[0]);
 
         block = new Block(96).addTx(Tx.deposit(114, 300, alice, 1337));
         period = new Period(p[3], [block]);
         p[4] = period.merkleRoot();
-        await parsec.submitPeriod(1, p[2], p[4], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[2], p[4], ALL_SIGS, {from: alice}).should.be.fulfilled;
 
         block = new Block(96).addTx(Tx.deposit(115, 300, bob, 1337));
         period = new Period(p[4], [block]);
         p[5] = period.merkleRoot();
-        await parsec.submitPeriod(4, p[2], p[5], {from: bob}).should.be.fulfilled;
+        await parsec.submitPeriod(4, p[2], p[5], ALL_SIGS, {from: bob}).should.be.fulfilled;
 
         // tip not updated because bob reused slot
         tip = await parsec.getTip();
@@ -243,7 +244,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(128).addTx(Tx.deposit(6, 400, alice, 1337));
         let period = new Period(p[5], [block]);
         p[6] = period.merkleRoot();
-        await parsec.submitPeriod(2, p[5], p[6], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(2, p[5], p[6], ALL_SIGS, {from: alice}).should.be.fulfilled;
         // check tip
         let tip = await parsec.getTip();
         assert.equal(p[3], tip[0]);
@@ -253,7 +254,7 @@ contract('Parsec', (accounts) => {
         block = new Block(160).addTx(Tx.deposit(7, 500, alice, 1337));
         period = new Period(p[6], [block]);
         p[7] = period.merkleRoot();
-        await parsec.submitPeriod(3, p[6], p[7], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(3, p[6], p[7], ALL_SIGS, {from: alice}).should.be.fulfilled;
         // check tip
         tip = await parsec.getTip();
         assert.equal(p[7], tip[0]);
@@ -268,17 +269,17 @@ contract('Parsec', (accounts) => {
         let block = new Block(128).addTx(Tx.deposit(8, 400, charlie, 1337));
         let period = new Period(p[7], [block]);
         p[8] = period.merkleRoot();
-        await parsec.submitPeriod(6, p[4], p[8], {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(6, p[4], p[8], ALL_SIGS, {from: charlie}).should.be.fulfilled;
 
         block = new Block(160).addTx(Tx.deposit(9, 500, charlie, 1337));
         period = new Period(p[8], [block]);
         p[9] = period.merkleRoot();
-        await parsec.submitPeriod(7, p[8], p[9], {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(7, p[8], p[9], ALL_SIGS, {from: charlie}).should.be.fulfilled;
 
         block = new Block(192).addTx(Tx.deposit(10, 600, alice, 1337));
         period = new Period(p[9], [block]);
         p[10] = period.merkleRoot();
-        await parsec.submitPeriod(2, p[9], p[10], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(2, p[9], p[10], ALL_SIGS, {from: alice}).should.be.fulfilled;
 
         // check tip
         let tip = await parsec.getTip();
@@ -304,7 +305,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(224).addTx(Tx.deposit(11, 700, alice, 1337));
         let period = new Period(p[10], [block]);
         p[11] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[10], p[11], {from: alice, gasPrice: highGas}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[10], p[11], ALL_SIGS, {from: alice, gasPrice: highGas}).should.be.fulfilled;
 
         let incrAvg = await parsec.averageGasPrice.call();
         assert(incrAvg > initialAvg);
@@ -314,7 +315,7 @@ contract('Parsec', (accounts) => {
         block = new Block(256).addTx(Tx.deposit(12, 800, alice, 1337));
         period = new Period(p[11], [block]);
         p[12] = period.merkleRoot();
-        await parsec.submitPeriod(1, p[11], p[12], {from: alice, gasPrice: lowGas}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[11], p[12], ALL_SIGS, {from: alice, gasPrice: lowGas}).should.be.fulfilled;
 
         let decrAvg = await parsec.averageGasPrice.call();
         assert(decrAvg < incrAvg);
@@ -372,7 +373,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(96).addTx(deposit).addTx(transfer);
         let period = new Period(p[0], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[0], p[2], ALL_SIGS, {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
 
         // withdraw output
@@ -394,7 +395,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(96).addTx(deposit).addTx(transfer);
         let period = new Period(p[0], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[0], p[2], ALL_SIGS, {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
 
         // withdraw second output
@@ -423,7 +424,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(128).addTx(deposit).addTx(transfer).addTx(spend);
         let period = new Period(p[2], [block]);
         p[3] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[2], p[3], ALL_SIGS, {from: alice}).should.be.fulfilled;
         const proof = period.proof(transfer);
         const spendProof = period.proof(spend);
         // withdraw output
@@ -487,14 +488,14 @@ contract('Parsec', (accounts) => {
         block.addTx(Tx.deposit(12, value, alice));
         let period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
-        await parsec.submitPeriod(1, p[0], p[1], {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(1, p[0], p[1], ALL_SIGS, {from: charlie}).should.be.fulfilled;
         const prevProof = period.proof(transfer);
 
         // submit tx spending same out in later block
         block = new Block(64).addTx(transfer);
         period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(2, p[1], p[2], {from: charlie}).should.be.fulfilled;
+        await parsec.submitPeriod(2, p[1], p[2], ALL_SIGS, {from: charlie}).should.be.fulfilled;
         const proof = period.proof(transfer);
 
         // check tip
@@ -523,7 +524,7 @@ contract('Parsec', (accounts) => {
         let block = new Block(92).addTx(invalidDeposit);
         let period = new Period(p[1], [block]);
         p[2] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
+        await parsec.submitPeriod(0, p[1], p[2], ALL_SIGS, {from: alice}).should.be.fulfilled;
         const proof = period.proof(invalidDeposit);
 
         // complain, if deposit tx wrong

@@ -65,7 +65,7 @@ contract ParsecBridge {
     uint32 parentIndex; //  the position of this node in the Parent's children list
     uint8 slot;
     uint32 timestamp;
-    uint64 reward;
+    uint256 sigs;
     bytes32[] children; // unordered list of children below this node
   }
   mapping(bytes32 => Period) public periods;
@@ -85,6 +85,14 @@ contract ParsecBridge {
     address owner;
   }
   mapping(bytes32 => Exit) public exits;
+
+  struct Challenge {
+    uint64 stake;
+    address signer;
+    uint32 finalizationEpoch;
+  }
+  
+  mapping(bytes32 => mapping(uint256 => Challenge)) challenges;
 
 
   constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
@@ -256,13 +264,21 @@ contract ParsecBridge {
     averageGasPrice = averageGasPrice - (averageGasPrice / 15) + (tx.gasprice / 15);
   }
 
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
+  function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
+    for (uint i = 256; i >= 256 - _epochLength; i--) {
+        count += uint8(_sigs >> i) & 0x01;
+    }
+  }
+
+  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root, uint256 _sigs) public {
     // check parent node exists
     require(periods[_prevHash].parent > 0);
     // check that same root not submitted yet
     require(periods[_root].height == 0);
     // check slot
     require(_slotId < epochLength);
+    // count sigs
+    require(countSigs(_sigs, epochLength) > epochLength.mul(2).div(3));
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender);
     if (slot.activationEpoch > 0) {
@@ -285,6 +301,7 @@ contract ParsecBridge {
     // store the period
     Period memory newPeriod;
     newPeriod.parent = _prevHash;
+    newPeriod.sigs = _sigs;
     newPeriod.height = uint32(newHeight);
     newPeriod.slot = uint8(_slotId);
     newPeriod.timestamp = uint32(block.timestamp);
@@ -308,6 +325,84 @@ contract ParsecBridge {
       lastCompleteEpoch++;
       lastEpochBlockHeight = newHeight;
     }
+  }
+ 
+  function challengeSig(bytes32 _period, uint256 _slotId) public {
+      // check that sig was actually 1
+      require(uint8(periods[_period].sigs >> _slotId) & 0x01 == 1);
+      // check that challenge doesn't exist yet
+      require(challenges[_period][_slotId].signer == 0x0);
+      // check that challenge submitted for previous epoche, and current epoch has not progressed more than 1/3
+      uint256 finalizationEpoch;
+      if (periods[_period].height < lastEpochBlockHeight) {
+          // check that challenge not older than 4/3 epoch
+          require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(4).div(3));
+          // check that current epoch not older than 1/3 epochLength
+          require(periods[tipHash].height - lastEpochBlockHeight < epochLength.mul(32).div(3));
+          finalizationEpoch = lastCompleteEpoch + 1;
+      } else {
+          // challenge submitted for current epoch, nothing to check
+          finalizationEpoch = lastCompleteEpoch + 2;
+      }
+      // transfer funds for bond
+      challenges[_period][_slotId] = Challenge(100, msg.sender, uint32(finalizationEpoch));
+  }
+  
+  function answerSig(bytes32 _period, uint256 _slotId, uint8 _v, bytes32 _r, bytes32 _s) public {
+      // check that challenge does exist
+      require(challenges[_period][_slotId].stake > 0);
+      // check signature
+      require(ecrecover(_period, _v, _r, _s) == slots[_slotId].signer);
+      // slash challenger
+      slots[_slotId].stake += challenges[_period][_slotId].stake / 2;
+      // delete challenge
+      delete challenges[_period][_slotId];
+  }
+  
+
+  function slash(uint256 _slotId, uint256 _value) public {
+    require(_slotId < epochLength);
+    Slot storage slot = slots[_slotId];
+    require(slot.stake > 0);
+    uint256 prevStake = slot.stake;
+    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
+    // if slot became empty by slashing
+    if (prevStake > 0 && slot.stake == 0) {
+      //emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
+      slot.activationEpoch = 0;
+        // activate next guy
+    }
+  }
+  
+  function slashSig(bytes32 _period, uint256 _slotId) public {
+    // check that challenge does exist
+    require(challenges[_period][_slotId].stake > 0);
+    // check that we are in next epoch
+    require(periods[_period].height < lastEpochBlockHeight);
+    // check that 2/3 of next epoch passed
+    require(periods[tipHash].height - lastEpochBlockHeight > epochLength.mul(32).mul(2).div(3));
+    // check that challenge not older than 2 epochs
+    require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(2));
+    // slash validator
+    slash(_slotId, challenges[_period][_slotId].stake);
+    // pay out challenger
+    
+    // delete challenge
+    delete challenges[_period][_slotId];
+  }
+  
+  function slashDoubleSig(uint256 _slotId, bytes32 _root1, uint8 _v1, bytes32 _r1, bytes32 _s1, bytes32 _root2, uint8 _v2, bytes32 _r2, bytes32 _s2) public {
+    // check roots are different
+    require(_root1 != _root2);
+    // check _roots exist and have same height
+    require(periods[_root1].height == periods[_root2].height);
+    // check that signer has slot
+    address signer = ecrecover(_root1, _v1, _r1, _s1);
+    require(slots[_slotId].signer == signer);
+    // check that second signature also mathches signer
+    require(ecrecover(_root2, _v2, _r2, _s2) == signer);
+    // slash signer
+    slash(_slotId, 100);
   }
 
   function deletePeriod(bytes32 hash) internal {
@@ -335,7 +430,6 @@ contract ParsecBridge {
     value = uint64(_txData[2] >> 176);
     signer = address(_txData[2]);
   }
-
 
   /*
    * _txData = [ 32b periodHash, (1b Proofoffset, 8b pos,  ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
@@ -406,29 +500,6 @@ contract ParsecBridge {
     // EVENT
     // slash operator
     slash(p.slot, 50);
-  }
-
-  function slash(uint256 _slotId, uint256 _value) public {
-    require(_slotId < epochLength);
-    Slot storage slot = slots[_slotId];
-    require(slot.stake > 0);
-    uint256 prevStake = slot.stake;
-    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
-    // if slot became empty by slashing
-    if (prevStake > 0 && slot.stake == 0) {
-      emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
-      slot.activationEpoch = 0;
-      if (slot.newStake > 0) {
-        // someone in queue
-        activate(_slotId);
-      } else {
-        // clean out account
-        slot.owner = 0;
-        slot.signer = 0;
-        slot.tendermint = 0x0;
-        slot.stake = 0;
-      }
-    }
   }
 
   /*
