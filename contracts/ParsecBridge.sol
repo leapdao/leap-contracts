@@ -326,65 +326,56 @@ contract ParsecBridge {
       lastEpochBlockHeight = newHeight;
     }
   }
+
+  function getChallenge(bytes32 _period, uint256 _slotId) public constant returns (uint256, address, uint256) {
+    return (challenges[_period][_slotId].stake, challenges[_period][_slotId].signer, challenges[_period][_slotId].finalizationEpoch);
+
+  }
  
   function challengeSig(bytes32 _period, uint256 _slotId) public {
-      // check that sig was actually 1
-      require(uint8(periods[_period].sigs >> _slotId) & 0x01 == 1);
-      // check that challenge doesn't exist yet
-      require(challenges[_period][_slotId].signer == 0x0);
-      // check that challenge submitted for previous epoche, and current epoch has not progressed more than 1/3
-      uint256 finalizationEpoch;
-      if (periods[_period].height < lastEpochBlockHeight) {
-          // check that challenge not older than 4/3 epoch
-          require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(4).div(3));
-          // check that current epoch not older than 1/3 epochLength
-          require(periods[tipHash].height - lastEpochBlockHeight < epochLength.mul(32).div(3));
-          finalizationEpoch = lastCompleteEpoch + 1;
-      } else {
-          // challenge submitted for current epoch, nothing to check
-          finalizationEpoch = lastCompleteEpoch + 2;
-      }
-      // transfer funds for bond
-      challenges[_period][_slotId] = Challenge(100, msg.sender, uint32(finalizationEpoch));
+    require(_slotId < epochLength);
+    // check that sig was actually 1
+    require(uint8(periods[_period].sigs >> _slotId) & 0x01 == 1);
+    // check that challenge doesn't exist yet
+    require(challenges[_period][_slotId].signer == 0x0);
+    // check that challenge submitted for previous epoche, and current epoch has not progressed more than 1/3
+    uint256 finalizationEpoch;
+    if (periods[_period].height <= lastEpochBlockHeight) {
+      // check that challenge not older than 4/3 epoch
+      require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(4).div(3));
+      // check that current epoch not older than 1/3 epochLength
+      require(periods[tipHash].height - lastEpochBlockHeight < epochLength.mul(32).div(3));
+      finalizationEpoch = lastCompleteEpoch;
+    } else {
+      // challenge submitted for current epoch, nothing to check
+      finalizationEpoch = lastCompleteEpoch + 1;
+    }
+    // transfer funds for bond
+    challenges[_period][_slotId] = Challenge(100, msg.sender, uint32(finalizationEpoch));
   }
   
   function answerSig(bytes32 _period, uint256 _slotId, uint8 _v, bytes32 _r, bytes32 _s) public {
-      // check that challenge does exist
-      require(challenges[_period][_slotId].stake > 0);
-      // check signature
-      require(ecrecover(_period, _v, _r, _s) == slots[_slotId].signer);
-      // slash challenger
-      slots[_slotId].stake += challenges[_period][_slotId].stake / 2;
-      // delete challenge
-      delete challenges[_period][_slotId];
-  }
-  
-
-  function slash(uint256 _slotId, uint256 _value) public {
-    require(_slotId < epochLength);
-    Slot storage slot = slots[_slotId];
-    require(slot.stake > 0);
-    uint256 prevStake = slot.stake;
-    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
-    // if slot became empty by slashing
-    if (prevStake > 0 && slot.stake == 0) {
-      //emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
-      slot.activationEpoch = 0;
-        // activate next guy
-    }
+    // check that challenge does exist
+    require(challenges[_period][_slotId].stake > 0);
+    // check signature
+    require(ecrecover(_period, _v, _r, _s) == slots[_slotId].signer);
+    // slash challenger
+    slots[_slotId].stake += challenges[_period][_slotId].stake / 2;
+    // delete challenge
+    delete challenges[_period][_slotId];
   }
   
   function slashSig(bytes32 _period, uint256 _slotId) public {
     // check that challenge does exist
     require(challenges[_period][_slotId].stake > 0);
     // check that we are in next epoch
-    require(periods[_period].height < lastEpochBlockHeight);
+    require(periods[_period].height <= lastEpochBlockHeight);
     // check that 2/3 of next epoch passed
-    require(periods[tipHash].height - lastEpochBlockHeight > epochLength.mul(32).mul(2).div(3));
+    require(periods[tipHash].height - lastEpochBlockHeight >= epochLength.mul(32).mul(2).div(3));
     // check that challenge not older than 2 epochs
     require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(2));
     // slash validator
-    slash(_slotId, challenges[_period][_slotId].stake);
+    slash(periods[_period].slot, challenges[_period][_slotId].stake);
     // pay out challenger
     
     // delete challenge
@@ -403,6 +394,20 @@ contract ParsecBridge {
     require(ecrecover(_root2, _v2, _r2, _s2) == signer);
     // slash signer
     slash(_slotId, 100);
+  }
+
+  function slash(uint256 _slotId, uint256 _value) public {
+    require(_slotId < epochLength);
+    Slot storage slot = slots[_slotId];
+    require(slot.stake > 0);
+    uint256 prevStake = slot.stake;
+    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
+    // if slot became empty by slashing
+    if (prevStake > 0 && slot.stake == 0) {
+      //emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
+      slot.activationEpoch = 0;
+        // activate next guy
+    }
   }
 
   function deletePeriod(bytes32 hash) internal {

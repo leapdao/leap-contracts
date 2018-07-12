@@ -461,7 +461,7 @@ contract('Parsec', (accounts) => {
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
-      parsec = await deployBridge(token, 8);
+      parsec = await deployBridge(token, 3);
       p[0] = await parsec.tipHash();
       let data = await parsec.contract.bet.getData(0, 100, alice, alice, alice);
       await token.approveAndCall(parsec.address, 1000, data, {from: alice});
@@ -542,6 +542,36 @@ contract('Parsec', (accounts) => {
     });
     describe('Same Height', function() {
       it('should allow to slash two periods at same height');
+    });
+    describe('Crypto-economic Aggregate Signatures', function() {
+      it('should allow to challenge invalid sig', async () => {
+        // some block to end epoch 0
+        let deposit = Tx.deposit(12, 50, alice);
+        let block = new Block(96).addTx(deposit);
+        let period = new Period(p[1], [block]);
+        p[2] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[1], p[2], ALL_SIGS, {from: alice}).should.be.fulfilled;
+        
+        await parsec.challengeSig(p[2], 2);  
+
+        // blocks to complete 2/3 of epoch 1
+        deposit = Tx.deposit(13, 50, alice);
+        block = new Block(128).addTx(deposit);
+        period = new Period(p[2], [block]);
+        p[3] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[2], p[3], ALL_SIGS, {from: alice}).should.be.fulfilled;
+
+        deposit = Tx.deposit(14, 50, alice);
+        block = new Block(160).addTx(deposit);
+        period = new Period(p[3], [block]);
+        p[4] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[3], p[4], ALL_SIGS, {from: alice}).should.be.fulfilled;
+        
+        const bal1 = (await parsec.getSlot(0))[2];
+        await parsec.slashSig(p[2], 2);
+        const bal2 = (await parsec.getSlot(0))[2];
+        assert(bal1.toNumber() > bal2.toNumber());
+      });
     });
   });
 
