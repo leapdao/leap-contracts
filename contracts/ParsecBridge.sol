@@ -18,6 +18,7 @@ contract ParsecBridge {
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
+  using TxLib for TxLib.Tx;
   using PriorityQueue for PriorityQueue.Token;
 
   event Epoch(uint256 epoch);
@@ -86,6 +87,20 @@ contract ParsecBridge {
   }
   mapping(bytes32 => Exit) public exits;
 
+  uint256 constant inflightBond = 1; //todo define
+  uint256 constant exitFirstPeriodDuration = 0; //todo define
+  uint256 constant exitSecondPeriodDuration = 0; //todo define
+
+  struct InflightExit {
+      bytes32 txHash;
+      TxLib.Input[] inputs;
+      address[] outputBonds;
+      uint32 startedAt;
+      uint32 height;
+      uint256 priority;
+  }
+
+  mapping(bytes32 => InflightExit) inflightExits;
 
   constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // init genesis preiod
@@ -522,4 +537,137 @@ contract ParsecBridge {
     exitable_at = priority >> 128;
   }
 
+  function startInflightExit(bytes32[] _txData, bytes32[] _i1Proof, bytes32[] _i2Proof, uint16 _oindex) public {
+
+//  Honest owners of outputs to t “piggyback” on this exit and post a bond
+//  Users who do not piggyback will not be able to exit.
+//  In case of doublespending user couldn't post a bond due to possible challenge
+
+    //check that txHash has not been used in inflight exit
+    bytes32 txHash = keccak256(bytes(_txData));
+    require(inflightExits[txHash].txHash == bytes32(0));
+
+    TxLib.Tx tx = TxLib.parseTx(bytes(_txData));
+
+    _validateInputs(tx.ins, _i1Proof, _i2Proof);
+
+    // todo validate tx sig
+
+    //place bond for output
+    ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
+
+    //create exit
+    InflightExit memory exit;
+    exit.txHash = txHash;
+    exit.inputs = tx.ins;
+    exit.outputBonds[_oindex] = msg.sender;
+    exit.startedAt = uint32(block.timestamp);
+    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
+    exit.height = uint32(-1);
+
+    inflightExits[txHash] = exit;
+  }
+
+  function bondToOutput(bytes32 txHash, uint16 _oindex) public {
+    require((inflightExits[txHash].startedAt + exitFirstPeriodDuration) > block.timestamp);
+    InflightExit storage exit = inflightExits[txHash];
+    require(exit.outputBonds[_oindex] == address(0));
+    exit.outputBonds[_oindex] = msg.sender;
+    ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond);
+  }
+
+  function competitorToTx(bytes32[] _proof, bytes32[] _i1Proof, bytes32[] _i2Proof, uint16 _oindex, bytes32 target) public {
+    //  Users who present a competitor (2.) must place a bond. Any other user may present an earlier competitor,
+    //  claim the bond, and place a new bond. This construction ensures that the last presented competitor
+    //  is also the earliest competitor.
+
+    bytes32 txHash;
+    bytes memory txData;
+    (,txHash, txData) = TxLib.validateProof(32, _proof); //todo check offset
+    require(inflightExits[txHash].txHash != bytes32(0));
+    require((inflightExits[txHash].startedAt + exitFirstPeriodDuration) > block.timestamp);
+
+    TxLib.Tx memory tx = TxLib.parseTx(txData);
+
+    _validateInputs(tx.ins, _i1Proof, _i2Proof);
+
+    uint256 priority = _determineTxPriority(_i1Proof, _i2Proof);
+    require(inflightExits[txHash].height < inflightExits[target].height);
+
+    ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
+
+    //todo claim bonds
+
+    //create exit
+    InflightExit exit;
+    exit.txHash = txHash;
+    exit.inputs = tx.ins;
+    exit.outputBonds[_oindex] = msg.sender;
+    exit.startedAt = uint32(block.timestamp);
+    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
+    exit.height = uint32(-1);
+
+    delete inflightExits[target];
+
+    inflightExits[txHash] = exit;
+  }
+
+  function _validateInputs(TxLib.Input[] inputs, bytes32[] _i1Proof, bytes32[] _i2Proof) private {
+    bytes memory txData1;
+    uint256 offset1; //todo check offset
+    (, , txData1) = TxLib.validateProof(offset1, _i1Proof);
+    require(inputs[0].outpoint.hash == keccak256(txData1));
+
+    bytes memory txData2;
+    uint256 offset2; //todo check offset
+    (, , txData2) = TxLib.validateProof(offset2, _i2Proof);
+    require(inputs[1].outpoint.hash == keccak256(txData2));
+  }
+
+  function _determineTxPriority(bytes32[] _i1Proof, bytes32[] _i2Proof) private returns(uint256) {
+    uint256 youngest_i_exitable_at
+      = Math.max64(uint64(periods[_i1Proof[0]].timestamp), uint64(periods[_i2Proof[0]].timestamp));
+    uint256 tx_exitable_at = Math.max256(youngest_i_exitable_at + (2 * exitDuration), block.timestamp + exitDuration);
+    return tx_exitable_at;
+  }
+
+    // check that time of first period elapsed
+    //check that there are competitors to exited tx
+
+//  We define canonicity with respect to a single transaction - the set of competing transactions to t
+//  is the set of all transactions such that the transaction shares an input with t. The canonical transaction
+//  within that set is the transaction that’s included first.
+
+//  If competitors were presented, period 2 serves to determine whether t is canonical. Any user may present:
+//  t, included in the chain before all competitors presented in period 1.
+//  Spends of any “piggybacked” inputs or outputs (except t itself).
+//  That some input was not created by a canonical transaction.
+//  This means revealing both the transaction that created the input, as well as some competitor to that transaction
+//  such that the competitor came first.
+
+  function challengeCompetitorWithInclusion(bytes32 _exit, bytes32 _proof) public {
+    // check that the second period lasts
+  }
+
+  function challengeCompetitorWithSpending(bytes32 _exit, bytes32 _proof) public {
+    // check that the second period lasts
+  }
+
+  function challengeOutput(bytes32 _exit, uint256 _oindex, bytes32[] _proofTxData, uint256 _proofOindex) public {
+    // check that the second period lasts
+
+    // check that it is not the same tx as in exit
+  }
+
+  function finalizeInflightExit(bytes32 _exit) {
+
+    //check that second exit period elapsed
+    //    bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
+
+    // create standard exits for piggybacked outputs
+  }
+
+
+
+  //todo add output pointed to input(itself) in parsec-lib
 }
