@@ -566,11 +566,35 @@ contract('Parsec', (accounts) => {
         period = new Period(p[3], [block]);
         p[4] = period.merkleRoot();
         await parsec.submitPeriod(0, p[3], p[4], ALL_SIGS, {from: alice}).should.be.fulfilled;
-        
+        // once answer period expired, slash validator that submited invalid CAS bitmap
         const bal1 = (await parsec.getSlot(0))[2];
         await parsec.slashSig(p[2], 2);
         const bal2 = (await parsec.getSlot(0))[2];
         assert(bal1.toNumber() > bal2.toNumber());
+      });
+
+      it('should allow to challenge and answer CAS', async () => {
+        // some block to end epoch 0
+        let deposit = Tx.deposit(15, 50, alice);
+        let block = new Block(192).addTx(deposit);
+        let period = new Period(p[4], [block]);
+        p[5] = period.merkleRoot();
+        // vote an data availability
+        const vote = Tx.periodVote(p[5]);
+        vote.sign(alicePriv);
+        // submit period once majority notarized period
+        await parsec.submitPeriod(0, p[4], p[5], ALL_SIGS, {from: alice}).should.be.fulfilled;
+        // challenge an signature of the period
+        await parsec.challengeSig(p[5], 0);
+        // answer and slash challenger
+        const bal1 = (await parsec.getSlot(0))[2];
+        await parsec.answerSig(p[5], 0, vote.options.v, vote.options.r, vote.options.s);
+        // check challenge got deleted
+        const chal = await parsec.getChallenge(p[5], 0);
+        assert.equal(chal[0].toNumber(), 0);
+        // check slot got rewarded
+        const bal2 = (await parsec.getSlot(0))[2];
+        assert(bal1.toNumber() < bal2.toNumber());
       });
     });
   });

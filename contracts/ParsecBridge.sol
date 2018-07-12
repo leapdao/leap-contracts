@@ -351,6 +351,8 @@ contract ParsecBridge {
       finalizationEpoch = lastCompleteEpoch + 1;
     }
     // transfer funds for bond
+    tokens[0].addr.transferFrom(msg.sender, this, 100);
+    // create challenge object
     challenges[_period][_slotId] = Challenge(100, msg.sender, uint32(finalizationEpoch));
   }
   
@@ -366,8 +368,9 @@ contract ParsecBridge {
   }
   
   function slashSig(bytes32 _period, uint256 _slotId) public {
+    Challenge memory challenge = challenges[_period][_slotId];
     // check that challenge does exist
-    require(challenges[_period][_slotId].stake > 0);
+    require(challenge.stake > 0);
     // check that we are in next epoch
     require(periods[_period].height <= lastEpochBlockHeight);
     // check that 2/3 of next epoch passed
@@ -375,9 +378,10 @@ contract ParsecBridge {
     // check that challenge not older than 2 epochs
     require(periods[tipHash].height - periods[_period].height < epochLength.mul(32).mul(2));
     // slash validator
-    slash(periods[_period].slot, challenges[_period][_slotId].stake);
+    slash(periods[_period].slot, challenge.stake);
     // pay out challenger
-    
+    tokens[0].addr.transfer(challenge.signer, challenge.stake / 2);
+    // TODO burn rest of tokens in total supply
     // delete challenge
     delete challenges[_period][_slotId];
   }
