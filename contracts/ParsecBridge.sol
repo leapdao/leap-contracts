@@ -16,7 +16,6 @@ import "./TxLib.sol";
 
 contract ParsecBridge {
   using SafeMath for uint256;
-  using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
   using TxLib for TxLib.Tx;
   using PriorityQueue for PriorityQueue.Token;
@@ -496,11 +495,11 @@ contract ParsecBridge {
     // validate spending tx
     bytes memory txData;
     (, , txData) = TxLib.validateProof(96, _proof);
-    TxLib.Outpoint memory outpoint = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
+    TxLib.Input memory input = TxLib.parseTx(txData).ins[_inputIndex];
 
     // make sure one is spending the other one
-    require(txHash1 == outpoint.hash);
-    require(_oIndex == outpoint.pos);
+    require(txHash1 == input.hash);
+    require(_oIndex == input.outPos);
 
     // delete invalid exit
     delete exits[utxoId].owner;
@@ -559,23 +558,19 @@ contract ParsecBridge {
     //place bond for output
     ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
 
+    //create exit with bond
+    InflightExit storage exit = inflightExits[txHash];
+    exit.txHash = txHash;
+    exit.txBond = msg.sender;
+    exit.outputBonds = new address[](2);
+    exit.startedAt = uint32(block.timestamp);
+    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
+    exit.height = uint32(-1);
+
     TxLib.Input[] memory inputs = new TxLib.Input[](tx.ins.length);
     for (uint256 i = 0; i < inputs.length; i++) {
-      inputs[i] = tx.ins[i];
+      exit.inputs[i] = tx.ins[i];
     }
-
-    //create exit with bond
-    InflightExit memory exit = InflightExit({
-      txHash: txHash,
-      inputs: tx.ins,
-      txBond: msg.sender,
-      outputBonds: new address[](2),
-      startedAt: uint32(block.timestamp),
-      priority: _determineTxPriority(_i1Proof, _i2Proof),
-      height: uint32(-1)
-    });
-
-    inflightExits[txHash] = exit;
   }
 
   function bondToOutput(bytes32 txHash, uint16 _oindex) public {
@@ -587,9 +582,6 @@ contract ParsecBridge {
   }
 
   function competitorToTx(bytes32[] _proof, bytes32[] _i1Proof, bytes32[] _i2Proof, uint16 _oindex, bytes32 target) public {
-    //  Users who present a competitor (2.) must place a bond. Any other user may present an earlier competitor,
-    //  claim the bond, and place a new bond. This construction ensures that the last presented competitor
-    //  is also the earliest competitor.
 
     bytes32 txHash;
     bytes memory txData;
@@ -604,47 +596,43 @@ contract ParsecBridge {
     uint256 priority = _determineTxPriority(_i1Proof, _i2Proof);
     require(inflightExits[txHash].height < inflightExits[target].height);
 
-    ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
+    InflightExit storage exit = inflightExits[txHash];
+    exit.txHash = txHash;
+    exit.txBond = msg.sender;
+    exit.outputBonds = new address[](2);
+    exit.startedAt = uint32(block.timestamp);
+    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
+    exit.height = uint32(-1);
 
     TxLib.Input[] memory inputs = new TxLib.Input[](tx.ins.length);
     for (uint256 i = 0; i < inputs.length; i++) {
-      inputs[i] = tx.ins[i];
+      exit.inputs[i] = tx.ins[i];
     }
 
-    //create exit with bond
-    InflightExit memory exit = InflightExit({
-      txHash: txHash,
-      inputs: tx.ins,
-      txBond: msg.sender,
-      outputBonds: new address[](2),
-      startedAt: uint32(block.timestamp),
-      priority: _determineTxPriority(_i1Proof, _i2Proof),
-      height: uint32(-1)
-    });
+    _releaseOutputBonds(target);
 
-    //return bonds for outputs
-    address[] storage bonds = inflightExits[target].outputBonds;
+    delete inflightExits[target];
+  }
+
+  function _releaseOutputBonds(bytes32 _exitHash) {
+    address[] storage bonds = inflightExits[_exitHash].outputBonds;
     for (uint256 j = 0; j < bonds.length; j++) {
       if (bonds[j] != address(0)) {
         ERC20(tokens[0].addr).transfer(bonds[j], inflightBond);
       }
     }
-
-    delete inflightExits[target];
-
-    inflightExits[txHash] = exit;
   }
 
-  function _validateInputs(TxLib.Input[] inputs, bytes32[] _i1Proof, bytes32[] _i2Proof) private {
+  function _validateInputs(TxLib.Input[] _inputs, bytes32[] _i1Proof, bytes32[] _i2Proof) private {
     bytes memory txData1;
     uint256 offset1; //todo check offset
     (, , txData1) = TxLib.validateProof(offset1, _i1Proof);
-    require(inputs[0].outpoint.hash == keccak256(txData1));
+    require(_inputs[0].hash == keccak256(txData1));
 
     bytes memory txData2;
     uint256 offset2; //todo check offset
     (, , txData2) = TxLib.validateProof(offset2, _i2Proof);
-    require(inputs[1].outpoint.hash == keccak256(txData2));
+    require(_inputs[1].hash == keccak256(txData2));
   }
 
   function _determineTxPriority(bytes32[] _i1Proof, bytes32[] _i2Proof) private returns(uint256) {

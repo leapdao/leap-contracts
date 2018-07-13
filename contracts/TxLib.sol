@@ -19,13 +19,9 @@ library TxLib {
 //   COMP_RESP: 6,
   enum TxType { Deposit, Transfer, Consolidate, CompReq, CompRsp }
 
-  struct Outpoint {
-    bytes32 hash;
-    uint8 pos;
-  }
-
   struct Input {
-    Outpoint outpoint;
+    bytes32 hash;
+    uint8 outPos;
     bytes32 r;
     bytes32 s;
     uint8 v;
@@ -63,8 +59,7 @@ library TxLib {
       }
       newOffset = offset + 33;
     }
-    Outpoint memory outpoint = Outpoint(hash, index);
-    Input memory input = Input(outpoint, 0, 0, 0);
+    Input memory input = Input(hash, index, 0, 0, 0);
     if (_type == TxType.Transfer ||
       ((_type == TxType.CompReq || _type == TxType.CompRsp ) && _pos > 0)) {
       bytes32 r;

@@ -43,8 +43,8 @@ contract TxMock {
   }
 
   function flattenInput(TxLib.Input _input, uint256 _offset, bytes32[] _rsp) internal pure {
-    _rsp[_offset] = bytes32(_input.outpoint.hash);
-    _rsp[_offset + 1] = bytes32(_input.outpoint.pos);
+    _rsp[_offset] = bytes32(_input.hash);
+    _rsp[_offset + 1] = bytes32(_input.outPos);
     _rsp[_offset + 2] = bytes32(_input.r);
     _rsp[_offset + 3] = bytes32(_input.s);
     _rsp[_offset + 4] = bytes32(_input.v);
