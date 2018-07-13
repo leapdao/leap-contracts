@@ -94,6 +94,7 @@ contract ParsecBridge {
   struct InflightExit {
       bytes32 txHash;
       TxLib.Input[] inputs;
+      address txBond;
       address[] outputBonds;
       uint32 startedAt;
       uint32 height;
@@ -537,17 +538,19 @@ contract ParsecBridge {
     exitable_at = priority >> 128;
   }
 
-  function startInflightExit(bytes32[] _txData, bytes32[] _i1Proof, bytes32[] _i2Proof, uint16 _oindex) public {
+  function startInflightExit(bytes32[] _tx, bytes32[] _i1Proof, bytes32[] _i2Proof, uint16 _oindex) public {
 
 //  Honest owners of outputs to t “piggyback” on this exit and post a bond
 //  Users who do not piggyback will not be able to exit.
 //  In case of doublespending user couldn't post a bond due to possible challenge
 
     //check that txHash has not been used in inflight exit
-    bytes32 txHash = keccak256(bytes(_txData));
+    bytes32 txHash;
+    bytes memory txData;
+//    ( ,txHash, txData) = TxLib.validateProof(txData); //todo parse txData for inflight exit in parsec-lib
     require(inflightExits[txHash].txHash == bytes32(0));
 
-    TxLib.Tx tx = TxLib.parseTx(bytes(_txData));
+    TxLib.Tx memory tx = TxLib.parseTx(txData);
 
     _validateInputs(tx.ins, _i1Proof, _i2Proof);
 
@@ -556,14 +559,21 @@ contract ParsecBridge {
     //place bond for output
     ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
 
-    //create exit
-    InflightExit memory exit;
-    exit.txHash = txHash;
-    exit.inputs = tx.ins;
-    exit.outputBonds[_oindex] = msg.sender;
-    exit.startedAt = uint32(block.timestamp);
-    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
-    exit.height = uint32(-1);
+    TxLib.Input[] memory inputs = new TxLib.Input[](tx.ins.length);
+    for (uint256 i = 0; i < inputs.length; i++) {
+      inputs[i] = tx.ins[i];
+    }
+
+    //create exit with bond
+    InflightExit memory exit = InflightExit({
+      txHash: txHash,
+      inputs: tx.ins,
+      txBond: msg.sender,
+      outputBonds: new address[](2),
+      startedAt: uint32(block.timestamp),
+      priority: _determineTxPriority(_i1Proof, _i2Proof),
+      height: uint32(-1)
+    });
 
     inflightExits[txHash] = exit;
   }
@@ -596,16 +606,29 @@ contract ParsecBridge {
 
     ERC20(tokens[0].addr).transferFrom(msg.sender, address(this), inflightBond); //currently set psc tokens
 
-    //todo claim bonds
+    TxLib.Input[] memory inputs = new TxLib.Input[](tx.ins.length);
+    for (uint256 i = 0; i < inputs.length; i++) {
+      inputs[i] = tx.ins[i];
+    }
 
-    //create exit
-    InflightExit exit;
-    exit.txHash = txHash;
-    exit.inputs = tx.ins;
-    exit.outputBonds[_oindex] = msg.sender;
-    exit.startedAt = uint32(block.timestamp);
-    exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
-    exit.height = uint32(-1);
+    //create exit with bond
+    InflightExit memory exit = InflightExit({
+      txHash: txHash,
+      inputs: tx.ins,
+      txBond: msg.sender,
+      outputBonds: new address[](2),
+      startedAt: uint32(block.timestamp),
+      priority: _determineTxPriority(_i1Proof, _i2Proof),
+      height: uint32(-1)
+    });
+
+    //return bonds for outputs
+    address[] storage bonds = inflightExits[target].outputBonds;
+    for (uint256 j = 0; j < bonds.length; j++) {
+      if (bonds[j] != address(0)) {
+        ERC20(tokens[0].addr).transfer(bonds[j], inflightBond);
+      }
+    }
 
     delete inflightExits[target];
 
