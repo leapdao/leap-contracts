@@ -195,9 +195,9 @@ library TxLib {
     for (uint256 i = _offset; i < _proof.length; i++) {
       // solhint-disable-next-line no-inline-assembly
       if (_index % 2 == 0) {
-        _leaf = keccak256(_leaf, _proof[i]);
+        _leaf = keccak256(abi.encodePacked(_leaf, _proof[i]));
       } else {
-        _leaf = keccak256(_proof[i], _leaf);
+        _leaf = keccak256(abi.encodePacked(_proof[i], _leaf));
       }
       _index = _index / 2;
     }

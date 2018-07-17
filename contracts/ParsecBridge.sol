@@ -249,7 +249,9 @@ contract ParsecBridge {
     slot.newTendermint = 0x0;
     slot.newStake = 0;
     slot.eventCounter++;
-    emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, slot.eventCounter, lastCompleteEpoch + 1);
+    if (slot.stake > 0) {
+      emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, slot.eventCounter, lastCompleteEpoch + 1);
+    }
   }
 
   function recordGas() internal {
