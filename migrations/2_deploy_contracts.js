@@ -1,3 +1,5 @@
+const fs = require('fs');
+
 var PriorityQueue = artifacts.require("./PriorityQueue.sol");
 var TxLib = artifacts.require("./TxLib.sol");
 var ParsecBridge = artifacts.require("./ParsecBridge.sol");
@@ -23,5 +25,17 @@ module.exports = function(deployer, network, accounts) {
     return token.approve(bridge.address, '1000000000000');
   }).then(function() {
     return bridge.registerToken(token.address);
+  }).then(function() {
+    var node_config = {
+      "bridgeAddr": bridge.address,
+      "network": "0",
+      "rootNetwork": "http://localhost:9545",
+      "peers": []
+    }
+    fs.writeFile("./node_config.json", JSON.stringify(node_config), 'utf8', function (err) {
+        if (err) {
+            return console.log(err);
+        }
+    });
   });
 };
