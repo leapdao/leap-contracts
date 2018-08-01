@@ -25,7 +25,7 @@ contract ParsecBridge {
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
   event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
-  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
+  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, address newSigner, uint256 eventCounter, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
   event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter);
 
@@ -188,7 +188,7 @@ contract ParsecBridge {
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 3);
+      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, 0x0, slot.eventCounter, lastCompleteEpoch + 3);
       return;
     }
     // check min stake
@@ -227,7 +227,7 @@ contract ParsecBridge {
       slot.newStake = uint64(_value);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 3);
+      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, _signerAddr, slot.eventCounter, lastCompleteEpoch + 3);
     }
   }
 
