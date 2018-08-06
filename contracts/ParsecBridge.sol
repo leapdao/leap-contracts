@@ -21,6 +21,7 @@ contract ParsecBridge {
   using PriorityQueue for PriorityQueue.Token;
 
   event Epoch(uint256 epoch);
+  event EpochLength(uint256 epochLength);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
   event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
@@ -105,6 +106,8 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
+
+    emit EpochLength(epochLength);
   }
 
   function registerToken(ERC20 _token) public {
