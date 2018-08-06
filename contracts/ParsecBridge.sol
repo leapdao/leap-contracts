@@ -309,6 +309,7 @@ contract ParsecBridge {
     if (newHeight >= lastEpochBlockHeight.add(epochLength.mul(32))) {
       lastCompleteEpoch++;
       lastEpochBlockHeight = newHeight;
+      emit Epoch(lastCompleteEpoch);
     }
   }
 
