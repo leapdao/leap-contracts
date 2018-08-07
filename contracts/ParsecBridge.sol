@@ -29,6 +29,7 @@ contract ParsecBridge {
   event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, address newSigner, uint256 eventCounter, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
   event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter);
+  event NewToken(address indexed tokenAddr, uint16 color);
 
   bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -120,6 +121,7 @@ contract ParsecBridge {
       heapList: arr,
       currentSize: 0
     });
+    emit NewToken(_token, tokenCount);
   }
 
   function getSlot(uint256 _slotId) constant public returns (uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
