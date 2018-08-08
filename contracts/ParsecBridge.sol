@@ -191,6 +191,7 @@ contract ParsecBridge {
     Slot storage slot = slots[_slotId];
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
+      require(slot.signer == msg.sender);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
       emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, 0x0, slot.eventCounter, lastCompleteEpoch + 3);

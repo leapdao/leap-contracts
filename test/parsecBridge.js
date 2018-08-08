@@ -117,6 +117,7 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to logout', async () => {
+        await parsec.bet(0, 0, bob, bob, bob, {from: charlie}).should.be.rejectedWith(EVMRevert);
         await parsec.bet(0, 0, bob, bob, bob, {from: bob}).should.be.fulfilled;
       });
 
