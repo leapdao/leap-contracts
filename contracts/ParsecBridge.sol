@@ -186,12 +186,12 @@ contract ParsecBridge {
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
 
-  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr, address _owner) public {
+  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
-      require(slot.signer == msg.sender);
+      require(slot.owner == tx.origin);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
       emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, 0x0, slot.eventCounter, lastCompleteEpoch + 3);
@@ -206,10 +206,10 @@ contract ParsecBridge {
     require(required < _value);
 
     // new purchase or update
-    if (slot.stake == 0 || (slot.owner == _owner && slot.newStake == 0)) {
+    if (slot.stake == 0 || (slot.owner == tx.origin && slot.newStake == 0)) {
       uint64 stake = slot.stake;
-      tokens[0].addr.transferFrom(_owner, this, _value - slot.stake);
-      slot.owner = _owner;
+      tokens[0].addr.transferFrom(tx.origin, this, _value - slot.stake);
+      slot.owner = tx.origin;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
       slot.stake = uint64(_value);
@@ -226,8 +226,8 @@ contract ParsecBridge {
       if (slot.newStake > 0) {
         tokens[0].addr.transfer(slot.newOwner, slot.newStake);
       }
-      tokens[0].addr.transferFrom(_owner, this, _value);
-      slot.newOwner = _owner;
+      tokens[0].addr.transferFrom(tx.origin, this, _value);
+      slot.newOwner = tx.origin;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
       slot.newStake = uint64(_value);
