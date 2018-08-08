@@ -5,6 +5,11 @@ var TxLib = artifacts.require("./TxLib.sol");
 var ParsecBridge = artifacts.require("./ParsecBridge.sol");
 var SimpleToken = artifacts.require("./SimpleToken.sol");
 
+const ethereumNodes = {
+  "develop": 'http://localhost:9545',
+  "rinkeby": 'https://rinkeby.infura.io',
+}
+
 module.exports = function(deployer, network, accounts) {
   deployer.deploy(PriorityQueue);
   deployer.deploy(TxLib);
@@ -28,8 +33,8 @@ module.exports = function(deployer, network, accounts) {
   }).then(function() {
     var node_config = {
       "bridgeAddr": bridge.address,
-      "network": "0",
-      "rootNetwork": "http://localhost:9545",
+      "network": Math.floor(Math.random() * 10000000).toString(),
+      "rootNetwork": ethereumNodes[network],
       "peers": []
     }
     fs.writeFile("./node_config.json", JSON.stringify(node_config), 'utf8', function (err) {
