@@ -103,7 +103,7 @@ contract ParsecBridge {
   mapping(bytes32 => InflightExit) inflightExits;
 
   constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
-    // init genesis preiod
+    // init genesis period
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
     genesisPeriod.height = 32;
@@ -567,8 +567,7 @@ contract ParsecBridge {
     exit.priority = _determineTxPriority(_i1Proof, _i2Proof);
     exit.height = uint32(-1);
 
-    TxLib.Input[] memory inputs = new TxLib.Input[](tx.ins.length);
-    for (uint256 i = 0; i < inputs.length; i++) {
+    for (uint256 i = 0; i < tx.ins.length; i++) {
       exit.inputs[i] = tx.ins[i];
     }
   }
@@ -677,8 +676,6 @@ contract ParsecBridge {
 
     // create standard exits for piggybacked outputs
   }
-
-
 
   //todo add output pointed to input(itself) in parsec-lib
 }
