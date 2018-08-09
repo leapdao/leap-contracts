@@ -75,12 +75,8 @@ contract('Parsec', (accounts) => {
         await parsec.bet(0, 131, bob, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should allow to be slashed',  async () => {
-        await parsec.slash(0, 20).should.be.fulfilled;
-      });
-
       it('should allow to auction for higer price',  async () => {
-        await parsec.bet(0, 150, bob, bob, bob, {from: bob}).should.be.fulfilled;
+        await parsec.bet(0, 170, bob, bob, bob, {from: bob}).should.be.fulfilled;
       });
 
       it('should allow submission when slot auctioned in same epoch', async () => {
@@ -115,7 +111,7 @@ contract('Parsec', (accounts) => {
         const bal1 = await token.balanceOf(alice);
         await parsec.activate(0);
         const bal2 = await token.balanceOf(alice);
-        assert.equal(bal1.add(180).toNumber(), bal2.toNumber());
+        assert.equal(bal1.add(200).toNumber(), bal2.toNumber());
         await parsec.submitPeriod(0, p[6], '0x07', {from: bob}).should.be.fulfilled;
         p[7] = await parsec.tipHash();
       });
@@ -145,7 +141,7 @@ contract('Parsec', (accounts) => {
         const bal1 = await token.balanceOf(bob);
         await parsec.activate(0);
         const bal2 = await token.balanceOf(bob);
-        assert.equal(bal1.add(200).toNumber(), bal2.toNumber());
+        assert.equal(bal1.add(220).toNumber(), bal2.toNumber());
         // including genesis period, we have submiteed 12 periods in total:
         // epoch 1: period 0 - 2
         // epoch 2: period 3 - 5
