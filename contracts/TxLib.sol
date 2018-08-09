@@ -51,6 +51,7 @@ library TxLib {
     uint8 index;
     if (_type == TxType.Deposit) {
       assembly {
+        // TODO: explain this
         hash := mload(add(add(offset, 4), _txData))
       }
       hash = bytes32(uint32(hash));

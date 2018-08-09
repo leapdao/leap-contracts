@@ -414,7 +414,7 @@ contract ParsecBridge {
     slash(p.slot, 50);
   }
 
-  function slash(uint256 _slotId, uint256 _value) public {
+  function slash(uint256 _slotId, uint256 _value) internal {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     require(slot.stake > 0);
