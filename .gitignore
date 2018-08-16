@@ -13,3 +13,6 @@ testrpc-db/*
 !testrpc-db/.gitkeep
 
 package-lock.json
+
+node_config.json
+.priv
