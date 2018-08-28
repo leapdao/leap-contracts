@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
  
-pragma solidity ^0.4.22;
+pragma solidity ^0.4.24;
 
 library TxLib {
 
