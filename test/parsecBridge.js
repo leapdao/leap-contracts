@@ -551,11 +551,17 @@ contract('Parsec', (accounts) => {
     });
 
     it('should register a new token', async () => {
-      const anotherToken = await SimpleToken.new();
       assert.equal((await parsec.tokens(0))[0], token.address);
-      await parsec.registerToken(anotherToken.address);
+      assert.equal(await parsec.tokenCount(), 1);
+
+      const anotherToken = await SimpleToken.new();
+      const res = await parsec.registerToken(anotherToken.address);
+      
+      const expectedColor = 1;
       assert.equal(await parsec.tokenCount(), 2);
-      assert.equal((await parsec.tokens(1))[0], anotherToken.address);
+      assert.equal((await parsec.tokens(expectedColor))[0], anotherToken.address);
+      assert.equal(res.logs[0].event, 'NewToken');
+      assert.equal(res.logs[0].args.color.toNumber(), expectedColor);
     });
 
     it('should fail when registering a same token again', async () => {

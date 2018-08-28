@@ -116,12 +116,14 @@ contract ParsecBridge {
     require(!tokenColors[_token]);
     uint256[] memory arr = new uint256[](1);
     tokenColors[_token] = true;
-    tokens[tokenCount++] = PriorityQueue.Token({
+    uint16 color = tokenCount;
+    tokenCount += 1;
+    tokens[color] = PriorityQueue.Token({
       addr: _token,
       heapList: arr,
       currentSize: 0
     });
-    emit NewToken(_token, tokenCount);
+    emit NewToken(_token, color);
   }
 
   function getSlot(uint256 _slotId) constant public returns (uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
