@@ -51,9 +51,9 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to auction slot and submit block', async () => {
-        const data = parsec.contract.bet.getData(0, 100, alice, alice);
-        await token.approveAndCall(parsec.address, 1000, data, {from: alice});
-        await parsec.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.fulfilled;
+        await token.approve(parsec.address, 1000, { from: alice });
+        await parsec.bet(0, 100, alice, alice, { from: alice });
+        await parsec.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
         p[1] = await parsec.tipHash();
       });
 
@@ -90,9 +90,8 @@ contract('Parsec', (accounts) => {
       });
 
       it('allow to auction another slot', async () => {
-        const data = parsec.contract.bet.getData(1, 100, charlie, charlie);
-        await token.approveAndCall(parsec.address, 1000, data, {from: charlie});
-
+        await token.approve(parsec.address, 1000, { from: charlie });
+        await parsec.bet(1, 100, charlie, charlie, { from: charlie });
       });
 
       it('should allow to activate auctioned slot and submit', async () => {
@@ -349,8 +348,9 @@ contract('Parsec', (accounts) => {
         let receipt = await parsec.deposit(bob, 200, 0, { from: bob });
         const depositId1 = receipt.logs[0].args.depositId.toNumber();
         // deposit 2 - here we use directDeposit without transfer
-        const data = parsec.contract.deposit.getData(alice, 300, 0);
-        receipt = await token.approveAndCall(parsec.address, 300, data, {from: alice}).should.be.fulfilled;
+
+        await token.approve(parsec.address, 300, { from: alice });
+        receipt = await parsec.deposit(alice, 300, 0, { from: alice }).should.be.fulfilled;
         const depositId2 = Buffer.from(receipt.receipt.logs[1].topics[1].replace('0x', ''), 'hex').readUInt32BE(28);
         assert(depositId1 < depositId2);
       });
@@ -459,12 +459,14 @@ contract('Parsec', (accounts) => {
       // initialize contract
       parsec = await deployBridge(token, 8);
       p[0] = await parsec.tipHash();
-      let data = await parsec.contract.bet.getData(0, 100, alice, alice);
-      await token.approveAndCall(parsec.address, 1000, data, {from: alice});
+
+      await token.approve(parsec.address, 1000, { from: alice });
+      await parsec.bet(0, 100, alice, alice, { from: alice });
       token.transfer(charlie, 1000);
-      data = await parsec.contract.bet.getData(1, 100, charlie, charlie);
-      await token.approveAndCall(parsec.address, 1000, data, {from: charlie});
-      await parsec.bet(2, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
+
+      await token.approve(parsec.address, 1000, { from: charlie });
+      await parsec.bet(1, 100, charlie, charlie, { from: charlie });
+      await parsec.bet(2, 100, charlie, charlie, { from: charlie }).should.be.fulfilled;
     });
 
     describe('Double Spend', function() {
