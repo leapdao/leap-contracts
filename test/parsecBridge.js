@@ -355,10 +355,25 @@ contract('Parsec', (accounts) => {
         const depositId2 = Buffer.from(receipt.receipt.logs[1].topics[1].replace('0x', ''), 'hex').readUInt32BE(28);
         assert(depositId1 < depositId2);
       });
+
+      it('should not allow to deposit non-registered tokens', async () => {
+        const nonRegisteredColor = 1;
+        await token.approve(parsec.address, 1000, { from: bob });
+        await parsec.deposit(bob, 200, nonRegisteredColor, { from: bob }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to deposit NFT tokens', async () => {
+        const nftToken = await SpaceDustNFT.new();
+        let receipt = await nftToken.mint(bob, 10, true, 2);
+        const tokenId = receipt.logs[0].args._tokenId.toNumber();
+        receipt = await parsec.registerToken(nftToken.address);
+        const color = receipt.logs[0].args.color.toNumber();
+        // TODO: fixme
+        await nftToken.approve(parsec.address, tokenId, { from: bob });
+        await parsec.deposit(bob, tokenId, color, { from: bob }).should.be.fulfilled;
+      });
     });
     describe('Exit', function() {
-
-
       it('should allow to exit valid utxo', async () => {
         const deposit = Tx.deposit(114, 50, alice);
         let transfer = Tx.transfer(

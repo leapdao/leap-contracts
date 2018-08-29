@@ -46,7 +46,7 @@ contract ParsecBridge {
   bytes32 public tipHash; // hash of first period that has extended chain to some height
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
-  mapping(address => uint16) tokenColors;
+  mapping(address => bool) tokenColors;
   uint16 public erc20TokenCount = 0;
   uint16 public nftTokenCount = 0;
 
@@ -120,7 +120,7 @@ contract ParsecBridge {
 
   function registerToken(TransferrableToken _token) public {
     require(_token != address(0));
-    require(!isRegisteredToken(_token));
+    require(!tokenColors[_token]);
     uint16 color;
     if (IntrospectionUtil.isERC721(_token)) {
       color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
@@ -130,7 +130,7 @@ contract ParsecBridge {
       erc20TokenCount += 1;
     }
     uint256[] memory arr = new uint256[](1);
-    tokenColors[_token] = color;
+    tokenColors[_token] = true;
     tokens[color] = PriorityQueue.Token({
       addr: _token,
       heapList: arr,
@@ -550,12 +550,6 @@ contract ParsecBridge {
     uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
     exitable_at = priority >> 128;
-  }
-
-  // check that token is registered. 
-  // 0 means either "empty" or "color 0". So if 0, let's check that "color 0" is taken by same token
-  function isRegisteredToken(address _token) internal view returns (bool) {
-    return tokenColors[_token] != 0 || (erc20TokenCount > 0 && tokens[0].addr == _token);
   }
 
 }
