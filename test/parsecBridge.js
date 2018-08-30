@@ -365,10 +365,9 @@ contract('Parsec', (accounts) => {
       it('should allow to deposit NFT tokens', async () => {
         const nftToken = await SpaceDustNFT.new();
         let receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId.toNumber();
+        const tokenId = receipt.logs[0].args._tokenId;
         receipt = await parsec.registerToken(nftToken.address);
         const color = receipt.logs[0].args.color.toNumber();
-        // TODO: fixme
         await nftToken.approve(parsec.address, tokenId, { from: bob });
         await parsec.deposit(bob, tokenId, color, { from: bob }).should.be.fulfilled;
       });
