@@ -16,7 +16,7 @@ module.exports = function(deployer, network, accounts) {
   deployer.deploy(SimpleToken);
   deployer.link(PriorityQueue, ParsecBridge);
   deployer.link(TxLib, ParsecBridge);
-  deployer.deploy(ParsecBridge, 4, 50, 10, 0);
+  deployer.deploy(ParsecBridge, 4, 50, 0, 0);
 
   var token, bridge;
 
