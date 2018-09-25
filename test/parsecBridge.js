@@ -380,6 +380,16 @@ contract('Parsec', (accounts) => {
         assert(bal1.toNumber() < bal2.toNumber());
       });
 
+      it('should not be able to exit fake periods', async () => {
+        const deposit = Tx.deposit(114, 50, alice);
+        let block = new Block(96).addTx(deposit);
+        let period = new Period(p[0], [block]);
+        const proof = period.proof(deposit);
+
+        // withdraw output
+        const event = await parsec.startExit(proof, 0).should.be.rejectedWith(EVMRevert);
+      });
+
       it('should allow to exit valid utxo at index 2', async () => {
         const deposit = Tx.deposit(114, 100, alice);
         let transfer = Tx.transfer(
