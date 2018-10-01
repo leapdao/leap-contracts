@@ -32,7 +32,7 @@ library TxLib {
   }
 
   struct Output {
-    uint64 value;
+    uint256 value;
     uint16 color;
     address owner;
     uint32 gasPrice;
@@ -112,21 +112,21 @@ library TxLib {
     uint16 color;
     address owner;
     assembly {
-      value := mload(add(add(offset, 8), _txData))
-      color := mload(add(add(offset, 10), _txData))
-      owner := mload(add(add(offset, 30), _txData))
+      value := mload(add(add(offset, 32), _txData))
+      color := mload(add(add(offset, 34), _txData))
+      owner := mload(add(add(offset, 54), _txData))
     }
     bytes memory data = new bytes(0);
     Output memory output = Output(value, color, owner, 0, data, 0);
     _outs[_pos] = output;
-    newOffset = offset + 30;
+    newOffset = offset + 54;
     if (_type == TxType.CompReq && _pos == 0) {
       // read gasPrice
       // read length of msgData
       uint32 gasPrice;
       assembly {
-        gasPrice := mload(add(add(offset, 34), _txData))
-        value := mload(add(add(offset, 36), _txData))
+        gasPrice := mload(add(add(offset, 58), _txData))
+        value := mload(add(add(offset, 60), _txData))
       }
       output.gasPrice = gasPrice;
       // read msgData
@@ -135,17 +135,17 @@ library TxLib {
       uint src;
       uint dest;
       assembly {
-        src := add(add(add(offset, 36), 0x20), _txData)
+        src := add(add(add(offset, 60), 0x20), _txData)
         dest := add(data, 0x20)
       }
       memcopy(src, dest, value);
       output.msgData = data;
-      newOffset = offset + 36 + value;
+      newOffset = offset + 60 + value;
     } else if (_type == TxType.CompRsp && _pos == 0) {
       // read new stateRoot
       bytes32 stateRoot;
       output.stateRoot = stateRoot; 
-      newOffset = offset + 33 + 32;
+      newOffset = offset + 57 + 32;
     }
   }
     

@@ -540,11 +540,6 @@ contract('Parsec', (accounts) => {
         await parsec.reportInvalidDeposit(proof, {from: charlie});
         const bal2 = (await parsec.getSlot(0))[2];
         assert(bal1.toNumber() > bal2.toNumber());
-
-        let [ readDepositId, readValue, readSigner ] = await parsec.readInvalidDepositProof(proof);
-        assert.equal(readDepositId.toNumber(), depositId);
-        assert.equal(readValue.toNumber(), 50);
-        assert.equal(readSigner, alice);
       });
       it('should allow to slash double deposit');
     });

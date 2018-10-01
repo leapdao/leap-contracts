@@ -82,7 +82,7 @@ contract ParsecBridge {
   uint32 depositCount = 0;
 
   struct Exit {
-    uint64 amount;
+    uint256 amount;
     uint16 color;
     address owner;
   }
@@ -335,19 +335,6 @@ contract ParsecBridge {
     delete periods[hash];
   }
 
-  function readInvalidDepositProof(
-    bytes32[] _txData
-  ) public pure returns (
-    uint32 depositId,
-    uint64 value,
-    address signer
-  ) {
-    depositId = uint32(_txData[2] >> 240);
-    value = uint64(_txData[2] >> 176);
-    signer = address(_txData[2]);
-  }
-
-
   /*
    * _txData = [ 32b periodHash, (1b Proofoffset, 8b pos,  ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
    *
@@ -363,16 +350,13 @@ contract ParsecBridge {
       require(p.height > periods[tipHash].height - epochLength);
     }
     // check transaction proof
-    TxLib.validateProof(0, _txData);
+    bytes memory txData;
+    (, , txData) = TxLib.validateProof(0, _txData);
 
-    // check deposit values
-    uint32 depositId;
-    uint64 value;
-    address signer;
-    (depositId, value, signer) = readInvalidDepositProof(_txData);
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
 
-    Deposit memory dep = deposits[depositId];
-    require(value != dep.amount || signer != dep.owner);
+    Deposit memory dep = deposits[uint32(txn.ins[0].outpoint.hash)];
+    require(txn.outs[0].value != dep.amount || txn.outs[0].owner != dep.owner);
 
     // delete invalid period
     deletePeriod(_txData[0]);
