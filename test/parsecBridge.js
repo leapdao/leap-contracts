@@ -12,6 +12,7 @@ import chai from 'chai';
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const PriorityQueue = artifacts.require('./PriorityQueue.sol');
 const SimpleToken = artifacts.require('SimpleToken');
+const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 const should = chai
   .use(require('chai-as-promised'))
@@ -354,10 +355,24 @@ contract('Parsec', (accounts) => {
         const depositId2 = Buffer.from(receipt.receipt.logs[1].topics[1].replace('0x', ''), 'hex').readUInt32BE(28);
         assert(depositId1 < depositId2);
       });
+
+      it('should not allow to deposit non-registered tokens', async () => {
+        const nonRegisteredColor = 1;
+        await token.approve(parsec.address, 1000, { from: bob });
+        await parsec.deposit(bob, 200, nonRegisteredColor, { from: bob }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to deposit NFT tokens', async () => {
+        const nftToken = await SpaceDustNFT.new();
+        let receipt = await nftToken.mint(bob, 10, true, 2);
+        const tokenId = receipt.logs[0].args._tokenId;
+        receipt = await parsec.registerToken(nftToken.address);
+        const color = receipt.logs[0].args.color.toNumber();
+        await nftToken.approve(parsec.address, tokenId, { from: bob });
+        await parsec.deposit(bob, tokenId, color, { from: bob }).should.be.fulfilled;
+      });
     });
     describe('Exit', function() {
-
-
       it('should allow to exit valid utxo', async () => {
         const deposit = Tx.deposit(114, 50, alice);
         let transfer = Tx.transfer(
@@ -557,16 +572,29 @@ contract('Parsec', (accounts) => {
       parsec = await deployBridge(token, 8);
     });
 
-    it('should register a new token', async () => {
+    it('should register a new ERC20 token', async () => {
       assert.equal((await parsec.tokens(0))[0], token.address);
-      assert.equal(await parsec.tokenCount(), 1);
+      assert.equal((await parsec.tokenCount()).toNumber(), 1);
 
       const anotherToken = await SimpleToken.new();
       const res = await parsec.registerToken(anotherToken.address);
       
       const expectedColor = 1;
-      assert.equal(await parsec.tokenCount(), 2);
+      assert.equal((await parsec.tokenCount()).toNumber(), 2);
       assert.equal((await parsec.tokens(expectedColor))[0], anotherToken.address);
+      assert.equal(res.logs[0].event, 'NewToken');
+      assert.equal(res.logs[0].args.color.toNumber(), expectedColor);
+    });
+
+    it('should register a new ERC721 token', async () => {
+      assert.equal((await parsec.tokenCount()).toNumber(), 2);
+
+      const nftToken = await SpaceDustNFT.new();
+      const res = await parsec.registerToken(nftToken.address);
+
+      const expectedColor = 2 ** 15 + 1; // NFT tokens namespace starts from 2^15 + 1
+      assert.equal((await parsec.tokenCount()).toNumber(), 3);
+      assert.equal((await parsec.tokens(expectedColor))[0], nftToken.address);
       assert.equal(res.logs[0].event, 'NewToken');
       assert.equal(res.logs[0].args.color.toNumber(), expectedColor);
     });
