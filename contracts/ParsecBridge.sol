@@ -459,6 +459,8 @@ contract ParsecBridge {
   }
 
   function startExit(bytes32[] _proof, uint256 _oindex) public {
+    // root was submitted as period
+    require(periods[_proof[0]].parent > 0);
     // validate proof
     bytes32 txHash;
     bytes memory txData;
