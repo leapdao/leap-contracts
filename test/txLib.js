@@ -238,4 +238,36 @@ contract('TxLib', (accounts) => {
       });
     });
   });
+  describe('Utils', function() {
+    let txLib;
+
+    before(async () => {
+      txLib = await TxMock.new();
+    });
+
+    it('should allow to verify proof', async () => {
+      const blocks = [];
+      let block;
+
+      for (let i = 0; i < 32; i ++) {
+        block = new Block(i).addTx(Tx.deposit(i, value, bob, color));
+        blocks.push(block);
+      }
+      const period = new Period(alicePriv, blocks);
+      const proof = period.proof(Tx.deposit(12, value, bob, color));
+      await txLib.validateProof(proof).should.be.fulfilled;
+    });
+
+    it('should allow to verify proof with always 2 txnns', async () => {
+      const blocks = [];
+      let block;
+      for (let i = 0; i < 32; i ++) {
+        block = new Block(i).addTx(Tx.deposit(i, value, bob, color)).addTx(Tx.deposit(100 + i, value, bob, color));
+        blocks.push(block);
+      }
+      const period = new Period(alicePriv, blocks);
+      const proof = period.proof(Tx.deposit(12, value, bob, color));
+      await txLib.validateProof(proof).should.be.fulfilled;
+    });
+  });
 });

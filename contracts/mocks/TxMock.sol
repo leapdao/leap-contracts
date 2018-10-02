@@ -71,4 +71,8 @@ contract TxMock {
       return 6;
     }
   }
+
+  function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+    (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
+  }
 }

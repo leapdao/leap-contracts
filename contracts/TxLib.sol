@@ -195,12 +195,22 @@ library TxLib {
   }
 
   function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+    bytes32 temp;
     for (uint256 i = _offset; i < _proof.length; i++) {
       // solhint-disable-next-line no-inline-assembly
+      temp = _proof[i];
       if (_index % 2 == 0) {
-        _leaf = keccak256(abi.encodePacked(_leaf, _proof[i]));
+        assembly {
+          mstore(0, _leaf)
+          mstore(0x20, temp)
+          _leaf := keccak256(0, 0x40)
+        }
       } else {
-        _leaf = keccak256(abi.encodePacked(_proof[i], _leaf));
+        assembly {
+          mstore(0, temp)
+          mstore(0x20, _leaf)
+          _leaf := keccak256(0, 0x40)
+        }
       }
       _index = _index / 2;
     }
@@ -221,7 +231,6 @@ library TxLib {
     bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
     require(root == _proof[0]);
   }
-
 
   function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
     uint16 txLength = uint16(_proof[1] >> 224);
