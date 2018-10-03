@@ -4,6 +4,7 @@ var PriorityQueue = artifacts.require("./PriorityQueue.sol");
 var TxLib = artifacts.require("./TxLib.sol");
 var ParsecBridge = artifacts.require("./ParsecBridge.sol");
 var SimpleToken = artifacts.require("./SimpleToken.sol");
+var ExitToken = artifacts.require("./ExitToken.sol");
 
 const ethereumNodes = {
   "develop": 'http://localhost:9545',
@@ -16,7 +17,10 @@ module.exports = function(deployer, network, accounts) {
   deployer.deploy(SimpleToken);
   deployer.link(PriorityQueue, ParsecBridge);
   deployer.link(TxLib, ParsecBridge);
-  deployer.deploy(ParsecBridge, 4, 50, 0, 0);
+  deployer.link(TxLib, ExitToken);
+  deployer.deploy(ExitToken).then(function() {
+    return deployer.deploy(ParsecBridge, 4, 50, 0, 0, ExitToken.address);
+  });
 
   var token, bridge;
 

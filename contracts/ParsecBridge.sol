@@ -17,6 +17,8 @@ import "./PriorityQueue.sol";
 import "./TxLib.sol";
 import "./IntrospectionUtil.sol";
 
+import "./ExitToken.sol";
+
 contract ParsecBridge {
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
@@ -51,6 +53,8 @@ contract ParsecBridge {
   mapping(address => bool) tokenColors;
   uint16 public erc20TokenCount = 0;
   uint16 public nftTokenCount = 0;
+
+  ExitToken public exitToken;
 
   struct Slot {
     uint32 eventCounter;
@@ -112,6 +116,8 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
+
+    exitToken = ExitToken(et);
 
     emit EpochLength(epochLength);
   }
@@ -462,7 +468,7 @@ contract ParsecBridge {
     emit NewDeposit(depositCount, _owner, _color, _amountOrTokenId);
   }
 
-  function startExit(bytes32[] _proof, uint256 _oindex) public {
+  function startExit(bytes32[] _proof, uint256 _oindex) public returns (bytes32 utxoId) {
     // root was submitted as period
     require(periods[_proof[0]].parent > 0);
     // validate proof
@@ -472,7 +478,7 @@ contract ParsecBridge {
     // parse tx and use data
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
+    utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
@@ -528,6 +534,8 @@ contract ParsecBridge {
         ERC20(tokens[currentExit.color].addr).transfer(currentExit.owner, currentExit.amount);
       }
       tokens[currentExit.color].delMin();
+
+      exitToken.exitFinalised(uint256(utxoId), tokens[currentExit.color].addr, currentExit.amount);
       delete exits[utxoId];
 
       if (tokens[currentExit.color].currentSize > 0) {
