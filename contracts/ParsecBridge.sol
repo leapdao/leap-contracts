@@ -91,7 +91,7 @@ contract ParsecBridge {
     address owner;
   }
   mapping(bytes32 => Exit) public exits;
-  
+
   constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // init genesis preiod
     Period memory genesisPeriod;
@@ -439,12 +439,12 @@ contract ParsecBridge {
     }
   }
 
-  /** 
-   * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens 
-   * or `(_amountOrTokenId)` token id if `(_color)` is NFT. 
+  /**
+   * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
+   * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
    * @dev Token should be registered with the Bridge first.
    * @param _owner Account to transfer tokens from
-   * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer 
+   * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer
    * @param _color Color of the token to deposit
    */
   function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
@@ -502,8 +502,7 @@ contract ParsecBridge {
     require(_oIndex == outpoint.pos);
 
     // delete invalid exit
-    delete exits[utxoId].owner;
-    delete exits[utxoId].amount;
+    delete exits[utxoId];
   }
 
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
@@ -521,8 +520,7 @@ contract ParsecBridge {
         ERC20(tokens[currentExit.color].addr).transfer(currentExit.owner, currentExit.amount);
       }
       tokens[currentExit.color].delMin();
-      delete exits[utxoId].owner;
-      delete exits[utxoId].amount;
+      delete exits[utxoId];
 
       if (tokens[currentExit.color].currentSize > 0) {
         (utxoId, exitable_at) = getNextExit(_color);
