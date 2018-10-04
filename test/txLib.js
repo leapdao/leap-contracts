@@ -269,5 +269,24 @@ contract('TxLib', (accounts) => {
       const proof = period.proof(Tx.deposit(12, value, bob, color));
       await txLib.validateProof(proof).should.be.fulfilled;
     });
+
+    it('should allow to get sigHash with 1 input', async () => {
+      const transfer = Tx.transfer(
+        [new Input(new Outpoint(prevTx, 0))],
+        [new Output(value, bob, color)],
+      );
+      transfer.sign([alicePriv]);
+      const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
+      assert.equal(rsp, transfer.sigHash());
+    });
+    it('should allow to get sigHash with 2 input and 2 outputs', async () => {
+      const transfer = Tx.transfer(
+        [new Input(new Outpoint(prevTx, 0)), new Input(new Outpoint(prevTx, 1))],
+        [new Output(value / 2, bob, color), new Output(value / 2, bob, color)],
+      );
+      transfer.sign([alicePriv, alicePriv]);
+      const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
+      assert.equal(rsp, transfer.sigHash());
+    });
   });
 });

@@ -75,4 +75,8 @@ contract TxMock {
   function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
     (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
   }
+
+  function getSigHash(bytes _txData) public pure returns (bytes32) {
+    return TxLib.getSigHash(_txData);
+  }
 }

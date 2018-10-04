@@ -194,6 +194,46 @@ library TxLib {
     txn = Tx(txType, ins, outs);
   }
 
+  function getSigHash(bytes _txData) internal pure returns (bytes32 sigHash) {
+    uint256 a;
+    assembly {
+      a := mload(add(0x20, _txData))
+    }
+    a = a >> 248;
+    // if not transfer, sighash is just tx hash
+    require(a == 3);
+    // read ins
+    assembly {
+        a := mload(add(0x21, _txData))
+    }
+    a = a >> 252; // get ins-length nibble
+    bytes memory sigData = new bytes(_txData.length);
+    assembly {
+      // copy type
+      mstore8(add(sigData, 32), byte(0, mload(add(_txData, 32))))
+      // copy #inputs / #outputs
+      mstore8(add(sigData, 33), byte(1, mload(add(_txData, 32))))
+      let offset := 0
+      for
+        { let i := 0 }
+        lt(i, a)
+        { i := add(i, 1) }
+        {
+          mstore(add(sigData, add(34, offset)), mload(add(_txData, add(34, offset))))
+          mstore8(add(sigData, add(66, offset)), byte(0, mload(add(_txData, add(66, offset)))))
+          offset := add(offset, add(33,65))
+        }
+      for 
+        { let i := add(34, offset) }
+        lt(i, add(64, mload(_txData)))
+        { i := add(i, 0x20) }
+        {
+          mstore(add(sigData, i), mload(add(_txData, i)))
+        }
+    }
+    return keccak256(sigData);
+  }
+
   function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
     bytes32 temp;
     for (uint256 i = _offset; i < _proof.length; i++) {

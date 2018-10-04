@@ -21,6 +21,8 @@ contract ParsecBridge {
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
+  using TxLib for TxLib.Tx;
+  using TxLib for TxLib.TxType;
   using PriorityQueue for PriorityQueue.Token;
 
   event Epoch(uint256 epoch);
@@ -495,11 +497,17 @@ contract ParsecBridge {
     // validate spending tx
     bytes memory txData;
     (, , txData) = TxLib.validateProof(96, _proof);
-    TxLib.Outpoint memory outpoint = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
 
     // make sure one is spending the other one
-    require(txHash1 == outpoint.hash);
-    require(_oIndex == outpoint.pos);
+    require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
+    require(_oIndex == txn.ins[_inputIndex].outpoint.pos);
+
+    // if transfer, make sure signature correct
+    if (txn.txType == TxLib.TxType.Transfer) {
+      address signer = ecrecover(TxLib.getSigHash(txData), txn.ins[_inputIndex].v, txn.ins[_inputIndex].r, txn.ins[_inputIndex].s);
+      require(exits[utxoId].owner == signer);
+    }
 
     // delete invalid exit
     delete exits[utxoId];
