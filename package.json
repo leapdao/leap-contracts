@@ -50,7 +50,7 @@
     "cross-env": "^5.1.3",
     "dotenv": "^4.0.0",
     "openzeppelin-solidity": "1.12.0",
-    "parsec-lib": "file:../parsec-lib",
+    "parsec-lib": "^0.16.9",
     "truffle-hdwallet-provider": "0.0.5"
   }
 }

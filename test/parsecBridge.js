@@ -21,7 +21,7 @@ const should = chai
 const deployBridge = async (token, periodTime) => {
   const pqLib = await PriorityQueue.new();
   ParsecBridge.link('PriorityQueue', pqLib.address);
-  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0);
+  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0, 0);
   bridge.registerToken(token.address);
   return bridge;
 }

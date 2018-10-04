@@ -67,37 +67,8 @@ contract ExitToken is ERC721BasicToken {
     assembly {
       calldatacopy(add(txData, 32), add(100, offset), txLength)
     }
-    bytes memory sigData = sigBytes(txData, txLength);
     TxLib.Tx memory txn = TxLib.parseTx(txData);
-    signer = ecrecover(keccak256(sigData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s);
-  }
-
-  // TODO: might be writing to memory out of bounds
-  function sigBytes(bytes txData, uint256 txLength) public pure returns (bytes memory sigData) {
-    uint256 offset;
-    bytes32 firstOne;
-    assembly {
-      firstOne := mload(add(txData, 32))
-    }
-    uint8 numInputs = uint8((firstOne << 8) >> 252);
-    sigData = new bytes(txLength);
-    assembly {
-      mstore8(add(sigData, 32), byte(0, mload(add(txData, 32))))
-      mstore8(add(sigData, 33), byte(1, mload(add(txData, 32))))
-      offset := 0
-      for
-        { let i := 0 }
-        lt(i, numInputs)
-        { i := add(i, 1) }
-        {
-          mstore(add(sigData, add(34, offset)), mload(add(txData, add(34, offset))))
-          mstore8(add(sigData, add(66, offset)), byte(0, mload(add(txData, add(66, offset)))))
-          offset := add(offset, add(33,65))
-        }
-      mstore(add(sigData, add(34, offset)), mload(add(txData, add(34, offset))))
-      offset := add(offset, 32)
-      mstore(add(sigData, add(34, offset)), mload(add(txData, add(34, offset))))
-    }
+    signer = ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s);
   }
 
 }
