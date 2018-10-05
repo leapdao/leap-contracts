@@ -18,10 +18,8 @@ module.exports = function(deployer, network, accounts) {
   deployer.link(PriorityQueue, ParsecBridge);
   deployer.link(TxLib, ParsecBridge);
   deployer.link(TxLib, ExitToken);
-  deployer.deploy(ExitToken).then(function() {
-    return deployer.deploy(ParsecBridge, 4, 50, 0, 0, ExitToken.address);
-  });
-
+  deployer.deploy(ParsecBridge, 4, 50, 0, 0);
+  
   var token, bridge;
 
   deployer.then(function() {

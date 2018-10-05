@@ -54,8 +54,6 @@ contract ParsecBridge {
   uint16 public erc20TokenCount = 0;
   uint16 public nftTokenCount = 0;
 
-  address exitToken;
-
   struct Slot {
     uint32 eventCounter;
     address owner;
@@ -95,10 +93,11 @@ contract ParsecBridge {
     uint256 amount;
     uint16 color;
     address owner;
+    bool finalized;
   }
   mapping(bytes32 => Exit) public exits;
 
-  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration, address et) public {
+  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -116,8 +115,6 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
-
-    exitToken = et;
 
     emit EpochLength(epochLength);
   }
@@ -486,7 +483,8 @@ contract ParsecBridge {
     exits[utxoId] = Exit({
       owner: out.owner,
       color: out.color,
-      amount: out.value
+      amount: out.value,
+      finalized: false
     });
     emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
   }
@@ -535,10 +533,7 @@ contract ParsecBridge {
       }
       tokens[currentExit.color].delMin();
 
-      if (exitToken != address(0)) {
-        ExitToken(exitToken).exitFinalised(uint256(utxoId), tokens[currentExit.color].addr, currentExit.amount);
-      }
-      delete exits[utxoId];
+      exits[utxoId].finalized = true;
 
       if (tokens[currentExit.color].currentSize > 0) {
         (utxoId, exitable_at) = getNextExit(_color);

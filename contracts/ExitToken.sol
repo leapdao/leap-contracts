@@ -6,18 +6,13 @@ import "./TxLib.sol";
 
 contract ExitToken is ERC721BasicToken {
 
-  event Debug(bytes data);
+  // event Debug(bytes data);
   event ProxyExit(address exiter, uint256 utxoId);
 
-  bool public bridgeHasBeenSet;
   ParsecBridge public bridge;
-  mapping (uint256 => address) public exitColor;
-  mapping (uint256 => uint256) public exitValue;
 
-  function setBridge(address b) public {
-    require(!bridgeHasBeenSet);
+  constructor(address b) public {
     bridge = ParsecBridge(b);
-    bridgeHasBeenSet = true;
   }
 
   function proxyExit(bytes32[] _proof, uint256 _oindex) public {
@@ -27,24 +22,13 @@ contract ExitToken is ERC721BasicToken {
     emit ProxyExit(exiter, utxoId);
   }
 
-  function exitFinalised(uint256 utxoId, address color, uint256 value) public {
-    require(msg.sender == address(bridge));
-    exitColor[utxoId] = color;
-    exitValue[utxoId] = value;
-  }
-
   function withdrawUtxo(uint256 utxoId) public {
-    require(exitValue[utxoId] > 0);
-    ERC20(exitColor[utxoId]).transfer(ownerOf(utxoId), exitValue[utxoId]);
-    delete exitColor[utxoId];
-    delete exitValue[utxoId];
+    (uint256 amount, uint16 color, , bool finalized) = bridge.exits(bytes32(utxoId));
+    require(finalized);
+    (address erc20, ) = bridge.tokens(color);
+    ERC20(erc20).transfer(ownerOf(utxoId), amount);
     _burn(ownerOf(utxoId), utxoId);
   }
-
-  // funds withdrawal:
-  // - check NFT has been succesfully exited????
-  // - check what color and what value it was
-  // - transfer value coins to owner of nft
 
   // will only work from proxyExit due to calldata offset
   function recoverSigner(bytes32[] _proof) public pure returns (address signer) {

@@ -20,16 +20,14 @@ contract('TokenizedExits', (accounts) => {
   let exitToken;
   before(async () => {
     token = await SimpleToken.new();
-    exitToken = await ExitToken.new();
 
     // deploy bridge
     const pqLib = await PriorityQueue.new();
     ParsecBridge.link('PriorityQueue', pqLib.address);
-    bridge = await ParsecBridge.new(4, 50, 0, 0, exitToken.address);
+    bridge = await ParsecBridge.new(4, 50, 0, 0);
     await bridge.registerToken(token.address);
 
-    // link exitToken to bridge
-    await exitToken.setBridge(bridge.address);
+    exitToken = await ExitToken.new(bridge.address);
 
     p[0] = await bridge.tipHash();
 
@@ -68,7 +66,6 @@ contract('TokenizedExits', (accounts) => {
     await bridge.finalizeExits(0).should.be.fulfilled;
     const bal2 = await token.balanceOf(alice);
     assert(bal2.toNumber() == bal1.toNumber());
-    assert((await exitToken.exitValue(utxoId)).toNumber() == 50);
 
     // exchange NFT for tokens and check balance correct
     await exitToken.withdrawUtxo(utxoId).should.be.fulfilled;
