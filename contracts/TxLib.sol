@@ -168,7 +168,7 @@ library TxLib {
     } else if (a == 6 ) {
       txType = TxType.CompRsp;
     } else {
-      revert("unknow tx type");
+      revert("unknown tx type");
     }
     // read ins and outs
     assembly {
@@ -186,7 +186,7 @@ library TxLib {
     a = (a >> 248) & 0x0f; // get outs-length nibble
     Output[] memory outs = new Output[](a);
     if (txType == TxType.Consolidate && ins.length <= outs.length) {
-      revert("invalide consolidate");
+      revert("invalid consolidate");
     }
     for (i = 0; i < outs.length; i++) {
       offset = parseOutput(txType, _txData, i, offset, outs);
