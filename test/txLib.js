@@ -6,20 +6,18 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import utils from 'ethereumjs-util';
+import BN from 'bn.js';
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'parsec-lib';
 import chai from 'chai';
 const TxMock = artifacts.require('./mocks/TxMock.sol');
-  const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
+const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const should = chai
-  .use(require('chai-as-promised'))
-  .should();
+chai.use(require('chai-as-promised')).should();
 
 function toInt(str) {
   const buf = Buffer.from(str.replace('0x', ''), 'hex');
-  return buf.readUInt32BE(28);
+  return new BN(buf);
 }
 
 function toAddr(str) {
@@ -28,9 +26,7 @@ function toAddr(str) {
 }
 
 function fromInt(num) {
-  const buf = Buffer.alloc(32, 0);
-  buf.writeUInt32BE(num, 28);
-  return buf;
+  return new BN(num).toBuffer('be', 32);
 }
 
 function checkParse(rsp, txn) {
@@ -82,6 +78,8 @@ contract('TxLib', (accounts) => {
   const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
   const value = 99000000;
   const color = 1337;
+  const nftTokenId = '3378025004445879814397';
+  const nftColor = 32769;
 
   describe('Parser', function() {
     let txLib;
@@ -94,6 +92,17 @@ contract('TxLib', (accounts) => {
 
       it('should allow to parse deposit', async () => {
         const deposit = Tx.deposit(12, value, bob, color);
+        const block = new Block(32);
+        block.addTx(deposit);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(deposit);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, deposit);
+      });
+
+      it('should allow to parse NFT deposit', async () => {
+        const deposit = Tx.deposit(12, nftTokenId, bob, nftColor);
         const block = new Block(32);
         block.addTx(deposit);
         const period = new Period(alicePriv, [block]);
@@ -156,6 +165,21 @@ contract('TxLib', (accounts) => {
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, transfer);   
+      });
+
+      it('should parse NFT transfers', async () => {
+        const transfer = Tx.transfer(
+          [new Input(new Outpoint(prevTx, 0))],
+          [new Output(nftTokenId, bob, nftColor)],
+        );
+        transfer.sign([alicePriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);
       });
     });
 

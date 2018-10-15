@@ -108,7 +108,7 @@ library TxLib {
   }
   
   function parseOutput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs) internal pure returns (uint256 newOffset) {
-    uint64 value;
+    uint256 value;
     uint16 color;
     address owner;
     assembly {
