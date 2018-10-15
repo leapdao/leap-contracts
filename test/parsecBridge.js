@@ -472,6 +472,44 @@ contract('Parsec', (accounts) => {
         assert.equal((await parsec.tokens(0))[1], 0);
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });
+
+      it('should allow to exit NFT utxo', async () => {
+        // register NFT
+        const nftToken = await SpaceDustNFT.new();
+        let receipt = await parsec.registerToken(nftToken.address);
+        const color = receipt.logs[0].args.color.toNumber();
+
+        // mint for alice
+        receipt = await nftToken.mint(alice, 10, true, 2);
+        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenIdStr = tokenId.toString(10);
+        
+        // deposit
+        await nftToken.approve(parsec.address, tokenId, { from: alice });
+        receipt = await parsec.deposit(alice, tokenId, color, { from: alice }).should.be.fulfilled;        
+        const depositId = receipt.logs[0].args.depositId.toNumber();
+        const deposit = Tx.deposit(depositId, tokenIdStr, alice, color);
+        
+        // transfer to bob
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(tokenIdStr, bob, color)]
+        );
+        transfer = transfer.sign([alicePriv]);
+
+        // include in block and period
+        let block = new Block(96).addTx(deposit).addTx(transfer);
+        let period = new Period(p[0], [block]);
+        p[2] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[0], p[2], { from: alice }).should.be.fulfilled;
+        const proof = period.proof(transfer);
+
+        // withdraw output
+        assert.equal(await nftToken.ownerOf(tokenId), parsec.address);
+        await parsec.startExit(proof, 0);
+        await parsec.finalizeExits(color);
+        assert.equal(await nftToken.ownerOf(tokenId), bob);
+      });
     });
   });
 

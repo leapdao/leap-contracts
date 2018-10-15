@@ -92,8 +92,22 @@ contract ParsecBridge {
     uint16 color;
     address owner;
   }
+
+  struct NftExit {
+    bytes32 utxoId;
+    uint256 exitableAt;
+  }
+
+  /**
+   * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
+   */
   mapping(bytes32 => Exit) public exits;
 
+  /**
+   * color → NftExit[] mapping. Contains (UTXO+exitable date) for NFT exits
+   */
+  mapping(uint16 => NftExit[]) public nftExits;
+  
   constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
     // init genesis preiod
     Period memory genesisPeriod;
@@ -144,9 +158,8 @@ contract ParsecBridge {
   function getSlot(uint256 _slotId) constant public returns (uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
     require(_slotId < epochLength);
     Slot memory slot = slots[_slotId];
-    return (slot.eventCounter, slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot. newStake, slot.newSigner, slot.newTendermint);
+    return (slot.eventCounter, slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot.newStake, slot.newSigner, slot.newTendermint);
   }
-
 
   // data = [winnerHash, claimCountTotal, operator, operator ...]
   // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
@@ -476,7 +489,11 @@ contract ParsecBridge {
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
-    tokens[out.color].insert(priority);
+    if (isNft(out.color)) {
+      nftExits[out.color].push(NftExit({ utxoId: utxoId, exitableAt: exitable_at }));
+    } else {
+      tokens[out.color].insert(priority);
+    }
     exits[utxoId] = Exit({
       owner: out.owner,
       color: out.color,
@@ -516,6 +533,9 @@ contract ParsecBridge {
   // @dev Loops through the priority queue of exits, settling the ones whose challenge
   // @dev challenge period has ended
   function finalizeExits(uint16 _color) public {
+    if (isNft(_color)) {
+      return finalizeNFTExits(_color);
+    }
     bytes32 utxoId;
     uint256 exitable_at;
     (utxoId, exitable_at) = getNextExit(_color);
@@ -524,8 +544,10 @@ contract ParsecBridge {
     while (exitable_at <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
       currentExit = exits[utxoId];
       if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
-        // replace with transferFrom?
-        ERC20(tokens[currentExit.color].addr).transfer(currentExit.owner, currentExit.amount);
+        ERC20(tokens[currentExit.color].addr).transfer(
+          currentExit.owner, 
+          currentExit.amount
+        );
       }
       tokens[currentExit.color].delMin();
       delete exits[utxoId];
@@ -542,6 +564,37 @@ contract ParsecBridge {
     uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
     exitable_at = priority >> 128;
+  }
+
+  function isNft(uint16 _color) internal pure returns (bool) {
+    return _color > 32768; // 2^15
+  }
+
+  function finalizeNFTExits(uint16 _color) internal {
+    NftExit[] memory colorExitUtxos = nftExits[_color];
+    uint256 i = 0;
+    bytes32 utxoId = colorExitUtxos[0].utxoId;
+    uint256 exitableAt = colorExitUtxos[0].exitableAt;
+    while (exitableAt <= block.timestamp) {
+      if (utxoId != 0) {
+        Exit memory currentExit = exits[utxoId];
+        if (currentExit.owner != 0 || currentExit.amount != 0) {
+          tokens[currentExit.color].addr.transferFrom(
+            address(this),
+            currentExit.owner,
+            currentExit.amount
+          );
+        }
+        delete exits[utxoId];
+        delete colorExitUtxos[i];
+      }
+      i += 1;
+      if (i >= colorExitUtxos.length) {
+        return;
+      }
+      utxoId = colorExitUtxos[i].utxoId;
+      exitableAt = colorExitUtxos[i].exitableAt;
+    }
   }
 
 }
