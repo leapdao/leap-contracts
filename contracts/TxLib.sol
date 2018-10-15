@@ -5,7 +5,7 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
- 
+
 pragma solidity ^0.4.24;
 
 library TxLib {
@@ -39,13 +39,13 @@ library TxLib {
     bytes msgData;
     bytes32 stateRoot;
   }
-    
+
   struct Tx {
     TxType txType;
     Input[] ins;
     Output[] outs;
   }
-  
+
   function parseInput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Input[] _ins) internal pure returns (uint256 newOffset) {
     bytes32 inputData;
     uint8 index;
@@ -57,11 +57,11 @@ library TxLib {
       inputData = bytes32(uint32(inputData));
       index = 0;
       newOffset = offset + 4;
-    } else {    
+    } else {
       assembly {
-        // load the prevHash (32 bytes) from input 
+        // load the prevHash (32 bytes) from input
         inputData := mload(add(add(offset, 32), _txData))
-        // load the output index (1 byte) from input 
+        // load the output index (1 byte) from input
         index := mload(add(add(offset, 33), _txData))
       }
       newOffset = offset + 33;
@@ -106,7 +106,7 @@ library TxLib {
       mstore(nDest, or(and(mload(nSrc), mask), and(mload(nDest), not(mask))))
     }
   }
-  
+
   function parseOutput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs) internal pure returns (uint256 newOffset) {
     uint256 value;
     uint16 color;
@@ -144,11 +144,11 @@ library TxLib {
     } else if (_type == TxType.CompRsp && _pos == 0) {
       // read new stateRoot
       bytes32 stateRoot;
-      output.stateRoot = stateRoot; 
+      output.stateRoot = stateRoot;
       newOffset = offset + 57 + 32;
     }
   }
-    
+
   function parseTx(bytes _txData) internal pure returns (Tx memory txn) {
     // read type
     TxType txType;
@@ -223,7 +223,7 @@ library TxLib {
           mstore8(add(sigData, add(66, offset)), byte(0, mload(add(_txData, add(66, offset)))))
           offset := add(offset, add(33,65))
         }
-      for 
+      for
         { let i := add(34, offset) }
         lt(i, add(64, mload(_txData)))
         { i := add(i, 0x20) }
@@ -285,7 +285,8 @@ library TxLib {
       v := calldataload(add(190, offset))
       calldatacopy(add(txData, 140), add(222, offset), 28) // 32 + 43 + 65
     }
-    dest = ecrecover(keccak256(txData), v, r, s);
+    bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+    dest = ecrecover(keccak256(abi.encodePacked(prefix, keccak256(txData))), v, r, s);
   }
-    
+
 }

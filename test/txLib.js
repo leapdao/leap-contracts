@@ -35,7 +35,7 @@ function checkParse(rsp, txn) {
   if (txn.type == Type.DEPOSIT) {
     txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
   }
-  assert.equal(toInt(rsp[1][0]), txn.inputs.length);  
+  assert.equal(toInt(rsp[1][0]), txn.inputs.length);
   assert.equal(toInt(rsp[1][1]), txn.outputs.length);
   // inputs
   for (let i = 0; i < txn.inputs.length; i++) {
@@ -58,13 +58,13 @@ function checkParse(rsp, txn) {
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
     if (txn.type === Type.COMP_RSP && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root    
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root
     } else if (txn.type === Type.COMP_REQ && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].gasPrice); // gas price
       assert.equal(rsp[2], `0x${txn.outputs[i].msgData.toString('hex')}`); // gas price
     } else {
       assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root    
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root
     }
   }
 }
@@ -164,7 +164,7 @@ contract('TxLib', (accounts) => {
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, transfer);   
+        checkParse(rsp, transfer);
       });
 
       it('should parse NFT transfers', async () => {
@@ -198,7 +198,7 @@ contract('TxLib', (accounts) => {
         const proof = period.proof(consolidate);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, consolidate);   
+        checkParse(rsp, consolidate);
       });
 
       it('should fail to validate consolidate with only 1 input', async () => {
@@ -271,10 +271,9 @@ contract('TxLib', (accounts) => {
 
     it('should allow to verify proof', async () => {
       const blocks = [];
-      let block;
 
       for (let i = 0; i < 32; i ++) {
-        block = new Block(i).addTx(Tx.deposit(i, value, bob, color));
+        const block = new Block(i).addTx(Tx.deposit(i, value, bob, color));
         blocks.push(block);
       }
       const period = new Period(alicePriv, blocks);
