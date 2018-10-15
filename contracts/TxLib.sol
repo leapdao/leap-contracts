@@ -259,7 +259,7 @@ library TxLib {
 
   //validate that transaction is included to the period (merkle proof)
   function validateProof(uint256 _cdOffset, bytes32[] _proof) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
-    uint256 offset = uint16(_proof[1] >> 248);
+    uint256 offset = uint8(_proof[1] >> 248);
     uint256 txLength = uint16(_proof[1] >> 224);
 
     txData = new bytes(txLength);
