@@ -300,7 +300,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, transfer.sigHash());
+      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
     });
     it('should allow to get sigHash with 2 input and 2 outputs', async () => {
       const transfer = Tx.transfer(
@@ -309,7 +309,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv, alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, transfer.sigHash());
+      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
     });
   });
 });
