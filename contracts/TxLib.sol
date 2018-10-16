@@ -108,7 +108,7 @@ library TxLib {
   }
   
   function parseOutput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs) internal pure returns (uint256 newOffset) {
-    uint64 value;
+    uint256 value;
     uint16 color;
     address owner;
     assembly {
@@ -168,7 +168,7 @@ library TxLib {
     } else if (a == 6 ) {
       txType = TxType.CompRsp;
     } else {
-      revert("unknow tx type");
+      revert("unknown tx type");
     }
     // read ins and outs
     assembly {
@@ -186,7 +186,7 @@ library TxLib {
     a = (a >> 248) & 0x0f; // get outs-length nibble
     Output[] memory outs = new Output[](a);
     if (txType == TxType.Consolidate && ins.length <= outs.length) {
-      revert("invalide consolidate");
+      revert("invalid consolidate");
     }
     for (i = 0; i < outs.length; i++) {
       offset = parseOutput(txType, _txData, i, offset, outs);
@@ -259,7 +259,7 @@ library TxLib {
 
   //validate that transaction is included to the period (merkle proof)
   function validateProof(uint256 _cdOffset, bytes32[] _proof) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
-    uint256 offset = uint16(_proof[1] >> 248);
+    uint256 offset = uint8(_proof[1] >> 248);
     uint256 txLength = uint16(_proof[1] >> 224);
 
     txData = new bytes(txLength);
