@@ -194,58 +194,22 @@ library TxLib {
     txn = Tx(txType, ins, outs);
   }
 
-  function getSigHeader(uint256 length) internal pure returns (bytes header) {
-    // The message header; we will fill in the length next
-    string memory _header = "\x19Ethereum Signed Message:\n000000";
-    uint256 lengthOffset;
-    assembly {
-      // The beginning of the base-10 message length in the prefix
-      lengthOffset := add(_header, 57)
+  // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
+  function uint2str(uint i) private pure returns (string){
+    if (i == 0) return "0";
+    uint j = i;
+    uint length;
+    while (j != 0){
+      length++;
+      j /= 10;
     }
-    // Maximum length we support
-    require(length <= 999999);
-    // The length of the message's length in base-10
-    uint256 lengthLength = 0;
-    // The divisor to get the next left-most message length digit
-    uint256 divisor = 100000;
-    // Move one digit of the message length to the right at a time
-    while (divisor != 0) {
-      // The place value at the divisor
-      uint256 digit = length / divisor;
-      if (digit == 0) {
-        // Skip leading zeros
-        if (lengthLength == 0) {
-          divisor /= 10;
-          continue;
-        }
-      }
-      // Found a non-zero digit or non-leading zero digit
-      lengthLength++;
-      // Remove this digit from the message length's current value
-      length -= digit * divisor;
-      // Shift our base-10 divisor over
-      divisor /= 10;
-
-      // Convert the digit to its ASCII representation (man ascii)
-      digit += 0x30;
-      // Move to the next character and write the digit
-      lengthOffset++;
-      assembly {
-        mstore8(lengthOffset, digit)
-      }
+    bytes memory bstr = new bytes(length);
+    uint k = length - 1;
+    while (i != 0){
+      bstr[k--] = byte(48 + i % 10);
+      i /= 10;
     }
-    // The null string requires exactly 1 zero (unskip 1 leading 0)
-    if (lengthLength == 0) {
-      lengthLength = 1 + 0x19 + 1;
-    } else {
-      lengthLength += 1 + 0x19;
-    }
-    // Truncate the tailing zeros from the header
-    assembly {
-      mstore(_header, lengthLength)
-    }
-
-    return bytes(_header);
+    return string(bstr);
   }
 
   function getSigHash(bytes _txData) internal pure returns (bytes32 sigHash) {
@@ -286,7 +250,7 @@ library TxLib {
         }
     }
 
-    return keccak256(abi.encodePacked(getSigHeader(_txData.length), sigData));
+    return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", uint2str(_txData.length), sigData));
   }
 
   function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
