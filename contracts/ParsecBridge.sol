@@ -586,7 +586,7 @@ contract ParsecBridge {
           );
         }
         delete exits[utxoId];
-        delete colorExitUtxos[i];
+        delete nftExits[_color][i];
       }
       i += 1;
       if (i >= colorExitUtxos.length) {

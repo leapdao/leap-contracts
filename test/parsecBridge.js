@@ -325,6 +325,8 @@ contract('Parsec', (accounts) => {
     const p = [];
     let parsec;
     let token;
+    let nftToken;
+    let nftColor;
     before(async () => {
       token = await SimpleToken.new();
       // initialize contract
@@ -341,6 +343,11 @@ contract('Parsec', (accounts) => {
       token.transfer(charlie, 1000);
       await token.approve(parsec.address, 1000, {from: charlie});
       await parsec.bet(2, 100, charlie, charlie, {from: charlie}).should.be.fulfilled;
+
+      // register NFT
+      nftToken = await SpaceDustNFT.new();
+      let receipt = await parsec.registerToken(nftToken.address);
+      nftColor = receipt.logs[0].args.color.toNumber();
     });
 
     describe('Deposit', function() {
@@ -474,26 +481,21 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to exit NFT utxo', async () => {
-        // register NFT
-        const nftToken = await SpaceDustNFT.new();
-        let receipt = await parsec.registerToken(nftToken.address);
-        const color = receipt.logs[0].args.color.toNumber();
-
         // mint for alice
-        receipt = await nftToken.mint(alice, 10, true, 2);
+        let receipt = await nftToken.mint(alice, 10, true, 2);
         const tokenId = receipt.logs[0].args._tokenId;
         const tokenIdStr = tokenId.toString(10);
         
         // deposit
         await nftToken.approve(parsec.address, tokenId, { from: alice });
-        receipt = await parsec.deposit(alice, tokenId, color, { from: alice }).should.be.fulfilled;        
+        receipt = await parsec.deposit(alice, tokenId, nftColor, { from: alice }).should.be.fulfilled;        
         const depositId = receipt.logs[0].args.depositId.toNumber();
-        const deposit = Tx.deposit(depositId, tokenIdStr, alice, color);
+        const deposit = Tx.deposit(depositId, tokenIdStr, alice, nftColor);
         
         // transfer to bob
         let transfer = Tx.transfer(
           [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(tokenIdStr, bob, color)]
+          [new Output(tokenIdStr, bob, nftColor)]
         );
         transfer = transfer.sign([alicePriv]);
 
@@ -506,9 +508,71 @@ contract('Parsec', (accounts) => {
 
         // withdraw output
         assert.equal(await nftToken.ownerOf(tokenId), parsec.address);
-        await parsec.startExit(proof, 0);
-        await parsec.finalizeExits(color);
+        const event = await parsec.startExit(proof, 0);
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        await parsec.finalizeExits(nftColor);
         assert.equal(await nftToken.ownerOf(tokenId), bob);
+        assert.equal((await parsec.nftExits(nftColor, 0))[0], '0x0000000000000000000000000000000000000000000000000000000000000000');
+        assert.equal((await parsec.exits(outpoint.getUtxoId()))[2], '0x0000000000000000000000000000000000000000');
+      });
+
+      it('should allow to challenge NFT exit', async () => {
+        // mint for alice
+        let receipt = await nftToken.mint(alice, 10, true, 3);
+        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenIdStr = tokenId.toString(10);
+
+        // deposit
+        await nftToken.approve(parsec.address, tokenId, { from: alice });
+        receipt = await parsec.deposit(alice, tokenId, nftColor, { from: alice }).should.be.fulfilled;        
+        const depositId = receipt.logs[0].args.depositId.toNumber();
+        const deposit = Tx.deposit(depositId, tokenIdStr, alice, nftColor);
+
+        // utxo that will try exit
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(tokenIdStr, bob, nftColor)]
+        );
+        transfer = transfer.sign([alicePriv]);
+
+        // utxo that will have spend exit utxo
+        let spend = Tx.transfer(
+          [new Input(new Outpoint(transfer.hash(), 0))],
+          [new Output(tokenIdStr, charlie, nftColor)]
+        );
+        spend = spend.sign([bobPriv]);
+
+        // submit period and get proofs
+        let block = new Block(128).addTx(deposit).addTx(transfer).addTx(spend);
+        let period = new Period(p[2], [block]);
+        p[3] = period.merkleRoot();
+        await parsec.submitPeriod(0, p[2], p[3], { from: alice }).should.be.fulfilled;
+        const proof = period.proof(transfer);
+        const spendProof = period.proof(spend);
+        
+        // withdraw output
+        const event = await parsec.startExit(proof, 0);
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+        // challenge exit and make sure exit is removed
+        let exit = await parsec.exits(outpoint.getUtxoId());
+        assert.equal((await parsec.nftExits(nftColor, 1))[0], outpoint.getUtxoId());
+        assert.equal(exit[2], bob);
+        
+        await parsec.challengeExit(spendProof, proof, 0, 0);        
+        exit = await parsec.exits(outpoint.getUtxoId());
+        // check that exit was deleted
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
+        await parsec.finalizeExits(nftColor);
+        // check transfer didn't happen
+        assert.equal(await nftToken.ownerOf(tokenId), parsec.address);        
+        assert.equal((await parsec.nftExits(nftColor, 1))[0], '0x0000000000000000000000000000000000000000000000000000000000000000');
       });
     });
   });
