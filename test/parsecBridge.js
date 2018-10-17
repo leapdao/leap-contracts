@@ -380,40 +380,11 @@ contract('Parsec', (accounts) => {
       });
     });
     describe('Exit', function() {
-      it('should allow to exit valid utxo', async () => {
-        const deposit = Tx.deposit(114, 50, alice);
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob)]
-        );
+      let transferProof;
+      let depositId = 114;
 
-        transfer = transfer.sign([alicePriv]);
-        let block = new Block(96).addTx(deposit).addTx(transfer);
-        let period = new Period(p[0], [block]);
-        p[2] = period.merkleRoot();
-        await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
-        const proof = period.proof(transfer);
-
-        // withdraw output
-        const event = await parsec.startExit(proof, 0);
-        const bal1 = await token.balanceOf(bob);
-        await parsec.finalizeExits(0);
-        const bal2 = await token.balanceOf(bob);
-        assert(bal1.toNumber() < bal2.toNumber());
-      });
-
-      it('should not be able to exit fake periods', async () => {
-        const deposit = Tx.deposit(114, 50, alice);
-        let block = new Block(96).addTx(deposit);
-        let period = new Period(p[0], [block]);
-        const proof = period.proof(deposit);
-
-        // withdraw output
-        const event = await parsec.startExit(proof, 0).should.be.rejectedWith(EVMRevert);
-      });
-
-      it('should allow to exit valid utxo at index 2', async () => {
-        const deposit = Tx.deposit(114, 100, alice);
+      beforeEach(async () => {
+        const deposit = Tx.deposit(depositId++, 100, alice);
         let transfer = Tx.transfer(
           [new Input(new Outpoint(deposit.hash(), 0))],
           [new Output(50, bob), new Output(50, alice)]
@@ -424,10 +395,26 @@ contract('Parsec', (accounts) => {
         let period = new Period(p[0], [block]);
         p[2] = period.merkleRoot();
         await parsec.submitPeriod(0, p[0], p[2], {from: alice}).should.be.fulfilled;
-        const proof = period.proof(transfer);
+        transferProof = period.proof(transfer);
+      });
 
+      it('should allow to exit valid utxo', async () => {
+        // withdraw output
+        await parsec.startExit(transferProof, 0, { from: bob });
+        const bal1 = await token.balanceOf(bob);
+        await parsec.finalizeExits(0);
+        const bal2 = await token.balanceOf(bob);
+        assert(bal1.toNumber() < bal2.toNumber());
+      });
+
+      it('should allow to exit only for utxo owner', async () => {
+        // withdraw output
+        await parsec.startExit(transferProof, 0, { from: charlie }).should.be.rejectedWith(EVMRevert);;
+      });
+
+      it('should allow to exit valid utxo at index 2', async () => {
         // withdraw second output
-        const event = await parsec.startExit(proof, 1);
+        await parsec.startExit(transferProof, 1, { from: alice });
         const bal1 = await token.balanceOf(alice);
         await parsec.finalizeExits(0);
         const bal2 = await token.balanceOf(alice);
@@ -456,7 +443,7 @@ contract('Parsec', (accounts) => {
         const proof = period.proof(transfer);
         const spendProof = period.proof(spend);
         // withdraw output
-        const event = await parsec.startExit(proof, 0);
+        const event = await parsec.startExit(proof, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()
@@ -478,6 +465,16 @@ contract('Parsec', (accounts) => {
         // check exit was evicted from PriorityQueue
         assert.equal((await parsec.tokens(0))[1], 0);
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
+      });
+
+      it('should not be able to exit fake periods', async () => {
+        const deposit = Tx.deposit(114, 50, alice);
+        let block = new Block(96).addTx(deposit);
+        let period = new Period(p[0], [block]);
+        const proof = period.proof(deposit);
+
+        // withdraw output
+        const event = await parsec.startExit(proof, 0, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to exit NFT utxo', async () => {
@@ -508,7 +505,7 @@ contract('Parsec', (accounts) => {
 
         // withdraw output
         assert.equal(await nftToken.ownerOf(tokenId), parsec.address);
-        const event = await parsec.startExit(proof, 0);
+        const event = await parsec.startExit(proof, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()
@@ -554,7 +551,7 @@ contract('Parsec', (accounts) => {
         const spendProof = period.proof(spend);
         
         // withdraw output
-        const event = await parsec.startExit(proof, 0);
+        const event = await parsec.startExit(proof, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()

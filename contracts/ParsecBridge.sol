@@ -484,6 +484,7 @@ contract ParsecBridge {
     (, txHash, txData) = TxLib.validateProof(32, _proof);
     // parse tx and use data
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
+    require(out.owner == msg.sender, "Only UTXO owner can start exit");
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
