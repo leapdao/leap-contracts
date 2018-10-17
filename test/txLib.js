@@ -6,6 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+import utils from "ethereumjs-util";
 import BN from 'bn.js';
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'parsec-lib';
@@ -212,53 +213,6 @@ contract('TxLib', (accounts) => {
         const period = new Period(alicePriv, [block]);
         const proof = period.proof(consolidate);
         await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
-      });
-    });
-
-    describe('Computation Request', function() {
-      it('should parse with 1 output', async () => {
-        const compRequest = Tx.compRequest([
-          new Input({
-            prevout: new Outpoint(prevTx, 0),
-          }),
-          new Input(new Outpoint(prevTx, 1)),
-        ],[
-          new Output({
-            value: value / 2,
-            color,
-            address: alice,
-            gasPrice: 123,
-            msgData: '0x1234',
-        })]);
-        compRequest.sign([_, alicePriv]);
-        const block = new Block(32);
-        block.addTx(compRequest);
-        const period = new Period(alicePriv, [block]);
-        const proof = period.proof(compRequest);
-
-        const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, compRequest);
-      });
-    });
-
-    describe('Computation Response', function() {
-      it('should parse with 1 output', async () => {
-        const compResponse = Tx.compResponse([
-          new Input(new Outpoint(prevTx, 0)),
-        ],[
-          new Output({
-            value,
-            color,
-            address: alice,
-            storageRoot: alicePriv,
-        })]);
-        const block = new Block(32);
-        block.addTx(compResponse);
-        const period = new Period(alicePriv, [block]);
-        const proof = period.proof(compResponse);
-
-        const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, compResponse);
       });
     });
   });
