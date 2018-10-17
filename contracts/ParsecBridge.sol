@@ -522,7 +522,8 @@ contract ParsecBridge {
 
     // if transfer, make sure signature correct
     if (txn.txType == TxLib.TxType.Transfer) {
-      address signer = ecrecover(TxLib.getSigHash(txData), txn.ins[_inputIndex].v, txn.ins[_inputIndex].r, txn.ins[_inputIndex].s);
+      bytes32 sigHash = TxLib.getSigHash(txData);
+      address signer = ecrecover(sigHash, txn.ins[_inputIndex].v, txn.ins[_inputIndex].r, txn.ins[_inputIndex].s);
       require(exits[utxoId].owner == signer);
     }
 

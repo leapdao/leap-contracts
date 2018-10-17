@@ -5,7 +5,7 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
- 
+
 pragma solidity ^0.4.24;
 
 import "../TxLib.sol";
@@ -24,7 +24,7 @@ contract TxMock {
     (, , txData) = TxLib.validateProof(0, _proof);
 
     TxLib.Tx memory txn = TxLib.parseTx(txData);
-    
+
     txType = typeToInt(txn.txType);
     rsp = new bytes32[](2 + txn.ins.length * 5 + txn.outs.length * 5);
     rsp[0] = bytes32(txn.ins.length);
@@ -56,8 +56,8 @@ contract TxMock {
     _rsp[_offset + 2] = bytes32(_output.owner);
     _rsp[_offset + 3] = bytes32(_output.gasPrice);
     _rsp[_offset + 4] = bytes32(_output.stateRoot);
-  } 
-  
+  }
+
   function typeToInt(TxLib.TxType _type) internal pure returns (uint256) {
     if (_type == TxLib.TxType.Deposit) {
       return 2;
