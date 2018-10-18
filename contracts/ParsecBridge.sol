@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
@@ -17,7 +17,9 @@ import "./PriorityQueue.sol";
 import "./TxLib.sol";
 import "./IntrospectionUtil.sol";
 
-contract ParsecBridge {
+// solium-disable security/no-block-members
+
+contract ParsecBridge { 
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
@@ -29,26 +31,63 @@ contract ParsecBridge {
   event EpochLength(uint256 epochLength);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
-  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
-  event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
-  event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, address newSigner, uint256 eventCounter, uint256 epoch);
-  event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
-  event ValidatorUpdate(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter);
+  
+  event ExitStarted(
+    bytes32 indexed txHash, 
+    uint256 indexed outIndex, 
+    uint256 indexed color, 
+    address exitor, 
+    uint256 amount
+  );
+  
+  event ValidatorJoin(
+    address indexed signerAddr, 
+    uint256 indexed slotId, 
+    bytes32 indexed tenderAddr, 
+    uint256 eventCounter, 
+    uint256 epoch
+  );
+  
+  event ValidatorLogout(
+    address indexed signerAddr, 
+    uint256 indexed slotId, 
+    bytes32 indexed tenderAddr, 
+    address newSigner, 
+    uint256 eventCounter, 
+    uint256 epoch
+  );
+
+  event ValidatorLeave(
+    address indexed signerAddr, 
+    uint256 indexed slotId, 
+    bytes32 indexed tenderAddr, 
+    uint256 epoch
+  );
+  
+  event ValidatorUpdate(
+    address indexed signerAddr, 
+    uint256 indexed slotId, 
+    bytes32 indexed tenderAddr, 
+    uint256 eventCounter
+  );
+  
   event NewToken(address indexed tokenAddr, uint16 color);
 
-  bytes32 constant genesis = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; // "I am very angry, but it was fun!" @victor
+  // "I am very angry, but it was fun!" @victor
+  bytes32 public constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21; 
+
   uint256 public epochLength; // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
-  uint256 lastEpochBlockHeight;
-  uint256 parentBlockInterval; // how often epochs can be submitted max
-  uint64 lastParentBlock; // last ethereum block when epoch was submitted
-  uint256 maxReward; // max reward per period
+  uint256 public lastEpochBlockHeight;
+  uint256 public parentBlockInterval; // how often epochs can be submitted max
+  uint64 public lastParentBlock; // last ethereum block when epoch was submitted
+  uint256 public maxReward; // max reward per period
   uint256 public averageGasPrice; // collected gas price for last submitted blocks
-  uint256 exitDuration;
+  uint256 public exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
-  mapping(address => bool) tokenColors;
+  mapping(address => bool) public tokenColors;
   uint16 public erc20TokenCount = 0;
   uint16 public nftTokenCount = 0;
 
@@ -76,6 +115,7 @@ contract ParsecBridge {
     uint64 reward;
     bytes32[] children; // unordered list of children below this node
   }
+
   mapping(bytes32 => Period) public periods;
 
   struct Deposit {
@@ -84,8 +124,10 @@ contract ParsecBridge {
     address owner;
     uint256 amount;
   }
+
   mapping(uint32 => Deposit) public deposits;
-  uint32 depositCount = 0;
+  
+  uint32 public depositCount = 0;
 
   struct Exit {
     uint256 amount;
@@ -108,13 +150,18 @@ contract ParsecBridge {
    */
   mapping(uint16 => NftExit[]) public nftExits;
   
-  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
+  constructor(
+    uint256 _epochLength, 
+    uint256 _maxReward, 
+    uint256 _parentBlockInterval, 
+    uint256 _exitDuration
+  ) public {
     // init genesis preiod
     Period memory genesisPeriod;
-    genesisPeriod.parent = genesis;
+    genesisPeriod.parent = GENESIS;
     genesisPeriod.height = 32;
     genesisPeriod.timestamp = uint32(block.timestamp);
-    tipHash = genesis;
+    tipHash = GENESIS;
     periods[tipHash] = genesisPeriod;
     // epochLength and at the same time number of validator slots
     require(_epochLength < 256);
@@ -155,57 +202,25 @@ contract ParsecBridge {
     emit NewToken(_token, color);
   }
 
-  function getSlot(uint256 _slotId) constant public returns (uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32) {
+  function getSlot(
+    uint256 _slotId
+  ) public view returns (
+    uint32, address, uint64, address, bytes32, uint32, address, uint64, address, bytes32
+  ) {
     require(_slotId < epochLength);
     Slot memory slot = slots[_slotId];
-    return (slot.eventCounter, slot.owner, slot.stake, slot.signer, slot.tendermint, slot.activationEpoch, slot.newOwner, slot.newStake, slot.newSigner, slot.newTendermint);
+    return (
+      slot.eventCounter, slot.owner, slot.stake, slot.signer, slot.tendermint,
+      slot.activationEpoch, slot.newOwner, slot.newStake, slot.newSigner, slot.newTendermint
+    );
   }
 
-  // data = [winnerHash, claimCountTotal, operator, operator ...]
-  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
-  function dfs(bytes32[] _data, bytes32 _nodeHash) internal constant returns(bytes32[] data) {
-    Period memory node = periods[_nodeHash];
-    // visit this node
-    data = new bytes32[](_data.length);
-    for (uint256 i = 1; i < _data.length; i++) {
-      data[i] = _data[i];
-    }
-    // find the operator that mined this block
-    i = node.slot + 2;
-    // if operator can claim rewards, assign
-    if (uint256(data[i]) == 0) {
-      data[i] = bytes32(1);
-      data[1] = bytes32(uint256(data[1]) + (1 << 128));
-      data[0] = _nodeHash;
-    }
-    // more of tree to walk
-    if (node.children.length > 0) {
-      bytes32[][] memory options = new bytes32[][](data.length);
-      for (i = 0; i < node.children.length; i++) {
-        options[i] = dfs(data, node.children[i]);
-      }
-      for (i = 0; i < node.children.length; i++) {
-        // compare options, return the best
-        if (uint256(options[i][1]) > uint256(data[1])) {
-          data[0] = options[i][0];
-          data[1] = options[i][1];
-        }
-      }
-    }
-    else {
-      data[0] = _nodeHash;
-      data[1] = bytes32(uint256(data[1]) + 1);
-    }
-    // else - reached a tip
-    // return data
-  }
-
-  function getTip() public constant returns (bytes32, uint256) {
+  function getTip() public view returns (bytes32, uint256) {
     // find consensus horizon
     bytes32 consensusHorizon = periods[tipHash].parent;
     uint256 depth = (periods[tipHash].height < epochLength * 32) ? 1 : periods[tipHash].height - (epochLength * 32);
     depth += 32;
-    while(periods[consensusHorizon].height > depth) {
+    while (periods[consensusHorizon].height > depth) {
       consensusHorizon = periods[consensusHorizon].parent;
     }
     // create data structure for depth first search
@@ -216,7 +231,14 @@ contract ParsecBridge {
     return (rsp[0], uint256(rsp[1]) >> 128);
   }
 
-  function bet(uint256 _slotId, uint256 _value, address _signerAddr, bytes32 _tenderAddr) public {
+  // solium-disable security/no-tx-origin
+  // TODO: consider not to use tx.origin
+  function bet(
+    uint256 _slotId, 
+    uint256 _value, 
+    address _signerAddr, 
+    bytes32 _tenderAddr
+  ) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     // take care of logout
@@ -224,7 +246,14 @@ contract ParsecBridge {
       require(slot.owner == tx.origin);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, 0x0, slot.eventCounter, lastCompleteEpoch + 3);
+      emit ValidatorLogout(
+        slot.signer, 
+        _slotId, 
+        _tenderAddr,
+        0x0, 
+        slot.eventCounter, 
+        lastCompleteEpoch + 3
+      );
       return;
     }
     // check min stake
@@ -246,13 +275,22 @@ contract ParsecBridge {
       slot.activationEpoch = 0;
       slot.eventCounter++;
       if (stake == 0) {
-        emit ValidatorJoin(slot.signer, _slotId, _tenderAddr, slot.eventCounter, lastCompleteEpoch + 1);
+        emit ValidatorJoin(
+          slot.signer, 
+          _slotId, 
+          _tenderAddr, 
+          slot.eventCounter, 
+          lastCompleteEpoch + 1
+        );
       } else {
-        emit ValidatorUpdate(slot.signer, _slotId, _tenderAddr, slot.eventCounter);
+        emit ValidatorUpdate(
+          slot.signer, 
+          _slotId, 
+          _tenderAddr, 
+          slot.eventCounter
+        );
       }
-    }
-    // auction
-    else {
+    } else { // auction
       if (slot.newStake > 0) {
         ERC20(tokens[0].addr).transfer(slot.newOwner, slot.newStake);
       }
@@ -263,9 +301,17 @@ contract ParsecBridge {
       slot.newStake = uint64(_value);
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
-      emit ValidatorLogout(slot.signer, _slotId, _tenderAddr, _signerAddr, slot.eventCounter, lastCompleteEpoch + 3);
+      emit ValidatorLogout(
+        slot.signer, 
+        _slotId, 
+        _tenderAddr, 
+        _signerAddr, 
+        slot.eventCounter, 
+        lastCompleteEpoch + 3
+      );
     }
   }
+  // solium-enable security/no-tx-origin
 
   function activate(uint256 _slotId) public {
     require(_slotId < epochLength);
@@ -273,7 +319,12 @@ contract ParsecBridge {
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
     if (slot.stake > 0) {
       ERC20(tokens[0].addr).transfer(slot.owner, slot.stake);
-      emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
+      emit ValidatorLeave(
+        slot.signer, 
+        _slotId, 
+        slot.tendermint, 
+        lastCompleteEpoch + 1
+      );
     }
     slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
@@ -286,21 +337,20 @@ contract ParsecBridge {
     slot.newStake = 0;
     slot.eventCounter++;
     if (slot.stake > 0) {
-      emit ValidatorJoin(slot.signer, _slotId, slot.tendermint, slot.eventCounter, lastCompleteEpoch + 1);
+      emit ValidatorJoin(
+        slot.signer, 
+        _slotId, 
+        slot.tendermint, 
+        slot.eventCounter, 
+        lastCompleteEpoch + 1
+      );
     }
   }
 
-  function recordGas() internal {
-    averageGasPrice = averageGasPrice - (averageGasPrice / 15) + (tx.gasprice / 15);
-  }
-
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
-    // check parent node exists
-    require(periods[_prevHash].parent > 0);
-    // check that same root not submitted yet
-    require(periods[_root].height == 0);
-    // check slot
-    require(_slotId < epochLength);
+    require(periods[_prevHash].parent > 0, "Parent node should exist");
+    require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
+    require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender);
     if (slot.activationEpoch > 0) {
@@ -316,8 +366,8 @@ contract ParsecBridge {
       require(block.number >= lastParentBlock + parentBlockInterval);
       tipHash = _root;
       lastParentBlock = uint64(block.number);
-	    // record gas
-	    recordGas();
+      // record gas
+      recordGas();
       emit NewHeight(newHeight, _root);
     }
     // store the period
@@ -349,21 +399,7 @@ contract ParsecBridge {
     }
   }
 
-  function deletePeriod(bytes32 hash) internal {
-    Period storage parent = periods[periods[hash].parent];
-    uint256 i = periods[hash].parentIndex;
-    if (i < parent.children.length - 1) {
-      // swap with last child
-      parent.children[i] = parent.children[parent.children.length - 1];
-    }
-    parent.children.length--;
-    if (hash == tipHash) {
-      tipHash = periods[hash].parent;
-    }
-    delete periods[hash];
-  }
-
-  /*
+    /*
    * _txData = [ 32b periodHash, (1b Proofoffset, 8b pos,  ..00.., 1b txData), 32b txData, 32b proof, 32b proof ]
    *
    * # 2 Deposit TX (33b)
@@ -431,29 +467,6 @@ contract ParsecBridge {
     slash(p.slot, 50);
   }
 
-  function slash(uint256 _slotId, uint256 _value) internal {
-    require(_slotId < epochLength);
-    Slot storage slot = slots[_slotId];
-    require(slot.stake > 0);
-    uint256 prevStake = slot.stake;
-    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
-    // if slot became empty by slashing
-    if (prevStake > 0 && slot.stake == 0) {
-      emit ValidatorLeave(slot.signer, _slotId, slot.tendermint, lastCompleteEpoch + 1);
-      slot.activationEpoch = 0;
-      if (slot.newStake > 0) {
-        // someone in queue
-        activate(_slotId);
-      } else {
-        // clean out account
-        slot.owner = 0;
-        slot.signer = 0;
-        slot.tendermint = 0x0;
-        slot.stake = 0;
-      }
-    }
-  }
-
   /**
    * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
    * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
@@ -472,7 +485,12 @@ contract ParsecBridge {
       color: _color,
       amount: _amountOrTokenId
     });
-    emit NewDeposit(depositCount, _owner, _color, _amountOrTokenId);
+    emit NewDeposit(
+      depositCount, 
+      _owner, 
+      _color, 
+      _amountOrTokenId
+    );
   }
 
   function startExit(bytes32[] _proof, uint256 _oindex) public {
@@ -485,13 +503,13 @@ contract ParsecBridge {
     // parse tx and use data
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
-    uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
-    uint256 priority = (exitable_at << 128) | uint128(utxoId);
+    uint256 priority = (exitableAt << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
     if (isNft(out.color)) {
-      nftExits[out.color].push(NftExit({ utxoId: utxoId, exitableAt: exitable_at }));
+      nftExits[out.color].push(NftExit({ utxoId: utxoId, exitableAt: exitableAt }));
     } else {
       tokens[out.color].insert(priority);
     }
@@ -500,14 +518,25 @@ contract ParsecBridge {
       color: out.color,
       amount: out.value
     });
-    emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
+    emit ExitStarted(
+      txHash, 
+      _oindex, 
+      out.color, 
+      out.owner, 
+      out.value
+    );
   }
 
-  function challengeExit(bytes32[] _proof, bytes32[] _prevProof, uint256 _oIndex, uint256 _inputIndex) public {
+  function challengeExit(
+    bytes32[] _proof, 
+    bytes32[] _prevProof, 
+    uint256 _oIndex, 
+    uint256 _inputIndex
+  ) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    ( , txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
+    (, txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
     bytes32 utxoId = bytes32((_oIndex << 120) | uint120(txHash1));
 
     require(exits[utxoId].amount > 0);
@@ -524,7 +553,12 @@ contract ParsecBridge {
     // if transfer, make sure signature correct
     if (txn.txType == TxLib.TxType.Transfer) {
       bytes32 sigHash = TxLib.getSigHash(txData);
-      address signer = ecrecover(sigHash, txn.ins[_inputIndex].v, txn.ins[_inputIndex].r, txn.ins[_inputIndex].s);
+      address signer = ecrecover(
+        sigHash, 
+        txn.ins[_inputIndex].v, 
+        txn.ins[_inputIndex].r, 
+        txn.ins[_inputIndex].s
+      );
       require(exits[utxoId].owner == signer);
     }
 
@@ -539,11 +573,11 @@ contract ParsecBridge {
       return finalizeNFTExits(_color);
     }
     bytes32 utxoId;
-    uint256 exitable_at;
-    (utxoId, exitable_at) = getNextExit(_color);
+    uint256 exitableAt;
+    (utxoId, exitableAt) = getNextExit(_color);
 
     Exit memory currentExit = exits[utxoId];
-    while (exitable_at <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
+    while (exitableAt <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
       currentExit = exits[utxoId];
       if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
         ERC20(tokens[currentExit.color].addr).transfer(
@@ -555,17 +589,17 @@ contract ParsecBridge {
       delete exits[utxoId];
 
       if (tokens[currentExit.color].currentSize > 0) {
-        (utxoId, exitable_at) = getNextExit(_color);
+        (utxoId, exitableAt) = getNextExit(_color);
       } else {
         return;
       }
     }
   }
 
-  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitable_at) {
+  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
     uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
-    exitable_at = priority >> 128;
+    exitableAt = priority >> 128;
   }
 
   function isNft(uint16 _color) internal pure returns (bool) {
@@ -599,4 +633,89 @@ contract ParsecBridge {
     }
   }
 
+  function deletePeriod(bytes32 hash) internal {
+    Period storage parent = periods[periods[hash].parent];
+    uint256 i = periods[hash].parentIndex;
+    if (i < parent.children.length - 1) {
+      // swap with last child
+      parent.children[i] = parent.children[parent.children.length - 1];
+    }
+    parent.children.length--;
+    if (hash == tipHash) {
+      tipHash = periods[hash].parent;
+    }
+    delete periods[hash];
+  }
+
+  function slash(uint256 _slotId, uint256 _value) internal {
+    require(_slotId < epochLength);
+    Slot storage slot = slots[_slotId];
+    require(slot.stake > 0);
+    uint256 prevStake = slot.stake;
+    slot.stake = (_value >= slot.stake) ? 0 : slot.stake - uint64(_value);
+    // if slot became empty by slashing
+    if (prevStake > 0 && slot.stake == 0) {
+      emit ValidatorLeave(
+        slot.signer, 
+        _slotId, 
+        slot.tendermint, 
+        lastCompleteEpoch + 1
+      );
+      slot.activationEpoch = 0;
+      if (slot.newStake > 0) {
+        // someone in queue
+        activate(_slotId);
+      } else {
+        // clean out account
+        slot.owner = 0;
+        slot.signer = 0;
+        slot.tendermint = 0x0;
+        slot.stake = 0;
+      }
+    }
+  }
+
+  function recordGas() internal {
+    averageGasPrice = averageGasPrice - (averageGasPrice / 15) + (tx.gasprice / 15);
+  }
+
+  // data = [winnerHash, claimCountTotal, operator, operator ...]
+  // operator: 1b claimCountByOperator - 10b 0x - 1b stake - 20b address
+  function dfs(bytes32[] _data, bytes32 _nodeHash) internal view returns(bytes32[] data) {
+    Period memory node = periods[_nodeHash];
+    // visit this node
+    data = new bytes32[](_data.length);
+    for (uint256 i = 1; i < _data.length; i++) {
+      data[i] = _data[i];
+    }
+    // find the operator that mined this block
+    i = node.slot + 2;
+    // if operator can claim rewards, assign
+    if (uint256(data[i]) == 0) {
+      data[i] = bytes32(1);
+      data[1] = bytes32(uint256(data[1]) + (1 << 128));
+      data[0] = _nodeHash;
+    }
+    // more of tree to walk
+    if (node.children.length > 0) {
+      bytes32[][] memory options = new bytes32[][](data.length);
+      for (i = 0; i < node.children.length; i++) {
+        options[i] = dfs(data, node.children[i]);
+      }
+      for (i = 0; i < node.children.length; i++) {
+        // compare options, return the best
+        if (uint256(options[i][1]) > uint256(data[1])) {
+          data[0] = options[i][0];
+          data[1] = options[i][1];
+        }
+      }
+    } else {
+      data[0] = _nodeHash;
+      data[1] = bytes32(uint256(data[1]) + 1);
+    }
+    // else - reached a tip
+    // return data
+  }
+
 }
+// solium-enable security/no-block-members

@@ -1,4 +1,3 @@
-
 /**
  * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
  *
@@ -6,7 +5,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
+
 
 library TxLib {
 
@@ -46,7 +46,9 @@ library TxLib {
     Output[] outs;
   }
 
-  function parseInput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Input[] _ins) internal pure returns (uint256 newOffset) {
+  function parseInput(
+    TxType _type, bytes _txData, uint256 _pos, uint256 offset, Input[] _ins
+  ) internal pure returns (uint256 newOffset) {
     bytes32 inputData;
     uint8 index;
     if (_type == TxType.Deposit) {
@@ -67,9 +69,9 @@ library TxLib {
       newOffset = offset + 33;
     }
     Outpoint memory outpoint = Outpoint(inputData, index);
-    Input memory input = Input(outpoint, 0, 0, 0);
+    Input memory input = Input(outpoint, 0, 0, 0); // solium-disable-line arg-overflow
     if (_type == TxType.Transfer ||
-      ((_type == TxType.CompReq || _type == TxType.CompRsp ) && _pos > 0)) {
+      ((_type == TxType.CompReq || _type == TxType.CompRsp) && _pos > 0)) {
       bytes32 r;
       bytes32 s;
       uint8 v;
@@ -107,7 +109,9 @@ library TxLib {
     }
   }
 
-  function parseOutput(TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs) internal pure returns (uint256 newOffset) {
+  function parseOutput(
+    TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs
+  ) internal pure returns (uint256 newOffset) {
     uint256 value;
     uint16 color;
     address owner;
@@ -117,7 +121,7 @@ library TxLib {
       owner := mload(add(add(offset, 54), _txData))
     }
     bytes memory data = new bytes(0);
-    Output memory output = Output(value, color, owner, 0, data, 0);
+    Output memory output = Output(value, color, owner, 0, data, 0);  // solium-disable-line arg-overflow
     _outs[_pos] = output;
     newOffset = offset + 54;
     if (_type == TxType.CompReq && _pos == 0) {
@@ -157,15 +161,15 @@ library TxLib {
       a := mload(add(0x20, _txData))
     }
     a = a >> 248; // get first byte
-    if (a == 2 ) {
+    if (a == 2) {
       txType = TxType.Deposit;
-    } else if (a == 3 ) {
+    } else if (a == 3) {
       txType = TxType.Transfer;
-    } else if (a == 4 ) {
+    } else if (a == 4) {
       txType = TxType.Consolidate;
-    } else if (a == 5 ) {
+    } else if (a == 5) {
       txType = TxType.CompReq;
-    } else if (a == 6 ) {
+    } else if (a == 6) {
       txType = TxType.CompRsp;
     } else {
       revert("unknown tx type");
@@ -178,7 +182,7 @@ library TxLib {
     Input[] memory ins = new Input[](a);
     uint256 offset = 2;
     for (uint i = 0; i < ins.length; i++) {
-      offset = parseInput(txType, _txData, i, offset, ins);
+      offset = parseInput(txType, _txData, i, offset, ins); // solium-disable-line arg-overflow
     }
     assembly {
         a := mload(add(0x21, _txData))
@@ -189,27 +193,9 @@ library TxLib {
       revert("invalid consolidate");
     }
     for (i = 0; i < outs.length; i++) {
-      offset = parseOutput(txType, _txData, i, offset, outs);
+      offset = parseOutput(txType, _txData, i, offset, outs); // solium-disable-line arg-overflow
     }
     txn = Tx(txType, ins, outs);
-  }
-
-  // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
-  function uint2str(uint i) private pure returns (string){
-    if (i == 0) return "0";
-    uint j = i;
-    uint length;
-    while (j != 0){
-      length++;
-      j /= 10;
-    }
-    bytes memory bstr = new bytes(length);
-    uint k = length - 1;
-    while (i != 0){
-      bstr[k--] = byte(48 + i % 10);
-      i /= 10;
-    }
-    return string(bstr);
   }
 
   function getSigHash(bytes _txData) internal pure returns (bytes32 sigHash) {
@@ -239,7 +225,7 @@ library TxLib {
         {
           mstore(add(sigData, add(34, offset)), mload(add(_txData, add(34, offset))))
           mstore8(add(sigData, add(66, offset)), byte(0, mload(add(_txData, add(66, offset)))))
-          offset := add(offset, add(33,65))
+          offset := add(offset, add(33, 65))
         }
       for
         { let i := add(34, offset) }
@@ -253,10 +239,12 @@ library TxLib {
     return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", uint2str(_txData.length), sigData));
   }
 
-  function getMerkleRoot(bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof) internal pure returns (bytes32) {
+  // solium-disable-next-line security/no-assign-params
+  function getMerkleRoot(
+    bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof
+  ) internal pure returns (bytes32) {
     bytes32 temp;
     for (uint256 i = _offset; i < _proof.length; i++) {
-      // solhint-disable-next-line no-inline-assembly
       temp = _proof[i];
       if (_index % 2 == 0) {
         assembly {
@@ -277,7 +265,9 @@ library TxLib {
   }
 
   //validate that transaction is included to the period (merkle proof)
-  function validateProof(uint256 _cdOffset, bytes32[] _proof) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+  function validateProof(
+    uint256 _cdOffset, bytes32[] _proof
+  ) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
     uint256 offset = uint8(_proof[1] >> 248);
     uint256 txLength = uint16(_proof[1] >> 224);
 
@@ -287,7 +277,12 @@ library TxLib {
     }
     txHash = keccak256(txData);
     txPos = uint64(_proof[1] >> 160);
-    bytes32 root = getMerkleRoot(txHash, txPos, uint8(_proof[1] >> 240), _proof);
+    bytes32 root = getMerkleRoot(
+      txHash, 
+      txPos, 
+      uint8(_proof[1] >> 240), 
+      _proof
+    ); 
     require(root == _proof[0]);
   }
 
@@ -304,7 +299,26 @@ library TxLib {
       v := calldataload(add(190, offset))
       calldatacopy(add(txData, 140), add(222, offset), 28) // 32 + 43 + 65
     }
-    dest = ecrecover(getSigHash(txData), v, r, s);
+    dest = ecrecover(getSigHash(txData), v, r, s); // solium-disable-line arg-overflow
+  }
+
+  // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
+  // solium-disable-next-line security/no-assign-params
+  function uint2str(uint i) private pure returns (string) {
+    if (i == 0) return "0";
+    uint j = i;
+    uint length;
+    while (j != 0) {
+      length++;
+      j /= 10;
+    }
+    bytes memory bstr = new bytes(length);
+    uint k = length - 1;
+    while (i != 0) {
+      bstr[k--] = byte(48 + i % 10);
+      i /= 10;
+    }
+    return string(bstr);
   }
 
 }
