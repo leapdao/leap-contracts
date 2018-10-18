@@ -6,15 +6,15 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 import "../TxLib.sol";
-
 
 /**
  * @title TxMock
  * @dev used to test Transaction lib
  */
+
 contract TxMock {
   using TxLib for TxLib.Tx;
   using TxLib for TxLib.TxType;
@@ -40,6 +40,14 @@ contract TxMock {
     if (txn.txType == TxLib.TxType.CompReq) {
       msgData = txn.outs[0].msgData;
     }
+  }
+
+  function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+    (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
+  }
+
+  function getSigHash(bytes _txData) public pure returns (bytes32) {
+    return TxLib.getSigHash(_txData);
   }
 
   function flattenInput(TxLib.Input _input, uint256 _offset, bytes32[] _rsp) internal pure {
@@ -70,13 +78,5 @@ contract TxMock {
     } else if (_type == TxLib.TxType.CompRsp) {
       return 6;
     }
-  }
-
-  function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
-    (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
-  }
-
-  function getSigHash(bytes _txData) public pure returns (bytes32) {
-    return TxLib.getSigHash(_txData);
   }
 }

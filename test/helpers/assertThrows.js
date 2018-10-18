@@ -15,7 +15,7 @@ export default async function(promise, err) {
     const outOfGas = error.message.search('out of gas') >= 0
     assert(
       invalidOpcode || outOfGas,
-      "Expected throw, got '" + error + "' instead"
+      `Expected throw, got '${error}' instead`
     )
     return
   }
