@@ -96,6 +96,7 @@ contract ParsecBridge is Ownable {
     uint16 color;
     address owner;
     bool finalized;
+    uint256 stake;
   }
   mapping(bytes32 => Exit) public exits;
 
@@ -490,12 +491,15 @@ contract ParsecBridge is Ownable {
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
+
+    tokens[0].addr.transferFrom(out.owner, this, exitStake);
     tokens[out.color].insert(priority);
     exits[utxoId] = Exit({
       owner: out.owner,
       color: out.color,
       amount: out.value,
-      finalized: false
+      finalized: false,
+      stake: exitStake
     });
     emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
   }
@@ -524,6 +528,8 @@ contract ParsecBridge is Ownable {
       require(exits[utxoId].owner == signer);
     }
 
+    // award stake to challanger
+    ERC20(tokens[0].addr).transfer(msg.sender, exits[utxoId].stake);
     // delete invalid exit
     delete exits[utxoId];
   }
@@ -541,6 +547,7 @@ contract ParsecBridge is Ownable {
       if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
         // replace with transferFrom?
         ERC20(tokens[currentExit.color].addr).transfer(currentExit.owner, currentExit.amount);
+        ERC20(tokens[0].addr).transfer(currentExit.owner, currentExit.stake);
       }
       tokens[currentExit.color].delMin();
 

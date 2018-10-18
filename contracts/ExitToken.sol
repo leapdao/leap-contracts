@@ -23,7 +23,7 @@ contract ExitToken is ERC721BasicToken {
   }
 
   function withdrawUtxo(uint256 utxoId) public {
-    (uint256 amount, uint16 color, , bool finalized) = bridge.exits(bytes32(utxoId));
+    (uint256 amount, uint16 color, , bool finalized, ) = bridge.exits(bytes32(utxoId));
     require(finalized);
     (address erc20, ) = bridge.tokens(color);
     ERC20(erc20).transfer(ownerOf(utxoId), amount);

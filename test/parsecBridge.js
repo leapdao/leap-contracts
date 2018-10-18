@@ -406,6 +406,7 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to exit valid utxo at index 2', async () => {
+        await token.approve(parsec.address, 1000, {from: alice});
         const deposit = Tx.deposit(114, 100, alice);
         let transfer = Tx.transfer(
           [new Input(new Outpoint(deposit.hash(), 0))],
