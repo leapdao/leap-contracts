@@ -11,6 +11,7 @@ pragma solidity ^0.4.24;
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 import "./TransferrableToken.sol";
 import "./PriorityQueue.sol";
@@ -19,7 +20,7 @@ import "./IntrospectionUtil.sol";
 
 import "./ExitToken.sol";
 
-contract ParsecBridge {
+contract ParsecBridge is Ownable {
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
@@ -48,6 +49,7 @@ contract ParsecBridge {
   uint256 public averageGasPrice; // collected gas price for last submitted blocks
   uint256 exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
+  uint256 public exitStake; // amount of token[0] needed fort staking on exits
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) tokenColors;
@@ -97,7 +99,7 @@ contract ParsecBridge {
   }
   mapping(bytes32 => Exit) public exits;
 
-  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration) public {
+  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration, uint256 _exitStake) public {
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -115,15 +117,24 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
+    exitStake = _exitStake;
 
     emit EpochLength(epochLength);
+  }
+
+  function setExitStake(uint256 _exitStake) public onlyOwner {
+    exitStake = _exitStake;
+  }
+
+  function setEpochLength(uint256 _epochLength) public onlyOwner {
+    epochLength = _epochLength;
   }
 
   function tokenCount() public view returns (uint256) {
     return erc20TokenCount + nftTokenCount;
   }
 
-  function registerToken(TransferrableToken _token) public {
+  function registerToken(TransferrableToken _token) public onlyOwner {
     require(_token != address(0));
     require(!tokenColors[_token]);
     uint16 color;

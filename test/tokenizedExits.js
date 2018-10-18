@@ -24,7 +24,7 @@ contract('TokenizedExits', (accounts) => {
     // deploy bridge
     const pqLib = await PriorityQueue.new();
     ParsecBridge.link('PriorityQueue', pqLib.address);
-    bridge = await ParsecBridge.new(4, 50, 0, 0);
+    bridge = await ParsecBridge.new(4, 50, 0, 0, 50);
     await bridge.registerToken(token.address);
 
     exitToken = await ExitToken.new(bridge.address);
