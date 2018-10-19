@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721BasicToken.sol";
 import "./ParsecBridge.sol";
 import "./TxLib.sol";
+import "./TransferrableToken.sol";
 
 contract ExitToken is ERC721BasicToken {
 
@@ -16,6 +17,10 @@ contract ExitToken is ERC721BasicToken {
   }
 
   function proxyExit(bytes32[] _proof, uint256 _oindex) public {
+    (TransferrableToken native, ) = bridge.tokens(0);
+    uint256 exitStake = bridge.exitStake();
+    native.transferFrom(msg.sender, this, exitStake);
+    ERC20(native).approve(bridge, exitStake);
     uint256 utxoId = uint256(bridge.startExit(_proof, _oindex));
     address exiter = recoverSigner(_proof);
     _mint(exiter, utxoId);
@@ -23,10 +28,12 @@ contract ExitToken is ERC721BasicToken {
   }
 
   function withdrawUtxo(uint256 utxoId) public {
-    (uint256 amount, uint16 color, , bool finalized, ) = bridge.exits(bytes32(utxoId));
+    (uint256 amount, uint16 color, , bool finalized, uint256 stake) = bridge.exits(bytes32(utxoId));
     require(finalized);
     (address erc20, ) = bridge.tokens(color);
+    (address native, ) = bridge.tokens(0);
     ERC20(erc20).transfer(ownerOf(utxoId), amount);
+    ERC20(native).transfer(ownerOf(utxoId), stake);
     _burn(ownerOf(utxoId), utxoId);
   }
 

@@ -33,6 +33,8 @@ contract('TokenizedExits', (accounts) => {
 
     // alice auctions slot
     await token.approve(bridge.address, 1000, {from: alice});
+    // aprove exit token contract to spend native tokens to pay the stake
+    await token.approve(exitToken.address, 1000, {from: alice});
     await bridge.bet(0, 150, alice, alice, {from: alice}).should.be.fulfilled;
   });
 
@@ -70,7 +72,8 @@ contract('TokenizedExits', (accounts) => {
     // exchange NFT for tokens and check balance correct
     await exitToken.withdrawUtxo(utxoId).should.be.fulfilled;
     const bal3 = await token.balanceOf(alice);
-    assert.equal(bal3.toNumber(), bal1.toNumber() + 50);
+    const exitStake = (await bridge.exitStake()).toNumber();
+    assert.equal(bal3.toNumber(), bal1.toNumber() + 50 + exitStake);
   });
 
   it('should allow exit of second output', async () => {
@@ -93,9 +96,57 @@ contract('TokenizedExits', (accounts) => {
 
     // exchange NFT for tokens and check
     const bal1 = await token.balanceOf(alice);
+    const exitStake = (await bridge.exitStake()).toNumber();
     const utxoId = (new Outpoint(transfer.hash(), 1)).getUtxoId();
     await exitToken.withdrawUtxo(utxoId).should.be.fulfilled;
     const bal2 = await token.balanceOf(alice);
-    assert.equal(bal2.toNumber(), bal1.toNumber() + 75);
+    assert.equal(bal2.toNumber(), bal1.toNumber() + 75 + exitStake);
   });
+
+  it('should work with non-native tokens', async () => {
+    // register new token
+    const secondToken = await SimpleToken.new();
+    await bridge.registerToken(secondToken.address);
+    // fill up the bridge contract with some tokens
+    await secondToken.approve(bridge.address, 1000, {from: alice});
+    await bridge.deposit(alice, 200, 0);
+    await bridge.deposit(alice, 200, 1);
+
+    const deposit = Tx.deposit(115, 50, alice, 1);
+    let transfer = Tx.transfer(
+      [new Input(new Outpoint(deposit.hash(), 0))],
+      [new Output(50, exitToken.address, 1)]
+    );
+    transfer = transfer.sign([alicePriv]);
+
+    let block = new Block(96).addTx(deposit).addTx(transfer);
+    let period = new Period(p[1], [block]);
+    p[2] = period.merkleRoot();
+    await bridge.submitPeriod(0, p[1], p[2], {from: alice}).should.be.fulfilled;
+    const proof = period.proof(transfer);
+
+    const nativeBal1 = await token.balanceOf(alice);
+    const secondBal1 = await secondToken.balanceOf(alice);
+    const exitStake = await bridge.exitStake();
+
+    // init tokenized exit
+    await exitToken.proxyExit(proof, 0).should.be.fulfilled;
+    await bridge.finalizeExits(1).should.be.fulfilled;
+
+    const nativeBal2 = await token.balanceOf(alice);
+    const secondBal2 = await secondToken.balanceOf(alice);
+
+    assert.equal(nativeBal2.toNumber(), nativeBal1.toNumber() - exitStake.toNumber());
+    assert.equal(secondBal1.toNumber(), secondBal2.toNumber());
+
+    const utxoId = (new Outpoint(transfer.hash(), 0)).getUtxoId();
+    await exitToken.withdrawUtxo(utxoId).should.be.fulfilled;
+
+    const nativeBal3 = await token.balanceOf(alice);
+    const secondBal3 = await secondToken.balanceOf(alice);
+
+    assert.equal(nativeBal1.toNumber(), nativeBal3.toNumber());
+    assert.equal(secondBal1.toNumber() + 50, secondBal3.toNumber());
+
+  })
 });
