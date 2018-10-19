@@ -32,7 +32,7 @@ contract ParsecBridge is Ownable {
   event EpochLength(uint256 epochLength);
   event NewHeight(uint256 blockNumber, bytes32 indexed root);
   event NewDeposit(uint32 indexed depositId, address indexed depositor, uint256 indexed color, uint256 amount);
-  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount);
+  event ExitStarted(bytes32 indexed txHash, uint256 indexed outIndex, uint256 indexed color, address exitor, uint256 amount, uint256 utxoId);
   event ValidatorJoin(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 eventCounter, uint256 epoch);
   event ValidatorLogout(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, address newSigner, uint256 eventCounter, uint256 epoch);
   event ValidatorLeave(address indexed signerAddr, uint256 indexed slotId, bytes32 indexed tenderAddr, uint256 epoch);
@@ -50,6 +50,7 @@ contract ParsecBridge is Ownable {
   uint256 exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
   uint256 public exitStake; // amount of token[0] needed fort staking on exits
+  ExitToken public exitToken;
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) tokenColors;
@@ -100,7 +101,7 @@ contract ParsecBridge is Ownable {
   }
   mapping(bytes32 => Exit) public exits;
 
-  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration, uint256 _exitStake) public {
+  constructor(uint256 _epochLength, uint256 _maxReward, uint256 _parentBlockInterval, uint256 _exitDuration, uint256 _exitStake, address exitToken) public {
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = genesis;
@@ -477,7 +478,7 @@ contract ParsecBridge is Ownable {
     emit NewDeposit(depositCount, _owner, _color, _amountOrTokenId);
   }
 
-  function startExit(bytes32[] _proof, uint256 _oindex) public returns (bytes32 utxoId) {
+  function startExit(bytes32[] _proof, uint256 _oindex) public {
     // root was submitted as period
     require(periods[_proof[0]].parent > 0);
     // validate proof
@@ -487,7 +488,7 @@ contract ParsecBridge is Ownable {
     // parse tx and use data
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
     uint256 exitable_at = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    utxoId = bytes32((_oindex << 120) | uint120(txHash));
+    uint256 utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitable_at << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
@@ -501,7 +502,9 @@ contract ParsecBridge is Ownable {
       finalized: false,
       stake: exitStake
     });
-    emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value);
+    ERC20(tokens[0].addr).transfer(this, exitStake);
+    exitToken.mint(out.owner, utxoId);
+    emit ExitStarted(txHash, _oindex, out.color, out.owner, out.value, utxoId);
   }
 
   function challengeExit(bytes32[] _proof, bytes32[] _prevProof, uint256 _oIndex, uint256 _inputIndex) public {
@@ -565,6 +568,15 @@ contract ParsecBridge is Ownable {
     uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
     exitable_at = priority >> 128;
+  }
+
+  function withdraw(uint256 utxoId) public {
+    (uint256 amount, uint16 color, , bool finalized, uint256 stake) = exits[bytes32(utxoId)];
+    require(finalized);
+    tokens[color].addr.transferFrom(this, exitToken.ownerOf(utxoId), amount);
+    ERC20(tokens[0].addr).transfer(ownerOf(utxoId), stake);
+    _burn(ownerOf(utxoId), utxoId);
+    delete exits[utxoId];
   }
 
 }
