@@ -1,18 +1,9 @@
 node_modules/
 build/
-dist/
+.vscode
 .idea
 
 *.env
-
-db/*
-!db/.gitkeep
-devdb/*
-!devdb/.gitkeep
-testrpc-db/*
-!testrpc-db/.gitkeep
-
-package-lock.json
 
 node_config.json
 .priv

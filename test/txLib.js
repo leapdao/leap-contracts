@@ -6,20 +6,19 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import utils from 'ethereumjs-util';
+import utils from "ethereumjs-util";
+import BN from 'bn.js';
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'parsec-lib';
 import chai from 'chai';
 const TxMock = artifacts.require('./mocks/TxMock.sol');
-  const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
+const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const should = chai
-  .use(require('chai-as-promised'))
-  .should();
+chai.use(require('chai-as-promised')).should();
 
 function toInt(str) {
   const buf = Buffer.from(str.replace('0x', ''), 'hex');
-  return buf.readUInt32BE(28);
+  return new BN(buf);
 }
 
 function toAddr(str) {
@@ -28,9 +27,7 @@ function toAddr(str) {
 }
 
 function fromInt(num) {
-  const buf = Buffer.alloc(32, 0);
-  buf.writeUInt32BE(num, 28);
-  return buf;
+  return new BN(num).toBuffer('be', 32);
 }
 
 function checkParse(rsp, txn) {
@@ -39,7 +36,7 @@ function checkParse(rsp, txn) {
   if (txn.type == Type.DEPOSIT) {
     txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
   }
-  assert.equal(toInt(rsp[1][0]), txn.inputs.length);  
+  assert.equal(toInt(rsp[1][0]), txn.inputs.length);
   assert.equal(toInt(rsp[1][1]), txn.outputs.length);
   // inputs
   for (let i = 0; i < txn.inputs.length; i++) {
@@ -62,13 +59,13 @@ function checkParse(rsp, txn) {
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
     if (txn.type === Type.COMP_RSP && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root    
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root
     } else if (txn.type === Type.COMP_REQ && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].gasPrice); // gas price
       assert.equal(rsp[2], `0x${txn.outputs[i].msgData.toString('hex')}`); // gas price
     } else {
       assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root    
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root
     }
   }
 }
@@ -82,6 +79,8 @@ contract('TxLib', (accounts) => {
   const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
   const value = 99000000;
   const color = 1337;
+  const nftTokenId = '3378025004445879814397';
+  const nftColor = 32769;
 
   describe('Parser', function() {
     let txLib;
@@ -94,6 +93,17 @@ contract('TxLib', (accounts) => {
 
       it('should allow to parse deposit', async () => {
         const deposit = Tx.deposit(12, value, bob, color);
+        const block = new Block(32);
+        block.addTx(deposit);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(deposit);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, deposit);
+      });
+
+      it('should allow to parse NFT deposit', async () => {
+        const deposit = Tx.deposit(12, nftTokenId, bob, nftColor);
         const block = new Block(32);
         block.addTx(deposit);
         const period = new Period(alicePriv, [block]);
@@ -155,7 +165,22 @@ contract('TxLib', (accounts) => {
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, transfer);   
+        checkParse(rsp, transfer);
+      });
+
+      it('should parse NFT transfers', async () => {
+        const transfer = Tx.transfer(
+          [new Input(new Outpoint(prevTx, 0))],
+          [new Output(nftTokenId, bob, nftColor)],
+        );
+        transfer.sign([alicePriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const period = new Period(alicePriv, [block]);
+        const proof = period.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);
       });
     });
 
@@ -174,7 +199,7 @@ contract('TxLib', (accounts) => {
         const proof = period.proof(consolidate);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, consolidate);   
+        checkParse(rsp, consolidate);
       });
 
       it('should fail to validate consolidate with only 1 input', async () => {
@@ -190,53 +215,6 @@ contract('TxLib', (accounts) => {
         await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
       });
     });
-
-    describe('Computation Request', function() {
-      it('should parse with 1 output', async () => {
-        const compRequest = Tx.compRequest([
-          new Input({
-            prevout: new Outpoint(prevTx, 0),
-          }),
-          new Input(new Outpoint(prevTx, 1)),
-        ],[
-          new Output({
-            value: value / 2,
-            color,
-            address: alice,
-            gasPrice: 123,
-            msgData: '0x1234',
-        })]);
-        compRequest.sign([_, alicePriv]);
-        const block = new Block(32);
-        block.addTx(compRequest);
-        const period = new Period(alicePriv, [block]);
-        const proof = period.proof(compRequest);
-
-        const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, compRequest);
-      });
-    });
-
-    describe('Computation Response', function() {
-      it('should parse with 1 output', async () => {
-        const compResponse = Tx.compResponse([
-          new Input(new Outpoint(prevTx, 0)),
-        ],[
-          new Output({
-            value,
-            color,
-            address: alice,
-            storageRoot: alicePriv,
-        })]);
-        const block = new Block(32);
-        block.addTx(compResponse);
-        const period = new Period(alicePriv, [block]);
-        const proof = period.proof(compResponse);
-
-        const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, compResponse);
-      });
-    });
   });
   describe('Utils', function() {
     let txLib;
@@ -247,10 +225,9 @@ contract('TxLib', (accounts) => {
 
     it('should allow to verify proof', async () => {
       const blocks = [];
-      let block;
 
       for (let i = 0; i < 32; i ++) {
-        block = new Block(i).addTx(Tx.deposit(i, value, bob, color));
+        const block = new Block(i).addTx(Tx.deposit(i, value, bob, color));
         blocks.push(block);
       }
       const period = new Period(alicePriv, blocks);
@@ -277,7 +254,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, transfer.sigHash());
+      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
     });
     it('should allow to get sigHash with 2 input and 2 outputs', async () => {
       const transfer = Tx.transfer(
@@ -286,7 +263,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv, alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, transfer.sigHash());
+      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
     });
   });
 });

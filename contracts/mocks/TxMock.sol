@@ -5,16 +5,16 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
- 
-pragma solidity ^0.4.24;
+
+pragma solidity 0.4.24;
 
 import "../TxLib.sol";
-
 
 /**
  * @title TxMock
  * @dev used to test Transaction lib
  */
+
 contract TxMock {
   using TxLib for TxLib.Tx;
   using TxLib for TxLib.TxType;
@@ -24,7 +24,7 @@ contract TxMock {
     (, , txData) = TxLib.validateProof(0, _proof);
 
     TxLib.Tx memory txn = TxLib.parseTx(txData);
-    
+
     txType = typeToInt(txn.txType);
     rsp = new bytes32[](2 + txn.ins.length * 5 + txn.outs.length * 5);
     rsp[0] = bytes32(txn.ins.length);
@@ -42,6 +42,14 @@ contract TxMock {
     }
   }
 
+  function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+    (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
+  }
+
+  function getSigHash(bytes _txData) public pure returns (bytes32) {
+    return TxLib.getSigHash(_txData);
+  }
+
   function flattenInput(TxLib.Input _input, uint256 _offset, bytes32[] _rsp) internal pure {
     _rsp[_offset] = bytes32(_input.outpoint.hash);
     _rsp[_offset + 1] = bytes32(_input.outpoint.pos);
@@ -56,8 +64,8 @@ contract TxMock {
     _rsp[_offset + 2] = bytes32(_output.owner);
     _rsp[_offset + 3] = bytes32(_output.gasPrice);
     _rsp[_offset + 4] = bytes32(_output.stateRoot);
-  } 
-  
+  }
+
   function typeToInt(TxLib.TxType _type) internal pure returns (uint256) {
     if (_type == TxLib.TxType.Deposit) {
       return 2;
@@ -70,13 +78,5 @@ contract TxMock {
     } else if (_type == TxLib.TxType.CompRsp) {
       return 6;
     }
-  }
-
-  function validateProof(bytes32[] _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
-    (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
-  }
-
-  function getSigHash(bytes _txData) public pure returns (bytes32) {
-    return TxLib.getSigHash(_txData);
   }
 }

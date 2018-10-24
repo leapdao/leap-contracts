@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
  
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
@@ -58,6 +58,7 @@ library PriorityQueue {
     return retVal;
   }
 
+  // solium-disable-next-line security/no-assign-params
   function percUp(Token storage self, uint256 i) private {
     uint256 j = i;
     uint256 newVal = self.heapList[i];
@@ -68,6 +69,7 @@ library PriorityQueue {
     if (i != j) self.heapList[i] = newVal;
   }
 
+  // solium-disable-next-line security/no-assign-params
   function percDown(Token storage self, uint256 i) private {
     uint256 j = i;
     uint256 newVal = self.heapList[i];
