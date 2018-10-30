@@ -1,6 +1,7 @@
 import chai from 'chai';
+import util from 'ethereumjs-util';
 
-import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
+import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'parsec-lib';
 
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const PriorityQueue = artifacts.require('./PriorityQueue.sol');
@@ -13,6 +14,7 @@ chai.use(require('chai-as-promised')).should();
 contract('TokenizedExits', (accounts) => {
 
   const alice = accounts[0];
+  const bob = accounts[1];
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const p = [];
   let bridge;
@@ -149,4 +151,42 @@ contract('TokenizedExits', (accounts) => {
     assert.equal(secondBal1.toNumber() + 50, secondBal3.toNumber());
 
   })
+
+  it('can sell signed exit', async () => {
+    const deposit = Tx.deposit(115, 50, alice);
+    let transfer = Tx.transfer(
+      [new Input(new Outpoint(deposit.hash(), 0))],
+      [new Output(50, exitToken.address)]
+    );
+    transfer = transfer.sign([alicePriv]);
+
+    let block = new Block(96).addTx(deposit).addTx(transfer);
+    let period = new Period(p[2], [block]);
+    p[3] = period.merkleRoot();
+    await bridge.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
+    const proof = period.proof(transfer);
+
+    await exitToken.proxyExit(proof, 0).should.be.fulfilled;
+
+    const utxoId = (new Outpoint(transfer.hash(), 0)).getUtxoId();
+    const signedData = Exit.signOverExit(utxoId, 40, alicePriv);
+    const signedDataBytes32 = Exit.bufferToBytes32Array(signedData);
+
+    await token.transfer(bob, 1000);
+    await token.approve(exitToken.address, 1000, {from:bob});
+
+    const aliceBalance1 = await token.balanceOf(alice);
+    const bobBalance1 = await token.balanceOf(bob);
+    
+    await exitToken.buyUtxo(signedDataBytes32, {from: bob});
+
+    const aliceBalance2 = await token.balanceOf(alice);
+    const bobBalance2 = await token.balanceOf(bob);
+
+    const utxoOwner = await exitToken.ownerOf(utxoId);
+
+    assert.equal(aliceBalance1.toNumber() + 40, aliceBalance2.toNumber());
+    assert.equal(bobBalance1.toNumber() - 40, bobBalance2.toNumber());
+    assert.equal(utxoOwner, bob);
+  });
 });

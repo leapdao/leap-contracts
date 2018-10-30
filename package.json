@@ -42,7 +42,7 @@
     "eslint-plugin-standard": "^3.0.1",
     "ethereumjs-util": "^5.1.3",
     "ganache-cli": "^6.1.0",
-    "parsec-lib": "^0.18.0",
+    "parsec-lib": "file:../parsec-lib",
     "solium": "^1.1.8",
     "truffle": "^4.1.13",
     "truffle-hdwallet-provider": "0.0.5"
