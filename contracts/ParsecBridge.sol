@@ -560,25 +560,20 @@ contract ParsecBridge is Ownable {
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     TxLib.Output memory out = txn.outs[_oindex];
     (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
-    // address sender = ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s);
 
     require(out.owner == address(this), "Funds were not sent to bridge");
     require(ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s) == signer, "Exit was not signed by owner");
 
     uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    // bytes32 utxoIdProof = bytes32((_oindex << 120) | uint120(txHash));
 
     require(bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, "The signed utxoid does not match the one in the proof");
 
     uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
     require(out.value > 0);
     require(exits[utxoIdSigned].amount == 0);
-    if (isNft(out.color)) {
-      nftExits[out.color].push(NftExit({ utxoId: utxoIdSigned, exitableAt: exitableAt }));
-    } else {
-      tokens[0].addr.transferFrom(msg.sender, this, exitStake);
-      tokens[out.color].insert(priority);
-    }
+    require(!isNft(out.color), "Tried to call with NFT");
+    tokens[0].addr.transferFrom(msg.sender, this, exitStake);
+    tokens[out.color].insert(priority);
 
     // pay the seller
     tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
