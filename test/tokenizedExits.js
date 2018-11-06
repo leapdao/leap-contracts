@@ -1,6 +1,7 @@
 import chai from 'chai';
+import util from 'ethereumjs-util';
 
-import { Period, Block, Tx, Input, Output, Outpoint } from 'parsec-lib';
+import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'parsec-lib';
 
 const ParsecBridge = artifacts.require('./ParsecBridge.sol');
 const PriorityQueue = artifacts.require('./PriorityQueue.sol');
@@ -14,6 +15,7 @@ contract('TokenizedExits', (accounts) => {
 
   const alice = accounts[0];
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
+  const bob = accounts[1];
   const p = [];
   let bridge;
   let token;
@@ -149,4 +151,44 @@ contract('TokenizedExits', (accounts) => {
     assert.equal(secondBal1.toNumber() + 50, secondBal3.toNumber());
 
   })
+
+  it('can sell signed exit', async () => {
+    await token.transfer(bob, 1000);
+    await token.approve(bridge.address, 1000, {from:bob});
+
+    // alice sends the tokens she want to exit to the bridge and produces proof
+    const deposit = Tx.deposit(115, 50, alice);
+    let transfer = Tx.transfer(
+      [new Input(new Outpoint(deposit.hash(), 0))],
+      [new Output(50, bridge.address)]
+    );
+    transfer = transfer.sign([alicePriv]);
+    let block = new Block(96).addTx(deposit).addTx(transfer);
+    let period = new Period(p[2], [block]);
+    p[3] = period.merkleRoot();
+    await bridge.submitPeriod(0, p[2], p[3], {from: alice}).should.be.fulfilled;
+    const proof = period.proof(transfer);
+
+    // she then signes over the utxo and some number, basically saying 
+    // "I agree to sell these tokens for x to whoever submits the exit"
+    const utxoId = (new Outpoint(transfer.hash(), 0)).getUtxoId();
+    const signedData = Exit.signOverExit(utxoId, 40, alicePriv);
+    const signedDataBytes32 = Exit.bufferToBytes32Array(signedData);
+
+    const aliceBalance1 = await token.balanceOf(alice);
+    const bobBalance1 = await token.balanceOf(bob);
+
+    // bob then recieves the signed data. He has to check the exit is valid and can
+    // then submit the signed exit to the biridge, paying the agreed price to alice
+    // and recieveing the exit
+    
+    await bridge.startBoughtExit(proof, 0, signedDataBytes32, {from: bob}).should.be.fulfilled;
+    const aliceBalance2 = await token.balanceOf(alice);
+    const bobBalance2 = await token.balanceOf(bob);
+    const exitOwner = (await bridge.exits(utxoId))[2];
+    const exitStake = (await bridge.exitStake()).toNumber();
+    assert.equal(aliceBalance1.toNumber() + 40, aliceBalance2.toNumber());
+    assert.equal(bobBalance1.toNumber() - 40 - exitStake, bobBalance2.toNumber());
+    assert.equal(exitOwner, bob);
+  });
 });

@@ -547,6 +547,67 @@ contract ParsecBridge is Ownable {
     );
   }
 
+  function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public {
+
+    // root was submitted as period, check bridge was reciever
+    require(periods[_proof[0]].parent > 0);
+
+    // validate proof
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(64, _proof);
+    // parse tx and use data
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    TxLib.Output memory out = txn.outs[_oindex];
+    (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
+
+    require(out.owner == address(this), "Funds were not sent to bridge");
+    require(ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s) == signer, "Exit was not signed by owner");
+
+    uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+
+    require(bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, "The signed utxoid does not match the one in the proof");
+
+    uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
+    require(out.value > 0);
+    require(exits[utxoIdSigned].amount == 0);
+    require(!isNft(out.color), "Tried to call with NFT");
+    tokens[0].addr.transferFrom(msg.sender, this, exitStake);
+    tokens[out.color].insert(priority);
+
+    // pay the seller
+    tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
+
+    // give exit to buyer
+    exits[utxoIdSigned] = Exit({
+      owner: msg.sender,
+      color: out.color,
+      amount: out.value,
+      finalized: false,
+      stake: exitStake
+    });
+    emit ExitStarted(
+      txHash, 
+      _oindex, 
+      out.color, 
+      out.owner, 
+      out.value
+    );
+  }
+
+  function unpackSignedData(bytes32[] signedData) internal pure returns (uint256 buyPrice, bytes32 utxoId, address signer) {
+    bytes32[] memory sigBuff = new bytes32[](2);
+    utxoId = signedData[0];
+    buyPrice = uint256(signedData[1]);
+    bytes32 r = signedData[2];
+    bytes32 s = signedData[3];
+    uint8 v = uint8(signedData[4]);
+    sigBuff[0] = utxoId;
+    sigBuff[1] = signedData[1];
+    bytes32 sigHash = keccak256(sigBuff);
+    signer = ecrecover(sigHash, v, r, s);
+  }
+
   function challengeExit(
     bytes32[] _proof, 
     bytes32[] _prevProof, 
