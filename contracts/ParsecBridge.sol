@@ -11,15 +11,17 @@ pragma solidity 0.4.24;
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 import "./TransferrableToken.sol";
 import "./PriorityQueue.sol";
 import "./TxLib.sol";
 import "./IntrospectionUtil.sol";
 
-// solium-disable security/no-block-members
 
-contract ParsecBridge { 
+contract ParsecBridge is Ownable {
+// solium-disable security/no-block-members 
+
   using SafeMath for uint256;
   using TxLib for TxLib.Outpoint;
   using TxLib for TxLib.Output;
@@ -85,6 +87,7 @@ contract ParsecBridge {
   uint256 public averageGasPrice; // collected gas price for last submitted blocks
   uint256 public exitDuration;
   bytes32 public tipHash; // hash of first period that has extended chain to some height
+  uint256 public exitStake; // amount of token[0] needed fort staking on exits
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
@@ -133,6 +136,8 @@ contract ParsecBridge {
     uint256 amount;
     uint16 color;
     address owner;
+    bool finalized;
+    uint256 stake;
   }
 
   struct NftExit {
@@ -154,7 +159,8 @@ contract ParsecBridge {
     uint256 _epochLength, 
     uint256 _maxReward, 
     uint256 _parentBlockInterval, 
-    uint256 _exitDuration
+    uint256 _exitDuration,
+    uint256 _exitStake
   ) public {
     // init genesis preiod
     Period memory genesisPeriod;
@@ -173,15 +179,24 @@ contract ParsecBridge {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     exitDuration = _exitDuration;
+    exitStake = _exitStake;
 
     emit EpochLength(epochLength);
+  }
+
+  function setExitStake(uint256 _exitStake) public onlyOwner {
+    exitStake = _exitStake;
+  }
+
+  function setEpochLength(uint256 _epochLength) public onlyOwner {
+    epochLength = _epochLength;
   }
 
   function tokenCount() public view returns (uint256) {
     return erc20TokenCount + nftTokenCount;
   }
 
-  function registerToken(TransferrableToken _token) public {
+  function registerToken(TransferrableToken _token) public onlyOwner {
     require(_token != address(0));
     require(!tokenColors[_token]);
     uint16 color;
@@ -493,7 +508,7 @@ contract ParsecBridge {
     );
   }
 
-  function startExit(bytes32[] _proof, uint256 _oindex) public {
+  function startExit(bytes32[] _proof, uint256 _oindex) public returns (bytes32 utxoId) {
     // root was submitted as period
     require(periods[_proof[0]].parent > 0);
     // validate proof
@@ -502,21 +517,26 @@ contract ParsecBridge {
     (, txHash, txData) = TxLib.validateProof(32, _proof);
     // parse tx and use data
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
+
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    bytes32 utxoId = bytes32((_oindex << 120) | uint120(txHash));
+    utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitableAt << 128) | uint128(utxoId);
     require(out.value > 0);
     require(exits[utxoId].amount == 0);
     if (isNft(out.color)) {
       nftExits[out.color].push(NftExit({ utxoId: utxoId, exitableAt: exitableAt }));
     } else {
+      tokens[0].addr.transferFrom(out.owner, this, exitStake);
       tokens[out.color].insert(priority);
     }
+
     exits[utxoId] = Exit({
       owner: out.owner,
       color: out.color,
-      amount: out.value
+      amount: out.value,
+      finalized: false,
+      stake: exitStake
     });
     emit ExitStarted(
       txHash, 
@@ -525,6 +545,67 @@ contract ParsecBridge {
       out.owner, 
       out.value
     );
+  }
+
+  function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public {
+
+    // root was submitted as period, check bridge was reciever
+    require(periods[_proof[0]].parent > 0);
+
+    // validate proof
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(64, _proof);
+    // parse tx and use data
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    TxLib.Output memory out = txn.outs[_oindex];
+    (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
+
+    require(out.owner == address(this), "Funds were not sent to bridge");
+    require(ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s) == signer, "Exit was not signed by owner");
+
+    uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+
+    require(bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, "The signed utxoid does not match the one in the proof");
+
+    uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
+    require(out.value > 0);
+    require(exits[utxoIdSigned].amount == 0);
+    require(!isNft(out.color), "Tried to call with NFT");
+    tokens[0].addr.transferFrom(msg.sender, this, exitStake);
+    tokens[out.color].insert(priority);
+
+    // pay the seller
+    tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
+
+    // give exit to buyer
+    exits[utxoIdSigned] = Exit({
+      owner: msg.sender,
+      color: out.color,
+      amount: out.value,
+      finalized: false,
+      stake: exitStake
+    });
+    emit ExitStarted(
+      txHash, 
+      _oindex, 
+      out.color, 
+      out.owner, 
+      out.value
+    );
+  }
+
+  function unpackSignedData(bytes32[] signedData) internal pure returns (uint256 buyPrice, bytes32 utxoId, address signer) {
+    bytes32[] memory sigBuff = new bytes32[](2);
+    utxoId = signedData[0];
+    buyPrice = uint256(signedData[1]);
+    bytes32 r = signedData[2];
+    bytes32 s = signedData[3];
+    uint8 v = uint8(signedData[4]);
+    sigBuff[0] = utxoId;
+    sigBuff[1] = signedData[1];
+    bytes32 sigHash = keccak256(sigBuff);
+    signer = ecrecover(sigHash, v, r, s);
   }
 
   function challengeExit(
@@ -562,6 +643,8 @@ contract ParsecBridge {
       require(exits[utxoId].owner == signer);
     }
 
+    // award stake to challanger
+    ERC20(tokens[0].addr).transfer(msg.sender, exits[utxoId].stake);
     // delete invalid exit
     delete exits[utxoId];
   }
@@ -580,13 +663,12 @@ contract ParsecBridge {
     while (exitableAt <= block.timestamp && tokens[currentExit.color].currentSize > 0) {
       currentExit = exits[utxoId];
       if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
-        ERC20(tokens[currentExit.color].addr).transfer(
-          currentExit.owner, 
-          currentExit.amount
-        );
+        ERC20(tokens[currentExit.color].addr).transfer(currentExit.owner, currentExit.amount);
+        ERC20(tokens[0].addr).transfer(currentExit.owner, currentExit.stake);
       }
       tokens[currentExit.color].delMin();
-      delete exits[utxoId];
+
+      exits[utxoId].finalized = true;
 
       if (tokens[currentExit.color].currentSize > 0) {
         (utxoId, exitableAt) = getNextExit(_color);

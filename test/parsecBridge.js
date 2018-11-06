@@ -21,7 +21,7 @@ const should = chai
 const deployBridge = async (token, periodTime) => {
   const pqLib = await PriorityQueue.new();
   ParsecBridge.link('PriorityQueue', pqLib.address);
-  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0);
+  const bridge = await ParsecBridge.new(periodTime, 50, 0, 0, 50);
   bridge.registerToken(token.address);
   return bridge;
 }
@@ -413,6 +413,8 @@ contract('Parsec', (accounts) => {
       });
 
       it('should allow to exit valid utxo at index 2', async () => {
+        await token.approve(parsec.address, 1000, {from: alice});
+
         // withdraw second output
         await parsec.startExit(transferProof, 1, { from: alice });
         const bal1 = await token.balanceOf(alice);
@@ -701,6 +703,36 @@ contract('Parsec', (accounts) => {
     it('should fail when registering a same token again', async () => {
       await parsec.registerToken(token.address).should.be.rejectedWith(EVMRevert);
     });
+  });
+
+  describe('Ownership', function() {
+    let parsec;
+    let token;
+    beforeEach(async () => {
+      token = await SimpleToken.new();
+      parsec = await deployBridge(token, 3);
+      token.transfer(bob, 1000);
+      token.transfer(charlie, 1000);
+    });
+
+    it('should set sender as initial owner', async () => {
+      assert.equal(await parsec.owner(), alice);
+    });
+
+    it('should be able to transfer ownership', async () => {
+      await parsec.transferOwnership(bob);
+      assert.equal(await parsec.owner(), bob);
+    });
+
+    it('non owner can not call registerToken', async () => {
+      await parsec.registerToken(token.address, {from: bob}).should.be.rejectedWith(EVMRevert);
+    });
+
+    it('owner can set exit stake and non owner can not', async () => {
+      await parsec.setExitStake(100);
+      assert.equal(await parsec.exitStake(), 100);
+      await parsec.setExitStake(200, {from: bob}).should.be.rejectedWith(EVMRevert);
+    })
   });
 
 });
