@@ -1,4 +1,4 @@
-# Parsec Bridge implementation
+# LeapDAO Bridge implementation
 
 # Development
 

@@ -1,9 +1,9 @@
 import chai from 'chai';
 import util from 'ethereumjs-util';
 
-import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'parsec-lib';
+import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
 
-const ParsecBridge = artifacts.require('./ParsecBridge.sol');
+const LeapBridge = artifacts.require('./LeapBridge.sol');
 const PriorityQueue = artifacts.require('./PriorityQueue.sol');
 const ExitToken = artifacts.require('./ExitToken.sol');
 const TxLib = artifacts.require('./TxLib.sol');
@@ -25,8 +25,8 @@ contract('TokenizedExits', (accounts) => {
 
     // deploy bridge
     const pqLib = await PriorityQueue.new();
-    ParsecBridge.link('PriorityQueue', pqLib.address);
-    bridge = await ParsecBridge.new(4, 50, 0, 0, 50);
+    LeapBridge.link('PriorityQueue', pqLib.address);
+    bridge = await LeapBridge.new(4, 50, 0, 0, 50);
     await bridge.registerToken(token.address);
 
     exitToken = await ExitToken.new(bridge.address);

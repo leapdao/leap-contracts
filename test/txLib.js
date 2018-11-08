@@ -1,6 +1,6 @@
 
 /**
- * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ * Copyright (c) 2018-present, Leap DAO (leapdao.org)
  *
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
@@ -9,7 +9,7 @@
 import utils from "ethereumjs-util";
 import BN from 'bn.js';
 import EVMRevert from './helpers/EVMRevert';
-import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'parsec-lib';
+import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
 const TxMock = artifacts.require('./mocks/TxMock.sol');
 const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';

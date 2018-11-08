@@ -2,7 +2,7 @@ const fs = require('fs');
 
 var PriorityQueue = artifacts.require("./PriorityQueue.sol");
 var TxLib = artifacts.require("./TxLib.sol");
-var ParsecBridge = artifacts.require("./ParsecBridge.sol");
+var LeapBridge = artifacts.require("./LeapBridge.sol");
 var SimpleToken = artifacts.require("./SimpleToken.sol");
 var ExitToken = artifacts.require("./ExitToken.sol");
 
@@ -15,15 +15,15 @@ module.exports = function(deployer, network, accounts) {
   deployer.deploy(PriorityQueue);
   deployer.deploy(TxLib);
   deployer.deploy(SimpleToken);
-  deployer.link(PriorityQueue, ParsecBridge);
-  deployer.link(TxLib, ParsecBridge);
+  deployer.link(PriorityQueue, LeapBridge);
+  deployer.link(TxLib, LeapBridge);
   deployer.link(TxLib, ExitToken);
-  deployer.deploy(ParsecBridge, 4, 50, 0, 0, 50);
+  deployer.deploy(LeapBridge, 4, 50, 0, 0, 50);
   
   var token, bridge;
 
   deployer.then(function() {
-    return ParsecBridge.deployed();
+    return LeapBridge.deployed();
   }).then(function(b) {
     bridge = b;
     return SimpleToken.deployed();

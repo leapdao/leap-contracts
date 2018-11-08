@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721BasicToken.sol";
-import "./ParsecBridge.sol";
+import "./LeapBridge.sol";
 import "./TxLib.sol";
 import "./TransferrableToken.sol";
 
@@ -10,10 +10,10 @@ contract ExitToken is ERC721BasicToken {
   // event Debug(bytes data);
   event ProxyExit(address exiter, uint256 utxoId);
 
-  ParsecBridge public bridge;
+  LeapBridge public bridge;
 
   constructor(address b) public {
-    bridge = ParsecBridge(b);
+    bridge = LeapBridge(b);
   }
 
   function proxyExit(bytes32[] _proof, uint256 _oindex) public {
