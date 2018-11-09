@@ -562,11 +562,20 @@ contract LeapBridge is Ownable {
     (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
 
     require(out.owner == address(this), "Funds were not sent to bridge");
-    require(ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s) == signer, "Exit was not signed by owner");
+    require(
+      ecrecover(
+        TxLib.getSigHash(txData), 
+        txn.ins[0].v, txn.ins[0].r, txn.ins[0].s
+      ) == signer,
+      "Exit was not signed by owner"
+    );
 
     uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
 
-    require(bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, "The signed utxoid does not match the one in the proof");
+    require(
+      bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, 
+      "The signed utxoid does not match the one in the proof"
+    );
 
     uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
     require(out.value > 0);
@@ -593,19 +602,6 @@ contract LeapBridge is Ownable {
       out.owner, 
       out.value
     );
-  }
-
-  function unpackSignedData(bytes32[] signedData) internal pure returns (uint256 buyPrice, bytes32 utxoId, address signer) {
-    bytes32[] memory sigBuff = new bytes32[](2);
-    utxoId = signedData[0];
-    buyPrice = uint256(signedData[1]);
-    bytes32 r = signedData[2];
-    bytes32 s = signedData[3];
-    uint8 v = uint8(signedData[4]);
-    sigBuff[0] = utxoId;
-    sigBuff[1] = signedData[1];
-    bytes32 sigHash = keccak256(sigBuff);
-    signer = ecrecover(sigHash, v, r, s);
   }
 
   function challengeExit(
@@ -676,6 +672,23 @@ contract LeapBridge is Ownable {
         return;
       }
     }
+  }
+
+  function unpackSignedData(
+    bytes32[] signedData
+  ) internal pure returns (
+    uint256 buyPrice, bytes32 utxoId, address signer
+  ) {
+    bytes32[] memory sigBuff = new bytes32[](2);
+    utxoId = signedData[0];
+    buyPrice = uint256(signedData[1]);
+    bytes32 r = signedData[2];
+    bytes32 s = signedData[3];
+    uint8 v = uint8(signedData[4]);
+    sigBuff[0] = utxoId;
+    sigBuff[1] = signedData[1];
+    bytes32 sigHash = keccak256(sigBuff);
+    signer = ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow
   }
 
   function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {

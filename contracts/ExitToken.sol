@@ -59,7 +59,12 @@ contract ExitToken is ERC721BasicToken {
       calldatacopy(add(txData, 32), add(100, offset), txLength)
     }
     TxLib.Tx memory txn = TxLib.parseTx(txData);
-    signer = ecrecover(TxLib.getSigHash(txData), txn.ins[0].v, txn.ins[0].r, txn.ins[0].s);
+    signer = ecrecover(
+      TxLib.getSigHash(txData), 
+      txn.ins[0].v, 
+      txn.ins[0].r, 
+      txn.ins[0].s
+    );
   }
 
 }
