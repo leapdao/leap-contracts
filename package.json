@@ -7,6 +7,7 @@
     "test": "scripts/ganache-cli.sh && truffle test test/*.js",
     "testExit": "scripts/ganache-cli.sh && truffle test test/tokenizedExits.js",
     "ganache-cli:dev": "scripts/ganache-cli.sh",
+    "clean": "rm -rf build/",
     "test-ci": "npm run clean && npm run compile && scripts/test.sh",
     "compile": "truffle compile",
     "deploy": "truffle deploy",

@@ -10,5 +10,5 @@ cache:
 matrix:
   fast_finish: true
 script:
-  - npm run lint
-  - npm run test-ci
+  - yarn run lint
+  - yarn run test-ci
