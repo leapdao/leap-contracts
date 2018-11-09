@@ -7,51 +7,45 @@ set -o errexit
 trap cleanup EXIT
 
 cleanup() {
-  echo "Cleaning up"
-  # Kill the client instance that we started (if we started one and if it's still running).
-  if [ -n "$client_pid" ] && ps -p $client_pid > /dev/null; then
-    kill -9 $client_pid
+  # Kill the ganache instance that we started (if we started one and if it's still running).
+  if [ -n "$ganache_pid" ] && ps -p $ganache_pid > /dev/null; then
+    kill -9 $ganache_pid
   fi
-
-  # Kill the testrpc instance that we started (if we started one and if it's still running).
-  if [ -n "$testrpc_pid" ] && ps -p $testrpc_pid > /dev/null; then
-    kill -9 $testrpc_pid
-  fi
-  echo "Done"
 }
 
-testrpc_port=8545
-testrpc_running() {
-  nc -z localhost "$testrpc_port"
+ganache_port=8545
+
+ganache_running() {
+  nc -z localhost "$ganache_port"
 }
 
-start_testrpc() {
-  npm run testrpc > /dev/null &
-  testrpc_pid=$!
+start_ganache() {
+  # We define 10 accounts with balance 1M ether, needed for high-value tests.
+  local accounts=(
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501201,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501202,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501203,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501204,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501205,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501206,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501207,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501208,1000000000000000000000000"
+    --account="0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501209,1000000000000000000000000"
+  )
+
+  node_modules/.bin/ganache-cli --gasLimit 0xfffffffffff "${accounts[@]}" > /dev/null &
+
+  ganache_pid=$!
 }
 
-client_port=8080
-client_running() {
-  nc -z localhost "$client_port"
-}
-
-start_client() {
-  npm run authorized-dev > /dev/null &
-  client_pid=$!
-}
-
-if testrpc_running; then
-  echo "Using existing testrpc instance"
+if ganache_running; then
+  echo "Using existing ganache instance"
 else
-  echo "Starting our own testrpc instance"
-  start_testrpc
+  echo "Starting our own ganache instance"
+  start_ganache
 fi
 
-if client_running; then
-  echo "Using existing client instance"
-else
-  echo "Starting our own client instance"
-  start_client
-fi
+truffle version
 
-npm run test "$@"
+node_modules/.bin/truffle test "$@"
