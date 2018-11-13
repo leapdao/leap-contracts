@@ -20,7 +20,7 @@ import "./TxLib.sol";
 import "./IntrospectionUtil.sol";
 
 
-contract LeapBridge is Ownable {
+contract LeapBridge is Initializable, Ownable {
 // solium-disable security/no-block-members 
 
   using SafeMath for uint256;
@@ -92,8 +92,8 @@ contract LeapBridge is Ownable {
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
-  uint16 public erc20TokenCount = 0;
-  uint16 public nftTokenCount = 0;
+  uint16 public erc20TokenCount;
+  uint16 public nftTokenCount;
 
   struct Slot {
     uint32 eventCounter;
@@ -156,13 +156,16 @@ contract LeapBridge is Ownable {
    */
   mapping(uint16 => NftExit[]) public nftExits;
   
-  constructor(
+  function initialize(
     uint256 _epochLength, 
     uint256 _maxReward, 
     uint256 _parentBlockInterval, 
     uint256 _exitDuration,
     uint256 _exitStake
-  ) public {
+  ) initializer public {
+    //initial values moved to initialize function
+    erc20TokenCount = 0;
+    nftTokenCount = 0;
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = GENESIS;

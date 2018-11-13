@@ -6,14 +6,15 @@ import "./LeapBridge.sol";
 import "./TxLib.sol";
 import "./TransferrableToken.sol";
 
-contract ExitToken is ERC721 {
+contract ExitToken is Initializable, ERC721 {
 
   // event Debug(bytes data);
   event ProxyExit(address exiter, uint256 utxoId);
 
   LeapBridge public bridge;
 
-  constructor(address b) public {
+  function initialize(address b) initializer public {
+    ERC721.initialize();
     bridge = LeapBridge(b);
   }
 

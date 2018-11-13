@@ -8,7 +8,6 @@
  
 pragma solidity 0.4.24;
 
-import "zos-lib/contracts/Initializable.sol";
 import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "openzeppelin-eth/contracts/token/ERC20/ERC20.sol";
 import "./TransferrableToken.sol";

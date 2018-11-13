@@ -12,6 +12,6 @@ import "zos-lib/contracts/Initializable.sol";
 import "openzeppelin-eth/contracts/introspection/ERC165.sol";
 
 
-contract TransferrableToken is ERC165 {
+contract TransferrableToken is Initializable, ERC165 {
   function transferFrom(address _from, address _to, uint256 _valueOrTokenId) public;
 }
