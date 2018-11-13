@@ -131,7 +131,7 @@ contract LeapBridge is Initializable, Ownable {
 
   mapping(uint32 => Deposit) public deposits;
   
-  uint32 public depositCount = 0;
+  uint32 public depositCount;
 
   struct Exit {
     uint256 amount;
@@ -166,6 +166,7 @@ contract LeapBridge is Initializable, Ownable {
     //initial values moved to initialize function
     erc20TokenCount = 0;
     nftTokenCount = 0;
+    depositCount = 0;
     // init genesis preiod
     Period memory genesisPeriod;
     genesisPeriod.parent = GENESIS;

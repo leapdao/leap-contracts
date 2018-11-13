@@ -9,3 +9,4 @@ node_config.json
 .priv
 yarn-error.log
 .zos.session
+zos.dev-*.json

@@ -2,5 +2,8 @@
   "zosversion": "2",
   "name": "leap-contracts",
   "version": "0.1.0",
-  "contracts": {}
+  "contracts": {
+    "LeapBridge": "LeapBridge",
+    "ExitToken": "ExitToken"
+  }
 }
