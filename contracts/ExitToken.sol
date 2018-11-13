@@ -1,11 +1,12 @@
 pragma solidity ^0.4.24;
 
-import "openzeppelin-solidity/contracts/token/ERC721/ERC721BasicToken.sol";
+import "openzeppelin-eth/contracts/token/ERC721/ERC721.sol";
+import "zos-lib/contracts/Initializable.sol";
 import "./LeapBridge.sol";
 import "./TxLib.sol";
 import "./TransferrableToken.sol";
 
-contract ExitToken is ERC721BasicToken {
+contract ExitToken is ERC721 {
 
   // event Debug(bytes data);
   event ProxyExit(address exiter, uint256 utxoId);

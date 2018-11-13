@@ -8,7 +8,8 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/introspection/ERC165.sol";
+import "zos-lib/contracts/Initializable.sol";
+import "openzeppelin-eth/contracts/introspection/ERC165.sol";
 
 
 contract TransferrableToken is ERC165 {
