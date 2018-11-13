@@ -523,7 +523,7 @@ contract LeapBridge is Initializable, Ownable {
     TxLib.Output memory out = TxLib.parseTx(txData).outs[_oindex];
 
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
-    uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     utxoId = bytes32((_oindex << 120) | uint120(txHash));
     uint256 priority = (exitableAt << 128) | uint128(utxoId);
     require(out.value > 0);
@@ -574,7 +574,7 @@ contract LeapBridge is Initializable, Ownable {
       "Exit was not signed by owner"
     );
 
-    uint256 exitableAt = Math.max256(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(periods[_proof[0]].timestamp + (2 * exitDuration), block.timestamp + exitDuration);
 
     require(
       bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, 
