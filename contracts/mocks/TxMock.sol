@@ -9,14 +9,13 @@
 pragma solidity 0.4.24;
 
 import "../TxLib.sol";
-import "zos-lib/contracts/Initializable.sol";
 
 /**
  * @title TxMock
  * @dev used to test Transaction lib
  */
 
-contract TxMock is Initializable {
+contract TxMock {
   using TxLib for TxLib.Tx;
   using TxLib for TxLib.TxType;
 

@@ -8,10 +8,9 @@
 
 pragma solidity 0.4.24;
 
-import "zos-lib/contracts/Initializable.sol";
 import "openzeppelin-eth/contracts/introspection/IERC165.sol";
 
 
-contract TransferrableToken is Initializable, IERC165 {
+contract TransferrableToken is IERC165 {
   function transferFrom(address _from, address _to, uint256 _valueOrTokenId) public;
 }
