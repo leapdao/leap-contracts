@@ -14,6 +14,8 @@ import chaiAsPromised from 'chai-as-promised';
 
 const Bridge = artifacts.require('Bridge');
 const MintableToken = artifacts.require('MockMintableToken');
+const SimpleToken = artifacts.require('SimpleToken');
+const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 const should = chai
   .use(chaiAsPromised)
@@ -36,7 +38,7 @@ contract('Bridge', (accounts) => {
       bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and has 10000 tokens
-      // Bob is the bridge operator
+      // Bob is the bridge operator and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
     });
 
@@ -78,7 +80,86 @@ contract('Bridge', (accounts) => {
       it('Period reward is computed correctly', async () => {
 
       });
-    })
+    });
+
+    describe('Register Token', async () => {
+      it('Native token gets register at 0 on construction and bridge is set as minter', async () => {
+        const nativeToken = await MintableToken.new();
+        const bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
+
+        const tokenZeroAddr = (await bridge.tokens(0))[0];
+        tokenZeroAddr.should.be.equal(nativeToken.address);
+
+        const minter = await nativeToken.minter();
+        minter.should.be.equal(bridge.address);
+      });
+
+      it('Owner can register ERC20 token', async () => {
+        const newToken = await SimpleToken.new();
+
+        await bridge.registerToken(newToken.address).should.be.fulfilled;
+
+        const tokenOneAddr = (await bridge.tokens(1))[0];
+        tokenOneAddr.should.be.equal(newToken.address);
+      });
+
+      it('Owner can register ERC721 token', async () => {
+        const newNFTtoken = await SpaceDustNFT.new();
+
+        await bridge.registerToken(newNFTtoken.address).should.be.fulfilled;
+
+        // NFTs have their own space
+        const NFTstartIndex = 32769;
+        const tokenTwoAddr = (await bridge.tokens(NFTstartIndex))[0];
+        tokenTwoAddr.should.be.equal(newNFTtoken.address);
+      });
+
+      it('Non-owner can not register token', async () => {
+        const newToken = await SimpleToken.new();
+
+        await bridge.registerToken(newToken.address, {from : charlie}).should.be.rejectedWith(EVMRevert);
+      });
+    });
+
+    describe('Deposit', async () => {
+      it('Can deposit registered ERC20 and balance of bridge increases', async () => {
+        await nativeToken.approve(bridge.address, 1000);
+
+        const bridgeBalanceBefore = await nativeToken.balanceOf(bridge.address);
+
+        const color = 0;
+        const amount = 300;
+
+        await bridge.deposit(alice, amount, color).should.be.fulfilled;
+
+        const bridgeBalanceAfter = await nativeToken.balanceOf(bridge.address);
+        const bridgeBalanceDiff = bridgeBalanceAfter.minus(bridgeBalanceBefore);
+
+        bridgeBalanceDiff.should.be.bignumber.equal(amount);
+      });
+
+      it('Can deposit ERC721 and bridge becomes owner', async () => {
+        const nftToken = await SpaceDustNFT.new();
+        const receipt = await nftToken.mint(bob, 10, true, 2);
+        const tokenId = receipt.logs[0].args._tokenId;
+        const NFTcolor = 32769;
+
+        await bridge.registerToken(nftToken.address).should.be.fulfilled;
+
+        await nftToken.approve(bridge.address, tokenId, {from : bob});
+
+        await bridge.deposit(bob, tokenId, NFTcolor, { from: bob }).should.be.fulfilled;
+
+        const nftOwner = await nftToken.ownerOf(tokenId);
+        nftOwner.should.be.equal(bridge.address);
+      });
+
+      it('Can not deposit non-registered token', async () => {
+        const amount = 100;
+        const color = 1;
+        await bridge.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
+      });
+    });
   });
 
 });

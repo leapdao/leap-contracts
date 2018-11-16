@@ -13,15 +13,29 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 import "./MintableToken.sol";
 import "./PriorityQueue.sol";
+import "./TransferrableToken.sol";
+import "./IntrospectionUtil.sol";
 
 contract Bridge is Ownable {
 
   using SafeMath for uint256;
+  using PriorityQueue for PriorityQueue.Token;
 
   modifier onlyOperator() {
     require(msg.sender == operator, "Tried to call a only-operator function from non-operator");
     _;
   }
+
+  event NewHeight(uint256 height, bytes32 indexed root);
+  event NewOperator(address operator);
+  event NewToken(address indexed tokenAddr, uint16 color);
+  event NewDeposit(
+    uint32 indexed depositId, 
+    address indexed depositor, 
+    uint256 indexed color, 
+    uint256 amount
+  );
+
 
   struct Period {
     bytes32 parent; // the id of the parent node
@@ -31,6 +45,13 @@ contract Bridge is Ownable {
     bytes32[] children; // unordered list of children below this node
   }
 
+  struct Deposit {
+    uint64 height;
+    uint16 color;
+    address owner;
+    uint256 amount;
+  }
+
   bytes32 public constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
 
   bytes32 public tipHash; // hash of first period that has extended chain to some height
@@ -38,10 +59,16 @@ contract Bridge is Ownable {
   uint64 public lastParentBlock; // last ethereum block when epoch was submitted
   address public operator; // the operator of the plasma chain (can be a contract)
   uint256 public maxReward; // max reward per period
-
   MintableToken public nativeToken; // plasma native token
 
+  uint16 public erc20TokenCount = 0;
+  uint16 public nftTokenCount = 0;
+  uint32 public depositCount = 0;
+
   mapping(bytes32 => Period) public periods;
+  mapping(uint16 => PriorityQueue.Token) public tokens;
+  mapping(address => bool) public tokenColors;
+  mapping(uint32 => Deposit) public deposits;
 
   constructor(
     uint256 _parentBlockInterval,
@@ -58,15 +85,41 @@ contract Bridge is Ownable {
     });
     tipHash = GENESIS;
     periods[tipHash] = genesisPeriod;
+
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     maxReward = _maxReward;
+
     nativeToken = _nativeToken;
     nativeToken.init(address(this));
+    registerToken(TransferrableToken(_nativeToken));
   }
 
   function setOperator(address _operator) public onlyOwner {
     operator = _operator;
+    emit NewOperator(_operator);
+  }
+
+  function registerToken(TransferrableToken _token) public onlyOwner {
+    // make sure token is not 0x0 and that it has not been registered yet
+    require(_token != address(0));
+    require(!tokenColors[_token]);
+    uint16 color;
+    if (IntrospectionUtil.isERC721(_token)) {
+      color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
+      nftTokenCount += 1;
+    } else {
+      color = erc20TokenCount;
+      erc20TokenCount += 1;
+    }
+    uint256[] memory arr = new uint256[](1);
+    tokenColors[_token] = true;
+    tokens[color] = PriorityQueue.Token({
+      addr: _token,
+      heapList: arr,
+      currentSize: 0
+    });
+    emit NewToken(_token, color);
   }
 
   function submitPeriod(bytes32 _prevHash, bytes32 _root) public onlyOperator {
@@ -83,6 +136,7 @@ contract Bridge is Ownable {
         "Tried to submit new period too soon");
       tipHash = _root;
       lastParentBlock = uint64(block.number);
+      emit NewHeight(newHeight, _root);
     }
     // store the period
     Period memory newPeriod = Period({
@@ -106,5 +160,31 @@ contract Bridge is Ownable {
     }
     nativeToken.mint(operator, reward);
   }
+
+  /**
+   * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
+   * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
+   * @dev Token should be registered with the Bridge first.
+   * @param _owner Account to transfer tokens from
+   * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer
+   * @param _color Color of the token to deposit
+   */
+  function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
+    require(tokens[_color].addr != address(0));
+    tokens[_color].addr.transferFrom(_owner, this, _amountOrTokenId);
+    deposits[depositCount] = Deposit({
+      height: periods[tipHash].height,
+      owner: _owner,
+      color: _color,
+      amount: _amountOrTokenId
+    });
+    depositCount++;
+    emit NewDeposit(
+      depositCount, 
+      _owner, 
+      _color, 
+      _amountOrTokenId
+    );
+  }  
   
 }
