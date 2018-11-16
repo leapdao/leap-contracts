@@ -10,6 +10,7 @@ pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
 
 import "./MintableToken.sol";
 import "./PriorityQueue.sol";
@@ -26,8 +27,14 @@ contract Bridge is Ownable {
     _;
   }
 
+  modifier onlyExitHandler() {
+    require(msg.sender == exitHandler, "Caller to function must be exitHandler");
+    _;
+  }
+
   event NewHeight(uint256 height, bytes32 indexed root);
   event NewOperator(address operator);
+  event NewExitHandler(address exitHandler);
   event NewToken(address indexed tokenAddr, uint16 color);
   event NewDeposit(
     uint32 indexed depositId, 
@@ -57,7 +64,8 @@ contract Bridge is Ownable {
   bytes32 public tipHash; // hash of first period that has extended chain to some height
   uint256 public parentBlockInterval; // how often epochs can be submitted max
   uint64 public lastParentBlock; // last ethereum block when epoch was submitted
-  address public operator; // the operator of the plasma chain (can be a contract)
+  address public operator; // the operator contract
+  address public exitHandler; // the exit handler contract
   uint256 public maxReward; // max reward per period
   MintableToken public nativeToken; // plasma native token
 
@@ -98,6 +106,11 @@ contract Bridge is Ownable {
   function setOperator(address _operator) public onlyOwner {
     operator = _operator;
     emit NewOperator(_operator);
+  }
+
+  function setExitHandler(address _exitHandler) public onlyOwner {
+    exitHandler = _exitHandler;
+    emit NewExitHandler(_exitHandler);
   }
 
   function registerToken(TransferrableToken _token) public onlyOwner {
@@ -185,6 +198,14 @@ contract Bridge is Ownable {
       _color, 
       _amountOrTokenId
     );
-  }  
+  } 
+
+  function payTokenExit(uint16 color, address receiver, uint256 amount) public onlyExitHandler {
+    ERC20(tokens[color].addr).transfer(receiver, amount);
+  }
+
+  function payNftExit(uint16 color, address receiver, uint256 tokenId) public onlyExitHandler {
+    ERC721(tokens[color].addr).transferFrom(address(this), receiver, tokenId);
+  }
   
 }

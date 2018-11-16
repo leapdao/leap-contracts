@@ -37,8 +37,9 @@ contract('Bridge', (accounts) => {
       nativeToken = await MintableToken.new();
       bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
       await bridge.setOperator(bob);
+      await bridge.setExitHandler(bob);
       // At this point alice is the owner of bridge and has 10000 tokens
-      // Bob is the bridge operator and has 0 tokens
+      // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
     });
 
@@ -158,6 +159,16 @@ contract('Bridge', (accounts) => {
         const amount = 100;
         const color = 1;
         await bridge.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
+      });
+    });
+
+    describe('Exits', async () => {
+      it('Only exit handler can call payTokenExit', async () => {
+        
+      });
+
+      it('Only exit handler can call payNftExit', async () => {
+        
       });
     });
   });
