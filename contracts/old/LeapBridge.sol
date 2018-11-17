@@ -13,10 +13,10 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
-import "./TransferrableToken.sol";
-import "./PriorityQueue.sol";
-import "./TxLib.sol";
-import "./IntrospectionUtil.sol";
+import "../TransferrableToken.sol";
+import "../PriorityQueue.sol";
+import "../TxLib.sol";
+import "../IntrospectionUtil.sol";
 
 
 contract LeapBridge is Ownable {
