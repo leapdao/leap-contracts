@@ -29,6 +29,7 @@ contract('ExitHandler', (accounts) => {
   // This is from ganache GUI version
   const alicePriv = '0xbd54b17c48ac1fc91d5ef2ef02e9911337f8758e93c801b619e5d178094486cc';
   const bob = accounts[1];
+  const bobPriv = '0xa1fed95333a31a1e2e900603991161a273f4dd977c4b8c60946d4283519a08f5';
   const charlie = accounts[2];
 
   describe('Test', function() {
@@ -145,6 +146,69 @@ contract('ExitHandler', (accounts) => {
       it('Should allow to exit valid utxo at index 2', async () => {
 
       });
+
+      it('Should allow to challenge exit', async () => {
+        const depositAmount = 100;
+        const nativeTokenColor = 0;
+        const depositId = 0;
+
+        await nativeToken.approve(exitHandler.address, 1000);
+        await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
+
+        const deposit = Tx.deposit(depositId, depositAmount, alice);
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(50, bob), new Output(50, alice)]
+        );
+        transfer = transfer.sign([alicePriv]);
+
+        // utxo that will have spend exit utxo
+        let spend = Tx.transfer(
+          [new Input(new Outpoint(transfer.hash(), 0))],
+          [new Output(50, charlie)]
+        );
+        spend = spend.sign([bobPriv]);
+
+        const p = [];
+        p[0] = await bridge.tipHash();
+        let block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
+        let period = new Period(p[0], [block]);
+        p[1] = period.merkleRoot();
+
+        await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
+
+        const transferProof = period.proof(transfer);
+        const spendProof = period.proof(spend);
+
+        // withdraw output
+        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+
+
+        // challenge exit and make sure exit is removed
+        let exit = await exitHandler.exits(outpoint.getUtxoId());
+        assert.equal(exit[2], bob);
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);
+        exit = await exitHandler.exits(outpoint.getUtxoId());
+        assert.equal((await exitHandler.tokens(0))[1], 1);
+        const bal1 = await nativeToken.balanceOf(bob);
+        await exitHandler.finalizeTopExit(0);
+        const bal2 = await nativeToken.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
+      });
+
+      it('Should allow to challenge NFT exit', async () => {
+
+      });
+
     });
 
   });

@@ -35,11 +35,6 @@ contract ExitHandler is DepositHandler {
     uint256 stake;
   }
 
-  struct NftExit {
-    bytes32 utxoId;
-    uint256 exitableAt;
-  }
-
   uint256 public exitDuration;
   uint256 public exitStake;
   uint256 public nftExitCounter = 0;
@@ -48,11 +43,6 @@ contract ExitHandler is DepositHandler {
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
    */
   mapping(bytes32 => Exit) public exits;
-
-  /**
-   * color → NftExit[] mapping. Contains (UTXO+exitable date) for NFT exits
-   */
-  mapping(uint16 => NftExit[]) public nftExits;
 
   constructor(
     Bridge _bridge, 
@@ -115,8 +105,7 @@ contract ExitHandler is DepositHandler {
     );
   }
 
-  // @dev Loops through the priority queue of exits, settling the ones whose challenge
-  // @dev period has ended
+  // @dev Finalizes exit for the chosen color with the highest priority
   function finalizeTopExit(uint16 _color) public {
     bytes32 utxoId;
     uint256 exitableAt;
@@ -151,6 +140,47 @@ contract ExitHandler is DepositHandler {
 
   function isNft(uint16 _color) internal pure returns (bool) {
     return _color > 32768; // 2^15
+  }
+
+  function challengeExit(
+    bytes32[] _proof, 
+    bytes32[] _prevProof, 
+    uint256 _outputIndex, 
+    uint256 _inputIndex
+  ) public {
+    // validate exiting tx
+    uint256 offset = 32 * (_proof.length + 2);
+    bytes32 txHash1;
+    (, txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
+
+    require(exits[utxoId].amount > 0);
+
+    // validate spending tx
+    bytes memory txData;
+    (, , txData) = TxLib.validateProof(96, _proof);
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+
+    // make sure one is spending the other one
+    require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
+    require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+
+    // if transfer, make sure signature correct
+    if (txn.txType == TxLib.TxType.Transfer) {
+      bytes32 sigHash = TxLib.getSigHash(txData);
+      address signer = ecrecover(
+        sigHash, 
+        txn.ins[_inputIndex].v, 
+        txn.ins[_inputIndex].r, 
+        txn.ins[_inputIndex].s
+      );
+      require(exits[utxoId].owner == signer);
+    }
+
+    // award stake to challanger
+    msg.sender.transfer(exits[utxoId].stake);
+    // delete invalid exit
+    delete exits[utxoId];
   }
 
   // Use this to find calldata offset - you are looking for the number:

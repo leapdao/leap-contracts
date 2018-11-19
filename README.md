@@ -30,7 +30,7 @@ The ExitHandler is actually the final contract in an inheritance chain that goes
 
 * Vault 
 
-  The vault defines what types of assets are allowed on the plasma chain and is responsible for registration of these funds.
+  The vault defines what types of assets are allowed on the plasma chain and is responsible for registration of these assets.
 
 * DepositHandler
 
