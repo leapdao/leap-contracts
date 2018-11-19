@@ -21,7 +21,7 @@ const should = chai
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
-contract('Vault', (accounts) => {
+contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
