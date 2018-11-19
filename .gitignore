@@ -8,3 +8,5 @@ build/
 node_config.json
 .priv
 yarn-error.log
+
+.DS_Store
