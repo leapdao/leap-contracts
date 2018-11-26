@@ -74,13 +74,13 @@ contract Bridge is Ownable {
     emit NewOperator(_operator);
   }
 
-  function submitPeriod(bytes32 _prevHash, bytes32 _root) public onlyOperator {
+  function submitPeriod(bytes32 _prevHash, bytes32 _root) public onlyOperator returns (uint256 newHeight, uint256 reward) {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
 
     // calculate height
-    uint256 newHeight = periods[_prevHash].height + 1;
+    newHeight = periods[_prevHash].height + 1;
     // do some magic if chain extended
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
@@ -103,7 +103,7 @@ contract Bridge is Ownable {
     // distribute rewards
     uint256 totalSupply = nativeToken.totalSupply();
     uint256 stakedSupply = nativeToken.balanceOf(operator);
-    uint256 reward = maxReward;
+    reward = maxReward;
     if (stakedSupply >= totalSupply.div(2)) {
       // 4 x br x as x (ts - as)
       // -----------------------
