@@ -80,7 +80,7 @@ contract ExitHandler is DepositHandler {
     require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
 
     uint256 priority;
-    if(isNft(out.color)) {
+    if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(utxoId);
       nftExitCounter++;
     } else {

@@ -27,9 +27,9 @@ const should = chai
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
-  const alicePriv = '0xbd54b17c48ac1fc91d5ef2ef02e9911337f8758e93c801b619e5d178094486cc';
+  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
-  const bobPriv = '0xa1fed95333a31a1e2e900603991161a273f4dd977c4b8c60946d4283519a08f5';
+  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';;
   const charlie = accounts[2];
 
   describe('Test', function() {
@@ -140,11 +140,31 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit only for utxo owner', async () => {
+        const depositAmount = 100;
+        const nativeTokenColor = 0;
 
-      });
+        await nativeToken.approve(exitHandler.address, 1000);
+        await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
 
-      it('Should allow to exit valid utxo at index 2', async () => {
+        const deposit = Tx.deposit(0, depositAmount, alice);
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(50, bob), new Output(50, alice)]
+        );
+        transfer = transfer.sign([alicePriv]);
 
+        const p = [];
+        p[0] = await bridge.tipHash();
+        let block = new Block(33).addTx(deposit).addTx(transfer);
+        let period = new Period(p[0], [block]);
+        p[1] = period.merkleRoot();
+
+        await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
+
+        const transferProof = period.proof(transfer);
+        const outputIndex = 1;
+
+        await exitHandler.startExit(transferProof, outputIndex, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('Should allow to challenge exit', async () => {
@@ -207,6 +227,63 @@ contract('ExitHandler', (accounts) => {
 
       it('Should allow to challenge NFT exit', async () => {
 
+        const nftToken = await SpaceDustNFT.new();
+
+        let receipt = await nftToken.mint(alice, 10, true, 2);
+        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenIdStr = tokenId.toString(10);
+
+        receipt = await exitHandler.registerToken(nftToken.address);
+        const nftColor = receipt.logs[0].args.color.toNumber();
+        
+        // deposit
+        await nftToken.approve(exitHandler.address, tokenId);
+        receipt = await exitHandler.deposit(alice, tokenId, nftColor, { from: alice }).should.be.fulfilled;        
+        const depositId = receipt.logs[0].args.depositId.toNumber();
+
+        const deposit = Tx.deposit(depositId, tokenIdStr, alice, nftColor);
+        
+        // transfer to bob
+        let transfer = Tx.transfer(
+          [new Input(new Outpoint(deposit.hash(), 0))],
+          [new Output(tokenIdStr, bob, nftColor)]
+        );
+        transfer = transfer.sign([alicePriv]);
+
+        // utxo that will have spend exit utxo
+        let spend = Tx.transfer(
+          [new Input(new Outpoint(transfer.hash(), 0))],
+          [new Output(tokenIdStr, charlie, nftColor)]
+        );
+        spend = spend.sign([bobPriv]);
+
+         // include in block and period
+        const p = [];
+        p[0] = await bridge.tipHash();
+        let block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
+        let period = new Period(p[0], [block]);
+        p[1] = period.merkleRoot();
+
+        await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;
+
+        const transferProof = period.proof(transfer);
+        const spendProof = period.proof(spend);
+        
+        // withdraw output
+        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+        // challenge exit and make sure exit is removed
+        let exit = await exitHandler.exits(outpoint.getUtxoId());
+        assert.equal(exit[2], bob);
+        
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);        
+        exit = await exitHandler.exits(outpoint.getUtxoId());
+        // check that exit was deleted
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });
 
     });

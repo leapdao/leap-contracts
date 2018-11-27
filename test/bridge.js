@@ -57,26 +57,6 @@ contract('Bridge', (accounts) => {
         // At this point the total stake is 0 (bob's balance) so bob should receive maxReward
         bobBalanceDiff.should.be.bignumber.equal(maxReward);
       });
-
-      it('Non-operator cannot submit period', async () => {
-
-      });
-
-      it('Reverts when submitting exsisting period', async () => {
-
-      });
-
-      it('Reverts when parent does not exsist', async () => {
-
-      });
-
-      it('Reverts when trying to submit before parent block interval passed', async () => {
-
-      });
-
-      it('Period reward is computed correctly', async () => {
-
-      });
     });
   });
 

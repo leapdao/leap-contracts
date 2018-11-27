@@ -26,9 +26,9 @@ const should = chai
 contract('FastExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
-  const alicePriv = '0xbd54b17c48ac1fc91d5ef2ef02e9911337f8758e93c801b619e5d178094486cc';
+  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
-  const bobPriv = '0xa1fed95333a31a1e2e900603991161a273f4dd977c4b8c60946d4283519a08f5';
+  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
 
   describe('Test', function() {

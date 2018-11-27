@@ -74,7 +74,10 @@ contract Bridge is Ownable {
     emit NewOperator(_operator);
   }
 
-  function submitPeriod(bytes32 _prevHash, bytes32 _root) public onlyOperator returns (uint256 newHeight, uint256 reward) {
+  function submitPeriod(
+    bytes32 _prevHash, 
+    bytes32 _root) 
+  public onlyOperator returns (uint256 newHeight, uint256 reward) {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
