@@ -19,7 +19,7 @@ contract Vault is Ownable {
 
   event NewToken(address indexed tokenAddr, uint16 color);
 
-  Bridge bridge;
+  Bridge public bridge;
 
   uint16 public erc20TokenCount = 0;
   uint16 public nftTokenCount = 0;

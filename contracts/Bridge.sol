@@ -35,6 +35,7 @@ contract Bridge is Ownable {
 
   bytes32 public constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
 
+  uint256 public genesisBlockNumber; 
   bytes32 public tipHash; // hash of first period that has extended chain to some height
   uint256 public parentBlockInterval; // how often epochs can be submitted max
   uint64 public lastParentBlock; // last ethereum block when epoch was submitted
@@ -60,6 +61,7 @@ contract Bridge is Ownable {
     });
     tipHash = GENESIS;
     periods[tipHash] = genesisPeriod;
+    genesisBlockNumber = block.number;
 
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);

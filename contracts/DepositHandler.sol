@@ -50,13 +50,13 @@ contract DepositHandler is Vault {
     bytes32 tipHash = bridge.tipHash();
     (,uint32 height,,) = bridge.periods(tipHash);
 
+    depositCount++;
     deposits[depositCount] = Deposit({
       height: height,
       owner: _owner,
       color: _color,
       amount: _amountOrTokenId
     });
-    depositCount++;
     emit NewDeposit(
       depositCount, 
       _owner, 
