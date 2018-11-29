@@ -50,6 +50,7 @@
     "openzeppelin-eth": "^2.0.2",
     "openzeppelin-solidity": "1.12.0",
     "truffle-hdwallet-provider": "0.0.5",
+    "zos": "^2.0.1",
     "zos-lib": "^2.0.1"
   }
 }

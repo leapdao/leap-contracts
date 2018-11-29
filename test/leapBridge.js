@@ -5,10 +5,15 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
+process.env.NODE_ENV = 'test';
 
 import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 import chai from 'chai';
+
+import { Contracts, encodeCall, assertRevert } from 'zos-lib';
+import { TestHelper } from 'zos';
+
 const LeapBridge = artifacts.require('./LeapBridge.sol');
 const PriorityQueue = artifacts.require('./PriorityQueue.sol');
 const SimpleToken = artifacts.require('SimpleToken');
@@ -18,10 +23,25 @@ const should = chai
   .use(require('chai-as-promised'))
   .should();
 
-const deployBridge = async (token, periodTime) => {
+require('chai')
+  .use(require('zos-lib').assertions)
+  .should();
+
+const sendTransaction = (target, method, args, values, opts) => {
+  const data = encodeCall(method, args, values);
+  return target.sendTransaction(Object.assign({ data }, opts));
+};
+
+//const LeapBridge = Contracts.getFromLocal('LeapBridge');
+
+const deployBridge = async (token, periodTime, owner, project) => {
   const pqLib = await PriorityQueue.new();
   LeapBridge.link('PriorityQueue', pqLib.address);
-  const bridge = await LeapBridge.new(periodTime, 50, 0, 0, 50);
+  const bridge = await project.createProxy(LeapBridge);
+  await sendTransaction(bridge, 
+    'initialize', 
+    ['uint256','uint256','uint256','uint256','uint256','address'],
+    [periodTime, 50, 0, 0, 50,owner]);
   bridge.registerToken(token.address);
   return bridge;
 }
@@ -33,6 +53,7 @@ contract('LeapBridge', (accounts) => {
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
   const charliePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+  const proxyAdmin = accounts[9];
 
   describe('Slot', function() {
     const p = [];
@@ -40,15 +61,17 @@ contract('LeapBridge', (accounts) => {
     let token;
     before(async () => {
       token = await SimpleToken.new();
+      await token.initialize();
       // initialize contract
-      bridge = await deployBridge(token, 3);
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 3, alice, this.project);
       p[0] = await bridge.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
     });
     describe('Auction', function() {
       it('should prevent submission by unbonded validators', async () => {
-        await bridge.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
+        await assertRevert(bridge.submitPeriod(0, p[0], '0x01', {from: alice}));
       });
 
       it('should allow to auction slot and submit block', async () => {
