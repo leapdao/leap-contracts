@@ -21,7 +21,7 @@ contract SimpleToken is Initializable, ERC20 {
   /**
    * @dev Constructor that gives msg.sender all of existing tokens.
    */
-  function initialize() initializer public {
+  function initialize() public initializer {
     _mint(msg.sender,INITIAL_SUPPLY);
   }
 
