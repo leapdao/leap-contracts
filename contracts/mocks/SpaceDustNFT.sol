@@ -17,7 +17,7 @@ import "zos-lib/contracts/Initializable.sol";
 
 contract SpaceDustNFT is Initializable, ERC721Metadata, MinterRole {
 
-  function initialize() initializer public {
+  function initialize() public initializer {
     ERC721Metadata.initialize("SpaceDustNFT", "SDST");
     MinterRole.initialize(msg.sender);
   }

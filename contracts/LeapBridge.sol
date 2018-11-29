@@ -163,7 +163,7 @@ contract LeapBridge is Initializable, Ownable {
     uint256 _exitDuration,
     uint256 _exitStake,
     address _owner
-  ) initializer public {
+  ) public initializer {
     Ownable.initialize(_owner);
     //initial values moved to initialize function
     erc20TokenCount = 0;

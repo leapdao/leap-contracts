@@ -13,7 +13,7 @@ contract ExitToken is Initializable, ERC721 {
 
   LeapBridge public bridge;
 
-  function initialize(address b) initializer public {
+  function initialize(address b) public initializer {
     ERC721.initialize();
     bridge = LeapBridge(b);
   }
