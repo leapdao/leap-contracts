@@ -203,14 +203,16 @@ contract LeapBridge is Initializable, Ownable {
     return erc20TokenCount + nftTokenCount;
   }
 
-  function registerToken(TransferrableToken _token) public onlyOwner {
+  function registerToken(TransferrableToken _token, bool _isERC721) public onlyOwner {
     require(_token != address(0));
     require(!tokenColors[_token]);
     uint16 color;
-    if (IntrospectionUtil.isERC721(_token)) {
+    if (_isERC721) {
+      require(_token.supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
       color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
+      require(ERC20(_token).totalSupply() >= 0, "Not an ERC20 token");
       color = erc20TokenCount;
       erc20TokenCount += 1;
     }
