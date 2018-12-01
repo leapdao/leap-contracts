@@ -625,7 +625,7 @@ contract LeapBridge is Initializable, Ownable {
     (, txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
     bytes32 utxoId = bytes32((_oIndex << 120) | uint120(txHash1));
 
-    require(exits[utxoId].amount > 0);
+    require(exits[utxoId].amount > 0, "No exit amount for UTXO");
 
     // validate spending tx
     bytes memory txData;
@@ -633,8 +633,8 @@ contract LeapBridge is Initializable, Ownable {
     TxLib.Tx memory txn = TxLib.parseTx(txData);
 
     // make sure one is spending the other one
-    require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
-    require(_oIndex == txn.ins[_inputIndex].outpoint.pos);
+    require(txHash1 == txn.ins[_inputIndex].outpoint.hash, "Hashes are not equal");
+    require(_oIndex == txn.ins[_inputIndex].outpoint.pos, "Wrong output index");
 
     // if transfer, make sure signature correct
     if (txn.txType == TxLib.TxType.Transfer) {
@@ -645,7 +645,7 @@ contract LeapBridge is Initializable, Ownable {
         txn.ins[_inputIndex].r, 
         txn.ins[_inputIndex].s
       );
-      require(exits[utxoId].owner == signer);
+      require(exits[utxoId].owner == signer, "Wrong signature");
     }
 
     // award stake to challanger

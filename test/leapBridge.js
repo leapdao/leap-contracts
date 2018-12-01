@@ -42,17 +42,17 @@ const deployBridge = async (token, periodTime, owner, project) => {
     'initialize', 
     ['uint256','uint256','uint256','uint256','uint256','address'],
     [periodTime, 50, 0, 0, 50,owner]);
-  bridge.registerToken(token.address);
+  bridge.registerToken(token.address, false);
   return bridge;
 }
 
 contract('LeapBridge', (accounts) => {
   const alice = accounts[0];
-  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
+  const alicePriv = '0x674272dbd59c41d16f62a10295c5bfa3dea591154b7757364eda2b43070f2aa9';
   const bob = accounts[1];
-  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
+  const bobPriv = '0xbe5c18259c75bf53a2da34ed8165a8f8dee4913696fa74750640f4da534d39ba';
   const charlie = accounts[2];
-  const charliePriv = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+  const charliePriv = '0x19ce6798bd162976de1ece55dd9eebe5b135c752cfe5f3fd62d3ce3adef2a376';
   const proxyAdmin = accounts[9];
 
   describe('Slot', function() {
@@ -187,8 +187,10 @@ contract('LeapBridge', (accounts) => {
     let token;
     before(async () => {
       token = await SimpleToken.new();
+      await token.initialize();
       // initialize contract
-      bridge = await deployBridge(token, 8);
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 8, alice, this.project);
       p[0] = await bridge.tipHash();
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
@@ -352,8 +354,10 @@ contract('LeapBridge', (accounts) => {
     let nftColor;
     before(async () => {
       token = await SimpleToken.new();
+      await token.initialize();
       // initialize contract
-      bridge = await deployBridge(token, 8);
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 8, alice, this.project);
       p[0] = await bridge.tipHash();
       // alice auctions slot
       await token.approve(bridge.address, 1000, {from: alice});
@@ -369,7 +373,8 @@ contract('LeapBridge', (accounts) => {
 
       // register NFT
       nftToken = await SpaceDustNFT.new();
-      let receipt = await bridge.registerToken(nftToken.address);
+      await sendTransaction(nftToken, 'initialize');
+      let receipt = await bridge.registerToken(nftToken.address, true);
       nftColor = receipt.logs[0].args.color.toNumber();
     });
 
@@ -393,13 +398,14 @@ contract('LeapBridge', (accounts) => {
       });
 
       it('should allow to deposit NFT tokens', async () => {
-        const nftToken = await SpaceDustNFT.new();
+        //const nftToken = await SpaceDustNFT.new();
+        //await sendTransaction(nftToken, 'initialize');
         let receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
-        receipt = await bridge.registerToken(nftToken.address);
-        const color = receipt.logs[0].args.color.toNumber();
+        const tokenId = receipt.logs[0].args.tokenId;
+        //receipt = await bridge.registerToken(nftToken.address, true);
+        //const color = receipt.logs[0].args.color.toNumber();
         await nftToken.approve(bridge.address, tokenId, { from: bob });
-        await bridge.deposit(bob, tokenId, color, { from: bob }).should.be.fulfilled;
+        await bridge.deposit(bob, tokenId, nftColor, { from: bob }).should.be.fulfilled;
       });
     });
     describe('Exit', function() {
@@ -505,7 +511,7 @@ contract('LeapBridge', (accounts) => {
       it('should allow to exit NFT utxo', async () => {
         // mint for alice
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args.tokenId;
         const tokenIdStr = tokenId.toString(10);
         
         // deposit
@@ -544,7 +550,7 @@ contract('LeapBridge', (accounts) => {
       it('should allow to challenge NFT exit', async () => {
         // mint for alice
         let receipt = await nftToken.mint(alice, 10, true, 3);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args.tokenId;
         const tokenIdStr = tokenId.toString(10);
 
         // deposit
@@ -605,8 +611,10 @@ contract('LeapBridge', (accounts) => {
     let token;
     before(async () => {
       token = await SimpleToken.new();
+      await token.initialize();
       // initialize contract
-      bridge = await deployBridge(token, 8);
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 8, alice, this.project);
       p[0] = await bridge.tipHash();
 
       await token.approve(bridge.address, 1000, { from: alice });
@@ -692,8 +700,10 @@ contract('LeapBridge', (accounts) => {
     let token;
     before(async () => {
       token = await SimpleToken.new();
+      await token.initialize();
       // initialize contract
-      bridge = await deployBridge(token, 8);
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 8, alice, this.project);
     });
 
     it('should register a new ERC20 token', async () => {
@@ -701,7 +711,8 @@ contract('LeapBridge', (accounts) => {
       assert.equal((await bridge.tokenCount()).toNumber(), 1);
 
       const anotherToken = await SimpleToken.new();
-      const res = await bridge.registerToken(anotherToken.address);
+      await anotherToken.initialize();
+      const res = await bridge.registerToken(anotherToken.address,false);
       
       const expectedColor = 1;
       assert.equal((await bridge.tokenCount()).toNumber(), 2);
@@ -714,7 +725,8 @@ contract('LeapBridge', (accounts) => {
       assert.equal((await bridge.tokenCount()).toNumber(), 2);
 
       const nftToken = await SpaceDustNFT.new();
-      const res = await bridge.registerToken(nftToken.address);
+      await sendTransaction(nftToken, 'initialize');
+      const res = await bridge.registerToken(nftToken.address, true);
 
       const expectedColor = 2 ** 15 + 1; // NFT tokens namespace starts from 2^15 + 1
       assert.equal((await bridge.tokenCount()).toNumber(), 3);
@@ -724,7 +736,7 @@ contract('LeapBridge', (accounts) => {
     });
 
     it('should fail when registering a same token again', async () => {
-      await bridge.registerToken(token.address).should.be.rejectedWith(EVMRevert);
+      await bridge.registerToken(token.address, false).should.be.rejectedWith(EVMRevert);
     });
   });
 
@@ -733,7 +745,10 @@ contract('LeapBridge', (accounts) => {
     let token;
     beforeEach(async () => {
       token = await SimpleToken.new();
-      bridge = await deployBridge(token, 3);
+      await token.initialize();
+      // initialize contract
+      this.project = await TestHelper({from: proxyAdmin});
+      bridge = await deployBridge(token, 3, alice, this.project);
       token.transfer(bob, 1000);
       token.transfer(charlie, 1000);
     });
@@ -748,7 +763,7 @@ contract('LeapBridge', (accounts) => {
     });
 
     it('non owner can not call registerToken', async () => {
-      await bridge.registerToken(token.address, {from: bob}).should.be.rejectedWith(EVMRevert);
+      await bridge.registerToken(token.address, false, {from: bob}).should.be.rejectedWith(EVMRevert);
     });
 
     it('owner can set exit stake and non owner can not', async () => {
