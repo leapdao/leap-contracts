@@ -65,7 +65,7 @@ module.exports = function(deployer, network, accounts) {
     return FastExitHandler.new(bridge.address, exitDuration, exitStake);
   }).then(function(eh) {
     exitHandler = eh;
-    return Bridge.setOperator(operator.address);
+    return bridge.setOperator(operator.address);
   }).then(function() {
     console.log('Bridge: ', bridge.address);
     console.log('Operator: ', operator.address);
