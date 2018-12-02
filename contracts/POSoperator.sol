@@ -66,7 +66,7 @@ contract POSoperator is Ownable {
     uint8 slot;
   }
 
-  Bridge bridge;
+  Bridge public bridge;
 
   uint256 public epochLength; // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
