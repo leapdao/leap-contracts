@@ -13,10 +13,10 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/math/Math.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
-import "./TransferrableToken.sol";
-import "./PriorityQueue.sol";
-import "./TxLib.sol";
-import "./IntrospectionUtil.sol";
+import "../TransferrableToken.sol";
+import "../PriorityQueue.sol";
+import "../TxLib.sol";
+import "../IntrospectionUtil.sol";
 
 
 contract LeapBridge is Ownable {
@@ -368,6 +368,7 @@ contract LeapBridge is Ownable {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender);
+    // This is here so that I can submit in the same epoch I auction/logout but not after
     if (slot.activationEpoch > 0) {
       // if slot not active, prevent submission
       require(lastCompleteEpoch.add(2) < slot.activationEpoch);

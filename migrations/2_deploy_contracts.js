@@ -1,48 +1,83 @@
 const fs = require('fs');
+const truffleConfig = require('../truffle.js');
 
-var PriorityQueue = artifacts.require("./PriorityQueue.sol");
-var TxLib = artifacts.require("./TxLib.sol");
-var LeapBridge = artifacts.require("./LeapBridge.sol");
-var SimpleToken = artifacts.require("./SimpleToken.sol");
-var ExitToken = artifacts.require("./ExitToken.sol");
+const Bridge = artifacts.require('Bridge');
+const MintableToken = artifacts.require('MockMintableToken');
+const POSoperator = artifacts.require('POSoperator');
+const FastExitHandler = artifacts.require('FastExitHandler');
+const PriorityQueue = artifacts.require('PriorityQueue');
 
-const ethereumNodes = {
-  "develop": 'http://localhost:9545',
-  "rinkeby": 'https://rinkeby.infura.io',
+function abiFileString(abi) {
+  return 'module.exports = ' + JSON.stringify(abi);
+}
+
+function writeAbi(name, abi) {
+  fs.writeFile("./build/nodeFiles/" + name + ".js", abiFileString(abi), function(err) {
+    if(err) {
+      return console.log(err);
+    }
+  });
+}
+
+function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
+  const networkData = truffleConfig.networks[network];
+  const rootNetwork = 'http://' + networkData.host + ':' + networkData.port;
+  const networkId = Math.floor(Math.random() * Math.floor(1000000000));
+  const config = {
+    "bridgeAddr": bridgeAddr,
+    "operatorAddr": operatorAddr,
+    "exitHandlerAddr": exitHandlerAddr,
+    "rootNetwork": rootNetwork,
+    "network": network,
+    "networkId": networkId,
+    "peers": []
+  }
+  fs.writeFile("./build/nodeFiles/generateConfig.json", JSON.stringify(config), function(err) {
+    if(err) {
+      return console.log(err);
+    }
+  });
 }
 
 module.exports = function(deployer, network, accounts) {
-  deployer.deploy(PriorityQueue);
-  deployer.deploy(TxLib);
-  deployer.deploy(SimpleToken);
-  deployer.link(PriorityQueue, LeapBridge);
-  deployer.link(TxLib, LeapBridge);
-  deployer.link(TxLib, ExitToken);
-  deployer.deploy(LeapBridge, 4, 50, 0, 0, 50);
-  
-  var token, bridge;
+  const maxReward = 50;
+  const parentBlockInterval = 0;
+  const epochLength = 3;
+  const exitDuration = 0;
+  const exitStake = 0;
+  let bridge, nativeToken, operator, pqLib, exitHandler;
 
   deployer.then(function() {
-    return LeapBridge.deployed();
-  }).then(function(b) {
-    bridge = b;
-    return SimpleToken.deployed();
-  }).then(function(t) {
-    token = t;
-    return token.approve(bridge.address, '1000000000000');
+    return MintableToken.new();
+  }).then(function(nt) {
+    nativeToken = nt;
+    return Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
+  }).then(function(br) {
+    bridge = br;
+    return POSoperator.new(bridge.address, epochLength);
+  }).then(function(op) {
+    operator = op;
+    return PriorityQueue.new();
+  }).then(function(pq) {
+    pqLib = pq;
+    return FastExitHandler.link('PriorityQueue', pqLib.address);
   }).then(function() {
-    return bridge.registerToken(token.address);
+    return FastExitHandler.new(bridge.address, exitDuration, exitStake);
+  }).then(function(eh) {
+    exitHandler = eh;
+    return bridge.setOperator(operator.address);
   }).then(function() {
-    var node_config = {
-      "bridgeAddr": bridge.address,
-      "network": Math.floor(Math.random() * 10000000).toString(),
-      "rootNetwork": ethereumNodes[network],
-      "peers": []
-    }
-    fs.writeFile("./node_config.json", JSON.stringify(node_config), 'utf8', function (err) {
-        if (err) {
-            return console.log(err);
-        }
-    });
+    console.log('Bridge: ', bridge.address);
+    console.log('Operator: ', operator.address);
+    console.log('ExitHandler: ', exitHandler.address);
+    console.log('Token: ', nativeToken.address);
+    
+    writeAbi('bridgeAbi', Bridge.abi);
+    writeAbi('exitHandler', FastExitHandler.abi);
+    writeAbi('operator', POSoperator.abi);
+
+    writeConfig(bridge.address, operator.address, exitHandler.address, network);
+
+    console.log("Generated node files in /build/nodeFiles");
   });
-};
+}
