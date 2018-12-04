@@ -27,7 +27,7 @@ contract DepositHandler is Vault {
     uint256 amount;
   }
 
-  uint32 public depositCount = 0;
+  uint32 public depositCount;
 
   mapping(uint32 => Deposit) public deposits;
 

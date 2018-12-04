@@ -37,7 +37,7 @@ contract ExitHandler is DepositHandler {
 
   uint256 public exitDuration;
   uint256 public exitStake;
-  uint256 public nftExitCounter = 0;
+  uint256 public nftExitCounter;
 
   /**
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors

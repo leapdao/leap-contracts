@@ -20,8 +20,8 @@ contract Vault is Initializable {
 
   Bridge public bridge;
 
-  uint16 public erc20TokenCount = 0;
-  uint16 public nftTokenCount = 0;
+  uint16 public erc20TokenCount;
+  uint16 public nftTokenCount;
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
