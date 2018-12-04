@@ -76,8 +76,8 @@ contract POSoperator is Initializable, Ownable {
   mapping(uint256 => Slot) public slots;
   mapping(bytes32 => PeriodData) public periodData;
 
-  function initialize (Bridge _bridge, uint256 _epochLength) public initializer {
-    Ownable.initialize(msg.sender);
+  function initialize (Bridge _bridge, uint256 _epochLength, address _owner) public initializer {
+    Ownable.initialize(_owner);
     bridge = _bridge;
     epochLength = _epochLength;
   }

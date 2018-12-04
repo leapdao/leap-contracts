@@ -33,8 +33,8 @@ contract DepositHandler is Initializable, Vault {
 
   mapping(uint32 => Deposit) public deposits;
 
-  function initialize(Bridge _bridge) public initializer {
-    Vault.initialize(_bridge);
+  function initialize(Bridge _bridge, address _owner) public initializer {
+    Vault.initialize(_bridge, _owner);
     depositCount = 0;
   }
 

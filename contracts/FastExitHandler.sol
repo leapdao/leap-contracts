@@ -19,9 +19,15 @@ contract FastExitHandler is Initializable, ExitHandler {
   function initialize(
     Bridge _bridge, 
     uint256 _exitDuration, 
-    uint256 _exitStake) 
+    uint256 _exitStake,
+    address _owner) 
   public initializer {
-    ExitHandler.initialize(_bridge, _exitDuration, _exitStake);
+    ExitHandler.initialize(
+      _bridge,
+     _exitDuration, 
+     _exitStake, 
+     _owner
+    );
   }
 
   function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public payable {

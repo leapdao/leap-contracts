@@ -28,8 +28,8 @@ contract Vault is Initializable, Ownable {
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
 
-  function initialize (Bridge _bridge) public initializer {
-    Ownable.initialize(msg.sender);
+  function initialize (Bridge _bridge, address _owner) public initializer {
+    Ownable.initialize(_owner);
     erc20TokenCount = 0;
     nftTokenCount = 0;
     bridge = _bridge;

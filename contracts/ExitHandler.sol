@@ -48,9 +48,10 @@ contract ExitHandler is Initializable, DepositHandler {
   function initialize(
     Bridge _bridge, 
     uint256 _exitDuration, 
-    uint256 _exitStake) 
+    uint256 _exitStake,
+    address _owner) 
   public initializer {
-    DepositHandler.initialize(_bridge);
+    DepositHandler.initialize(_bridge, _owner);
     nftExitCounter = 0;
     exitDuration = _exitDuration;
     exitStake = _exitStake;
