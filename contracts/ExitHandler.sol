@@ -8,14 +8,15 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/Math.sol";
+import "openzeppelin-eth/contracts/math/Math.sol";
+import "zos-lib/contracts/Initializable.sol";
 
 import "./DepositHandler.sol";
 import "./Bridge.sol";
 import "./TxLib.sol";
 import "./PriorityQueue.sol";
 
-contract ExitHandler is DepositHandler {
+contract ExitHandler is Initializable, DepositHandler {
 
   using PriorityQueue for PriorityQueue.Token;
 
@@ -37,18 +38,20 @@ contract ExitHandler is DepositHandler {
 
   uint256 public exitDuration;
   uint256 public exitStake;
-  uint256 public nftExitCounter = 0;
+  uint256 public nftExitCounter;
 
   /**
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
    */
   mapping(bytes32 => Exit) public exits;
 
-  constructor(
+  function initialize(
     Bridge _bridge, 
     uint256 _exitDuration, 
     uint256 _exitStake) 
-  DepositHandler(_bridge) public {
+  public initializer {
+    DepositHandler.initialize(_bridge);
+    nftExitCounter = 0;
     exitDuration = _exitDuration;
     exitStake = _exitStake;
   }
@@ -72,7 +75,7 @@ contract ExitHandler is DepositHandler {
 
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     // TODO: Safe math needed? Our period timestamp is only uint32, maybe exploitable?
-    uint256 exitableAt = Math.max256(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
 
     require(out.value > 0, "UTXO has no value");

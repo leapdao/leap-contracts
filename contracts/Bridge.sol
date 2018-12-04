@@ -8,12 +8,13 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-eth/contracts/math/SafeMath.sol";
+import "openzeppelin-eth/contracts/ownership/Ownable.sol";
+import "zos-lib/contracts/Initializable.sol";
 
 import "./MintableToken.sol";
 
-contract Bridge is Ownable {
+contract Bridge is Initializable, Ownable {
 
   using SafeMath for uint256;
 
@@ -46,11 +47,12 @@ contract Bridge is Ownable {
 
   mapping(bytes32 => Period) public periods;
 
-  constructor(
+  function initialize(
     uint256 _parentBlockInterval,
     uint256 _maxReward,
     MintableToken _nativeToken
-  ) public {
+  ) public initializer {
+    Ownable.initialize(msg.sender);
     // init genesis preiod
     Period memory genesisPeriod = Period({
       parent: GENESIS,
@@ -89,7 +91,8 @@ contract Bridge is Ownable {
     // do some magic if chain extended
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
-      require(block.number >= lastParentBlock + parentBlockInterval, 
+      require(
+        block.number >= lastParentBlock + parentBlockInterval, 
         "Tried to submit new period too soon");
       tipHash = _root;
       lastParentBlock = uint64(block.number);

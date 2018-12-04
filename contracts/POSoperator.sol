@@ -8,11 +8,12 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-eth/contracts/ownership/Ownable.sol";
+import "openzeppelin-eth/contracts/math/SafeMath.sol";
+import "zos-lib/contracts/Initializable.sol";
 import "./Bridge.sol";
 
-contract POSoperator is Ownable {
+contract POSoperator is Initializable, Ownable {
 
   using SafeMath for uint256;
 
@@ -75,7 +76,8 @@ contract POSoperator is Ownable {
   mapping(uint256 => Slot) public slots;
   mapping(bytes32 => PeriodData) public periodData;
 
-  constructor (Bridge _bridge, uint256 _epochLength) public {
+  function initialize (Bridge _bridge, uint256 _epochLength) public initializer {
+    Ownable.initialize(msg.sender);
     bridge = _bridge;
     epochLength = _epochLength;
   }

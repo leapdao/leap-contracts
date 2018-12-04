@@ -1,14 +1,15 @@
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-eth/contracts/token/ERC20/ERC20.sol";
+import "zos-lib/contracts/Initializable.sol";
 
-contract MintableToken is StandardToken {
+contract MintableToken is Initializable, ERC20 {
   event Mint(address indexed to, uint256 amount);
   event MintFinished();
 
-  bool public mintingFinished = false;
-  bool public initialized = false;
-  address public minter = 0x0;
+  bool public mintingFinished;
+  bool public initialized;
+  address public minter;
 
   modifier canMint() {
     require(!mintingFinished);
@@ -26,6 +27,11 @@ contract MintableToken is StandardToken {
     initialized = true;
   }
 
+  function initialize() public initializer {
+    mintingFinished = false;
+    initialized = false;
+    minter = 0x0;
+  }
   /**
    * @dev Function to mint tokens
    * @param _to The address that will receive the minted tokens.
@@ -41,10 +47,8 @@ contract MintableToken is StandardToken {
     canMint
     returns (bool)
   {
-    totalSupply_ = totalSupply_.add(_amount);
-    balances[_to] = balances[_to].add(_amount);
+    _mint(_to, _amount);
     emit Mint(_to, _amount);
-    emit Transfer(address(0), _to, _amount);
     return true;
   }
 

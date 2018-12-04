@@ -14,10 +14,10 @@ import "openzeppelin-eth/contracts/math/Math.sol";
 import "openzeppelin-eth/contracts/ownership/Ownable.sol";
 import "zos-lib/contracts/Initializable.sol";
 
-import "../TransferrableToken.sol";
-import "../PriorityQueue.sol";
-import "../TxLib.sol";
-import "../IntrospectionUtil.sol";
+import "../../contracts/TransferrableToken.sol";
+import "../../contracts/PriorityQueue.sol";
+import "../../contracts/TxLib.sol";
+import "../../contracts/IntrospectionUtil.sol";
 
 
 contract LeapBridge is Initializable, Ownable {

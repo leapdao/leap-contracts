@@ -8,10 +8,12 @@
 
 pragma solidity 0.4.24;
 
+import "zos-lib/contracts/Initializable.sol";
+
 import "./Vault.sol";
 import "./Bridge.sol";
 
-contract DepositHandler is Vault {
+contract DepositHandler is Initializable, Vault {
 
   event NewDeposit(
     uint32 indexed depositId, 
@@ -27,12 +29,13 @@ contract DepositHandler is Vault {
     uint256 amount;
   }
 
-  uint32 public depositCount = 0;
+  uint32 public depositCount;
 
   mapping(uint32 => Deposit) public deposits;
 
-  constructor(Bridge _bridge) Vault(_bridge) public {
-
+  function initialize(Bridge _bridge) public initializer {
+    Vault.initialize(_bridge);
+    depositCount = 0;
   }
 
    /**
