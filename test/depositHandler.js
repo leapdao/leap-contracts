@@ -11,7 +11,7 @@ import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
-const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
+const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const MintableToken = artifacts.require('MockMintableToken');
@@ -38,12 +38,12 @@ contract('DepositHandler', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data);
       bridge = Bridge.at(proxy.address);
 
       const vaultCont = await DepositHandler.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data);
       depositHandler = DepositHandler.at(proxy.address);
 
       // register first token

@@ -9,11 +9,11 @@
 pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "./Initializable.sol";
+import "./Adminable.sol";
 import "./Vault.sol";
 import "./Bridge.sol";
 
-contract POSoperator is Initializable {
+contract POSoperator is Adminable {
 
   using SafeMath for uint256;
 

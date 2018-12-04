@@ -15,7 +15,7 @@ const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const MintableToken = artifacts.require('MockMintableToken');
 const POSoperator = artifacts.require('POSoperator');
-const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
+const AdminableProxy = artifacts.require('AdminableProxy');
 
 const should = chai
   .use(chaiAsPromised)
@@ -40,17 +40,17 @@ contract('PosOperator', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data);
       bridge = Bridge.at(proxy.address);
 
       const vaultCont = await Vault.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data);
       vault = Vault.at(proxy.address);
 
       const opCont = await POSoperator.new();
       data = await opCont.contract.initialize.getData(bridge.address, vault.address, epochLength);
-      proxy = await AdminUpgradeabilityProxy.new(opCont.address, data);
+      proxy = await AdminableProxy.new(opCont.address, data);
       operator = POSoperator.at(proxy.address);
       await bridge.setOperator(operator.address);
       // register first token

@@ -8,13 +8,13 @@
 
 pragma solidity 0.4.24;
 
-import "./Initializable.sol";
+import "./Adminable.sol";
 import "./PriorityQueue.sol";
 import "./TransferrableToken.sol";
 import "./IntrospectionUtil.sol";
 import "./Bridge.sol";
 
-contract Vault is Initializable {
+contract Vault is Adminable {
 
   event NewToken(address indexed tokenAddr, uint16 color);
 

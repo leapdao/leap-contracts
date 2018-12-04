@@ -12,7 +12,7 @@ import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
 const Bridge = artifacts.require('Bridge');
-const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
+const AdminableProxy = artifacts.require('AdminableProxy');
 
 const should = chai
   .use(chaiAsPromised)
@@ -29,7 +29,7 @@ contract('Bridge', (accounts) => {
     beforeEach(async () => {
       const bridgeCont = await Bridge.new();
       const data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      const proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      const proxy = await AdminableProxy.new(bridgeCont.address, data);
       bridge = Bridge.at(proxy.address);
     });
 

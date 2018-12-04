@@ -13,7 +13,7 @@ import chaiAsPromised from 'chai-as-promised';
 
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 
-const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
+const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -48,12 +48,12 @@ contract('ExitHandler', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data);
       bridge = Bridge.at(proxy.address);
 
       const vaultCont = await ExitHandler.new();
       data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
-      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data);
       exitHandler = ExitHandler.at(proxy.address);
 
       // register first token

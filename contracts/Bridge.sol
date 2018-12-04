@@ -9,9 +9,9 @@
 pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "./Initializable.sol";
+import "./Adminable.sol";
 
-contract Bridge is Initializable {
+contract Bridge is Adminable {
 
   using SafeMath for uint256;
 
