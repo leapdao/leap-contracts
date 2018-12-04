@@ -6,12 +6,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
-
 import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
+require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
@@ -19,20 +15,13 @@ const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const MintableToken = artifacts.require('MockMintableToken');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
-
 contract('FastExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
-  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
-  const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let fastExitHandler;
     let nativeToken;
@@ -85,8 +74,8 @@ contract('FastExitHandler', (accounts) => {
 
       const p = [];
       p[0] = await bridge.tipHash();
-      let block = new Block(33).addTx(deposit).addTx(transfer);
-      let period = new Period(p[0], [block]);
+      const block = new Block(33).addTx(deposit).addTx(transfer);
+      const period = new Period(p[0], [block]);
       p[1] = period.merkleRoot();
 
       await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;

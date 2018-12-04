@@ -6,22 +6,15 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
+require('./helpers/setup');
 
 const Bridge = artifacts.require('Bridge');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
-
 contract('Bridge', (accounts) => {
+  const bob = accounts[1];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     const maxReward = 50;
     const parentBlockInterval = 0;

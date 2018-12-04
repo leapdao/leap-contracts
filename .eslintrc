@@ -1,0 +1,23 @@
+{
+  "parser": "babel-eslint",
+  "extends": ["airbnb-base", "prettier"],
+  "globals": {
+    "artifacts": false,
+    "contract": false,
+    "describe": false,
+    "assert": false,
+    "before": false,
+    "beforeEach": false,
+    "it": false,
+    "web3": false
+  },
+  "parserOptions": {
+    "ecmaVersion": 6
+  },
+  "env": {
+    "es6": true
+  },
+  "rules": {
+    "no-plusplus": 0
+  }
+}

@@ -80,8 +80,10 @@ contract Bridge is Adminable {
     // do some magic if chain extended
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
-      require(block.number >= lastParentBlock + parentBlockInterval, 
-        "Tried to submit new period too soon");
+      require(
+        block.number >= lastParentBlock + parentBlockInterval, 
+        "Tried to submit new period too soon"
+      );
       tipHash = _root;
       lastParentBlock = uint64(block.number);
       emit NewHeight(newHeight, _root);

@@ -7,9 +7,6 @@
  */
 
 import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -27,7 +24,7 @@ contract('PosOperator', (accounts) => {
   const bob = accounts[1];
   const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let nativeToken;
     let operator;
@@ -61,12 +58,12 @@ contract('PosOperator', (accounts) => {
       nativeToken.transfer(charlie, 1000);
     });
 
-    describe('Slot', function() {
+    describe('Slot', () => {
       const p = [];
       before(async () => {
         p[0] = await bridge.tipHash();
       });
-      describe('Auction', function() {
+      describe('Auction', () => {
         it('should prevent submission by unbonded validators', async () => {
           await operator.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
         });

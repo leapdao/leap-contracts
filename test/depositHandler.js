@@ -7,9 +7,8 @@
  */
 
 import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
+
+require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
@@ -17,17 +16,12 @@ const DepositHandler = artifacts.require('DepositHandler');
 const MintableToken = artifacts.require('MockMintableToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
 
 contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
-  const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let depositHandler;
     let nativeToken;
@@ -74,7 +68,7 @@ contract('DepositHandler', (accounts) => {
       it('Can deposit ERC721 and depositHandler becomes owner', async () => {
         const nftToken = await SpaceDustNFT.new();
         const receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
         await depositHandler.registerToken(nftToken.address).should.be.fulfilled;
