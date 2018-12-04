@@ -6,23 +6,14 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
-
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
+import EVMRevert from './helpers/EVMRevert';
 
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const MintableToken = artifacts.require('MockMintableToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
-
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
 
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
@@ -32,7 +23,7 @@ contract('ExitHandler', (accounts) => {
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';;
   const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let exitHandler;
     let nativeToken;
@@ -70,8 +61,8 @@ contract('ExitHandler', (accounts) => {
 
         const p = [];
         p[0] = await bridge.tipHash();
-        let block = new Block(33).addTx(deposit).addTx(transfer);
-        let period = new Period(p[0], [block]);
+        const block = new Block(33).addTx(deposit).addTx(transfer);
+        const period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
 
         await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
@@ -95,7 +86,7 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
         receipt = await exitHandler.registerToken(nftToken.address);
@@ -118,8 +109,8 @@ contract('ExitHandler', (accounts) => {
         // include in block and period
         const p = [];
         p[0] = await bridge.tipHash();
-        let block = new Block(33).addTx(deposit).addTx(transfer);
-        let period = new Period(p[0], [block]);
+        const block = new Block(33).addTx(deposit).addTx(transfer);
+        const period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
 
         await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;
@@ -155,8 +146,8 @@ contract('ExitHandler', (accounts) => {
 
         const p = [];
         p[0] = await bridge.tipHash();
-        let block = new Block(33).addTx(deposit).addTx(transfer);
-        let period = new Period(p[0], [block]);
+        const block = new Block(33).addTx(deposit).addTx(transfer);
+        const period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
 
         await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
@@ -191,8 +182,8 @@ contract('ExitHandler', (accounts) => {
 
         const p = [];
         p[0] = await bridge.tipHash();
-        let block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
-        let period = new Period(p[0], [block]);
+        const block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
+        const period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
 
         await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
@@ -230,7 +221,7 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
         receipt = await exitHandler.registerToken(nftToken.address);
@@ -260,8 +251,8 @@ contract('ExitHandler', (accounts) => {
          // include in block and period
         const p = [];
         p[0] = await bridge.tipHash();
-        let block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
-        let period = new Period(p[0], [block]);
+        const block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
+        const period = new Period(p[0], [block]);
         p[1] = period.merkleRoot();
 
         await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;

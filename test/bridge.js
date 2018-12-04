@@ -6,25 +6,13 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
-
 const Bridge = artifacts.require('Bridge');
 const MintableToken = artifacts.require('MockMintableToken');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
-
 contract('Bridge', (accounts) => {
-  const alice = accounts[0];
   const bob = accounts[1];
-  const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let nativeToken;
     const maxReward = 50;

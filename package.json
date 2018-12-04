@@ -10,7 +10,7 @@
     "test-ci": "npm run clean && npm run compile && scripts/test.sh",
     "lint": "npm run lint:contracts && npm run lint:js",
     "lint:contracts": "solium -d contracts/ --fix",
-    "lint:js": "eslint test/**/*.js --fix"
+    "lint:js": "eslint test/ --fix"
   },
   "husky": {
     "hooks": {
