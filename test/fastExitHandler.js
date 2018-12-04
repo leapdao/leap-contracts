@@ -8,6 +8,8 @@
 
 import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
 
+require('./helpers/setup');
+
 const Bridge = artifacts.require('Bridge');
 const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');

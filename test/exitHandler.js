@@ -9,6 +9,8 @@
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 import EVMRevert from './helpers/EVMRevert';
 
+require('./helpers/setup');
+
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');

@@ -8,6 +8,8 @@
 
 import EVMRevert from './helpers/EVMRevert';
 
+require('./helpers/setup');
+
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const MintableToken = artifacts.require('MockMintableToken');

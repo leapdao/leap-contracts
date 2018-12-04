@@ -6,6 +6,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+require('./helpers/setup');
+
 const Bridge = artifacts.require('Bridge');
 const MintableToken = artifacts.require('MockMintableToken');
 
