@@ -14,11 +14,6 @@ const MintableToken = artifacts.require('MockMintableToken');
 const POSoperator = artifacts.require('POSoperator');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
-
 contract('PosOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
