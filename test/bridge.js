@@ -12,7 +12,6 @@ const Bridge = artifacts.require('Bridge');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('Bridge', (accounts) => {
-  const bob = accounts[1];
 
   describe('Test', () => {
     let bridge;

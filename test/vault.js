@@ -17,7 +17,6 @@ const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 contract('Vault', (accounts) => {
   const bob = accounts[1];
-  const charlie = accounts[2];
 
   describe('Test', () => {
     let bridge;

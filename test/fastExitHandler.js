@@ -7,6 +7,7 @@
  */
 
 import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
+
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
