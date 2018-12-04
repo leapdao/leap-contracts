@@ -5,11 +5,15 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
+process.env.NODE_ENV = 'test';
 
-import EVMRevert from './helpers/EVMRevert';
+ import EVMRevert from './helpers/EVMRevert';
 import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
+
+import { encodeCall } from 'zos-lib';
+import { TestHelper } from 'zos';
 
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
@@ -21,10 +25,16 @@ const should = chai
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
+const sendTransaction = (target, method, args, values, opts) => {
+  const data = encodeCall(method, args, values);
+  return target.sendTransaction(Object.assign({ data }, opts));
+};  
+
 contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
+  const proxyAdmin = accounts[9];
 
   describe('Test', function() {
     let bridge;
@@ -34,9 +44,22 @@ contract('DepositHandler', (accounts) => {
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
-      nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      depositHandler = await DepositHandler.new(bridge.address);
+      this.project = await TestHelper({from: proxyAdmin});
+      nativeToken = await this.project.createProxy(MintableToken);
+      await sendTransaction(nativeToken, 'initialize'); 
+      
+      bridge = await this.project.createProxy(Bridge);
+      await sendTransaction(bridge, 
+        'initialize', 
+        ['uint256','uint256','address', 'address'],
+        [parentBlockInterval, maxReward, nativeToken.address, alice]);
+      
+      depositHandler = await this.project.createProxy(DepositHandler);
+      await sendTransaction(depositHandler, 
+        'initialize', 
+        ['address', 'address'],
+        [bridge.address, alice]);
+      
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -62,11 +85,12 @@ contract('DepositHandler', (accounts) => {
 
       it('Can deposit ERC721 and depositHandler becomes owner', async () => {
         const nftToken = await SpaceDustNFT.new();
+        await sendTransaction(nftToken, 'initialize');
         const receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args.tokenId;
         const NFTcolor = 32769;
 
-        await depositHandler.registerToken(nftToken.address).should.be.fulfilled;
+        await depositHandler.registerToken(nftToken.address, true).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});
 

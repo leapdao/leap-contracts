@@ -5,6 +5,7 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
+process.env.NODE_ENV = 'test';
 
 import EVMRevert from './helpers/EVMRevert';
 import chai from 'chai';
@@ -12,6 +13,8 @@ import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
+import { encodeCall } from 'zos-lib';
+import { TestHelper } from 'zos';
 
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
@@ -24,13 +27,19 @@ const should = chai
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
+const sendTransaction = (target, method, args, values, opts) => {
+  const data = encodeCall(method, args, values);
+  return target.sendTransaction(Object.assign({ data }, opts));
+}; 
+
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
-  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
+  const alicePriv = '0xe10d5404bb976d8a5c419b8b1174c4555e5fe803e4bfb06deca2230eed8d6537';
   const bob = accounts[1];
-  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';;
+  const bobPriv = '0x9001350c0cb71e7453dfd24d5f60f86fefcab8120c58bf984a6a9210c0064830';
   const charlie = accounts[2];
+  const proxyAdmin = accounts[9];
 
   describe('Test', function() {
     let bridge;
@@ -44,9 +53,22 @@ contract('ExitHandler', (accounts) => {
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
       ExitHandler.link('PriorityQueue', pqLib.address);
-      nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      exitHandler = await ExitHandler.new(bridge.address, exitDuration, exitStake);
+      this.project = await TestHelper({from: proxyAdmin});
+      nativeToken = await this.project.createProxy(MintableToken);
+      await sendTransaction(nativeToken, 'initialize'); 
+      
+      bridge = await this.project.createProxy(Bridge);
+      await sendTransaction(bridge, 
+        'initialize', 
+        ['uint256','uint256','address', 'address'],
+        [parentBlockInterval, maxReward, nativeToken.address, alice]);
+
+      exitHandler = await this.project.createProxy(ExitHandler);
+      await sendTransaction(exitHandler, 
+        'initialize', 
+        ['address', 'uint256', 'uint256', 'address'],
+        [bridge.address, exitDuration, exitStake, alice]);
+      
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -93,12 +115,13 @@ contract('ExitHandler', (accounts) => {
 
       it('Should allow to exit NFT utxo', async () => {
         const nftToken = await SpaceDustNFT.new();
+        await sendTransaction(nftToken, 'initialize');
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args.tokenId;
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
+        receipt = await exitHandler.registerToken(nftToken.address, true);
         const nftColor = receipt.logs[0].args.color.toNumber();
         
         // deposit
@@ -228,12 +251,13 @@ contract('ExitHandler', (accounts) => {
       it('Should allow to challenge NFT exit', async () => {
 
         const nftToken = await SpaceDustNFT.new();
+        await sendTransaction(nftToken, 'initialize');
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId;
+        const tokenId = receipt.logs[0].args.tokenId;
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
+        receipt = await exitHandler.registerToken(nftToken.address, true);
         const nftColor = receipt.logs[0].args.color.toNumber();
         
         // deposit

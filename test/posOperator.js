@@ -5,11 +5,15 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
+process.env.NODE_ENV = 'test';
 
 import EVMRevert from './helpers/EVMRevert';
 import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
+
+import { encodeCall } from 'zos-lib';
+import { TestHelper } from 'zos';
 
 const Bridge = artifacts.require('Bridge');
 const MintableToken = artifacts.require('MockMintableToken');
@@ -20,10 +24,16 @@ const should = chai
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
+const sendTransaction = (target, method, args, values, opts) => {
+  const data = encodeCall(method, args, values);
+  return target.sendTransaction(Object.assign({ data }, opts));
+};
+
 contract('Bridge', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
+  const proxyAdmin = accounts[9];
 
   describe('Test', function() {
     let bridge;
@@ -34,9 +44,23 @@ contract('Bridge', (accounts) => {
     const epochLength = 3;
 
     before(async () => {
+      this.project = await TestHelper({from: proxyAdmin});
+      //nativeToken = await this.project.createProxy(MintableToken);
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      operator = await POSoperator.new(bridge.address, epochLength);
+      await sendTransaction(nativeToken, 'initialize'); 
+      
+      bridge = await this.project.createProxy(Bridge);
+      await sendTransaction(bridge, 
+        'initialize', 
+        ['uint256','uint256','address', 'address'],
+        [parentBlockInterval, maxReward, nativeToken.address, alice]);
+      
+      operator = await this.project.createProxy(POSoperator);
+      await sendTransaction(operator, 
+        'initialize', 
+        ['address', 'uint256', 'address'],
+        [bridge.address, epochLength, alice]);
+      
       await bridge.setOperator(operator.address);
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified

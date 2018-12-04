@@ -5,11 +5,15 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
+process.env.NODE_ENV = 'test';
 
 import EVMRevert from './helpers/EVMRevert';
 import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
+
+import { encodeCall } from 'zos-lib';
+import { TestHelper } from 'zos';
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -22,10 +26,16 @@ const should = chai
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
+const sendTransaction = (target, method, args, values, opts) => {
+  const data = encodeCall(method, args, values);
+  return target.sendTransaction(Object.assign({ data }, opts));
+};
+
 contract('Vault', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
+  const proxyAdmin = accounts[9];
 
   describe('Test', function() {
     let bridge;
@@ -35,9 +45,23 @@ contract('Vault', (accounts) => {
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
+      this.project = await TestHelper({from: proxyAdmin});
+      //nativeToken = await this.project.createProxy(MintableToken);
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      vault = await Vault.new(bridge.address);
+      await sendTransaction(nativeToken, 'initialize'); 
+      
+      bridge = await this.project.createProxy(Bridge);
+      await sendTransaction(bridge, 
+        'initialize', 
+        ['uint256','uint256','address', 'address'],
+        [parentBlockInterval, maxReward, nativeToken.address, alice]);
+
+      vault = await this.project.createProxy(Vault);
+      await sendTransaction(vault, 
+        'initialize', 
+        ['address', 'address'],
+        [bridge.address, alice]);
+
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and vault and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -47,8 +71,19 @@ contract('Vault', (accounts) => {
     describe('Register Token', async () => {
       it('Bridge native token gets register at 0 on construction', async () => {
         const nativeToken = await MintableToken.new();
-        const bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-        const vault = await Vault.new(bridge.address);
+        await sendTransaction(nativeToken, 'initialize');
+        
+        const bridge = await this.project.createProxy(Bridge);
+        await sendTransaction(bridge, 
+          'initialize', 
+          ['uint256','uint256','address', 'address'],
+          [parentBlockInterval, maxReward, nativeToken.address, alice]);
+
+        const vault = await this.project.createProxy(Vault);
+        await sendTransaction(vault, 
+          'initialize', 
+          ['address', 'address'],
+          [bridge.address, alice]);
 
         const tokenZeroAddr = (await vault.tokens(0))[0];
         tokenZeroAddr.should.be.equal(nativeToken.address);
@@ -56,8 +91,9 @@ contract('Vault', (accounts) => {
 
       it('Owner can register ERC20 token', async () => {
         const newToken = await SimpleToken.new();
+        await newToken.initialize();
 
-        await vault.registerToken(newToken.address).should.be.fulfilled;
+        await vault.registerToken(newToken.address, false).should.be.fulfilled;
 
         const tokenOneAddr = (await vault.tokens(1))[0];
         tokenOneAddr.should.be.equal(newToken.address);
@@ -65,8 +101,9 @@ contract('Vault', (accounts) => {
 
       it('Owner can register ERC721 token', async () => {
         const newNFTtoken = await SpaceDustNFT.new();
+        await sendTransaction(newNFTtoken, 'initialize');
 
-        await vault.registerToken(newNFTtoken.address).should.be.fulfilled;
+        await vault.registerToken(newNFTtoken.address, true).should.be.fulfilled;
 
         // NFTs have their own space
         const NFTstartIndex = 32769;
@@ -76,8 +113,9 @@ contract('Vault', (accounts) => {
 
       it('Non-owner can not register token', async () => {
         const newToken = await SimpleToken.new();
+        await newToken.initialize();
 
-        await vault.registerToken(newToken.address, {from : charlie}).should.be.rejectedWith(EVMRevert);
+        await vault.registerToken(newToken.address, false, {from : charlie}).should.be.rejectedWith(EVMRevert);
       });
     });
 
