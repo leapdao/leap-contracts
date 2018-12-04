@@ -3,7 +3,12 @@
   "name": "leap-contracts",
   "version": "0.1.0",
   "contracts": {
-    "LeapBridge": "LeapBridge",
-    "ExitToken": "ExitToken"
+    "Bridge": "Bridge",
+    "DepositHandler": "DepositHandler",
+    "ExitHandler": "ExitHandler",
+    "FastExitHandler": "FastExitHandler",
+    "MintableToken": "MintableToken",
+    "POSoperator": "POSoperator",
+    "Vault": "Vault"
   }
 }
