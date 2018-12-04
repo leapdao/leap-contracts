@@ -1,14 +1,7 @@
-dist: trusty
-sudo: required
-group: beta
 language: node_js
+cache: yarn
 node_js:
-  - "8"
-cache:
-  directories:
-    - node_modules
-matrix:
-  fast_finish: true
+  - '8.11'
 script:
   - yarn run lint
   - yarn run test-ci

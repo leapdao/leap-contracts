@@ -8,9 +8,10 @@
 
 import utils from "ethereumjs-util";
 import BN from 'bn.js';
-import EVMRevert from './helpers/EVMRevert';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
+import EVMRevert from './helpers/EVMRevert';
+
 const TxMock = artifacts.require('./mocks/TxMock.sol');
 const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
 
@@ -33,7 +34,8 @@ function fromInt(num) {
 function checkParse(rsp, txn) {
   // transaction header
   assert.equal(rsp[0], txn.type);
-  if (txn.type == Type.DEPOSIT) {
+  if (txn.type === Type.DEPOSIT) {
+    // eslint-disable-next-line no-param-reassign
     txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
   }
   assert.equal(toInt(rsp[1][0]), txn.inputs.length);
@@ -59,7 +61,7 @@ function checkParse(rsp, txn) {
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
     if (txn.type === Type.COMP_RSP && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], tx.outputs[i].storageRoot); // storage root
+      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], txn.outputs[i].storageRoot); // storage root
     } else if (txn.type === Type.COMP_REQ && i === 0) {
       assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].gasPrice); // gas price
       assert.equal(rsp[2], `0x${txn.outputs[i].msgData.toString('hex')}`); // gas price
@@ -82,14 +84,14 @@ contract('TxLib', (accounts) => {
   const nftTokenId = '3378025004445879814397';
   const nftColor = 32769;
 
-  describe('Parser', function() {
+  describe('Parser', () => {
     let txLib;
 
     before(async () => {
       txLib = await TxMock.new();
     });
 
-    describe('Deposit', function() {
+    describe('Deposit', () => {
 
       it('should allow to parse deposit', async () => {
         const deposit = Tx.deposit(12, value, bob, color);
@@ -115,7 +117,7 @@ contract('TxLib', (accounts) => {
 
     });
 
-    describe('Transfer', function() {
+    describe('Transfer', () => {
 
       it('should parse single input and output', async () => {
         const transfer = Tx.transfer(
@@ -184,7 +186,7 @@ contract('TxLib', (accounts) => {
       });
     });
 
-    describe('Consolidate', function() {
+    describe('Consolidate', () => {
 
       it('should allow to parse consolidate tx', async () => {
         const consolidate = Tx.consolidate([
@@ -216,7 +218,7 @@ contract('TxLib', (accounts) => {
       });
     });
   });
-  describe('Utils', function() {
+  describe('Utils', () => {
     let txLib;
 
     before(async () => {
