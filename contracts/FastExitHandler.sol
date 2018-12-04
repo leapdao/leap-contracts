@@ -14,13 +14,6 @@ import "./TxLib.sol";
 
 contract FastExitHandler is ExitHandler {
 
-  constructor(
-    Bridge _bridge, 
-    uint256 _exitDuration, 
-    uint256 _exitStake) 
-  ExitHandler(_bridge, _exitDuration, _exitStake) public {
-  }
-
   function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public payable {
 
     (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);

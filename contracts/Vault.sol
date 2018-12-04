@@ -8,14 +8,13 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-
+import "./Initializable.sol";
 import "./PriorityQueue.sol";
 import "./TransferrableToken.sol";
 import "./IntrospectionUtil.sol";
 import "./Bridge.sol";
 
-contract Vault is Ownable {
+contract Vault is Initializable {
 
   event NewToken(address indexed tokenAddr, uint16 color);
 
@@ -27,12 +26,15 @@ contract Vault is Ownable {
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
 
-  constructor (Bridge _bridge) public {
+  function initialize(Bridge _bridge) public initializer {
     bridge = _bridge;
-    registerToken(TransferrableToken(bridge.nativeToken()));
   } 
 
-  function registerToken(TransferrableToken _token) public onlyOwner {
+  function getTokenAddr(uint16 _color) public view returns (address) {
+    return tokens[_color].addr;
+  }
+
+  function registerToken(TransferrableToken _token) public ifAdmin {
     // make sure token is not 0x0 and that it has not been registered yet
     require(_token != address(0), "Tried to register 0x0 address");
     require(!tokenColors[_token], "Token already registered");

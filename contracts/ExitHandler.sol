@@ -44,16 +44,16 @@ contract ExitHandler is DepositHandler {
    */
   mapping(bytes32 => Exit) public exits;
 
-  constructor(
+  function initializeWithExit(
     Bridge _bridge, 
     uint256 _exitDuration, 
-    uint256 _exitStake) 
-  DepositHandler(_bridge) public {
+    uint256 _exitStake) public initializer {
+    initialize(_bridge);
     exitDuration = _exitDuration;
     exitStake = _exitStake;
   }
 
-  function setExitStake(uint256 _exitStake) public onlyOwner {
+  function setExitStake(uint256 _exitStake) public ifAdmin {
     exitStake = _exitStake;
   }
 

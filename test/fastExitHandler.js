@@ -13,6 +13,7 @@ import chaiAsPromised from 'chai-as-promised';
 
 import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
 
+const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
 const Bridge = artifacts.require('Bridge');
 const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -44,8 +45,19 @@ contract('FastExitHandler', (accounts) => {
       const pqLib = await PriorityQueue.new();
       FastExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      fastExitHandler = await FastExitHandler.new(bridge.address, exitDuration, exitStake);
+
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      bridge = Bridge.at(proxy.address);
+
+      const vaultCont = await FastExitHandler.new();
+      data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
+      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      fastExitHandler = FastExitHandler.at(proxy.address);
+
+      // register first token
+      await fastExitHandler.registerToken(nativeToken.address);
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and fastExitHandler and has 10000 tokens
       // Bob is the bridge operator and has 0 tokens

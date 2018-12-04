@@ -11,6 +11,7 @@ import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
+const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const MintableToken = artifacts.require('MockMintableToken');
@@ -35,8 +36,18 @@ contract('DepositHandler', (accounts) => {
 
     beforeEach(async () => {
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      depositHandler = await DepositHandler.new(bridge.address);
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      bridge = Bridge.at(proxy.address);
+
+      const vaultCont = await DepositHandler.new();
+      data = await vaultCont.contract.initialize.getData(bridge.address);
+      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      depositHandler = DepositHandler.at(proxy.address);
+
+      // register first token
+      await depositHandler.registerToken(nativeToken.address);
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens

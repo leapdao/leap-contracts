@@ -8,11 +8,12 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "./Initializable.sol";
+import "./Vault.sol";
 import "./Bridge.sol";
 
-contract POSoperator is Ownable {
+contract POSoperator is Initializable {
 
   using SafeMath for uint256;
 
@@ -66,6 +67,7 @@ contract POSoperator is Ownable {
     uint8 slot;
   }
 
+  Vault public vault;
   Bridge public bridge;
 
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -75,12 +77,13 @@ contract POSoperator is Ownable {
   mapping(uint256 => Slot) public slots;
   mapping(bytes32 => PeriodData) public periodData;
 
-  constructor (Bridge _bridge, uint256 _epochLength) public {
+  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
+    vault = _vault;
     bridge = _bridge;
     epochLength = _epochLength;
   }
 
-  function setEpochLength(uint256 _epochLength) public onlyOwner {
+  function setEpochLength(uint256 _epochLength) public ifAdmin {
     epochLength = _epochLength;
   }
 
@@ -120,7 +123,7 @@ contract POSoperator is Ownable {
     // new purchase or update
     if (slot.stake == 0 || (slot.owner == tx.origin && slot.newStake == 0)) {
       uint64 stake = slot.stake;
-      ERC20(bridge.nativeToken()).transferFrom(tx.origin, this, _value - slot.stake);
+      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value - slot.stake);
       slot.owner = tx.origin;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
@@ -145,9 +148,9 @@ contract POSoperator is Ownable {
       }
     } else { // auction
       if (slot.newStake > 0) {
-        ERC20(bridge.nativeToken()).transfer(slot.newOwner, slot.newStake);
+        ERC20(vault.getTokenAddr(0)).transfer(slot.newOwner, slot.newStake);
       }
-      ERC20(bridge.nativeToken()).transferFrom(tx.origin, this, _value);
+      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value);
       slot.newOwner = tx.origin;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
@@ -171,7 +174,7 @@ contract POSoperator is Ownable {
     Slot storage slot = slots[_slotId];
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
     if (slot.stake > 0) {
-      ERC20(bridge.nativeToken()).transfer(slot.owner, slot.stake);
+      ERC20(vault.getTokenAddr(0)).transfer(slot.owner, slot.stake);
       emit ValidatorLeave(
         slot.signer, 
         _slotId, 

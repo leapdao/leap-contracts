@@ -31,10 +31,6 @@ contract DepositHandler is Vault {
 
   mapping(uint32 => Deposit) public deposits;
 
-  constructor(Bridge _bridge) Vault(_bridge) public {
-
-  }
-
    /**
    * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
    * or `(_amountOrTokenId)` token id if `(_color)` is NFT.

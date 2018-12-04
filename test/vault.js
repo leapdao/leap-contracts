@@ -11,6 +11,7 @@ import chai from 'chai';
 import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
+const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const MintableToken = artifacts.require('MockMintableToken');
@@ -36,8 +37,19 @@ contract('Vault', (accounts) => {
 
     beforeEach(async () => {
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      vault = await Vault.new(bridge.address);
+
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      bridge = Bridge.at(proxy.address);
+
+      const vaultCont = await Vault.new();
+      data = await vaultCont.contract.initialize.getData(bridge.address);
+      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      vault = Vault.at(proxy.address);
+
+      // register first token
+      await vault.registerToken(nativeToken.address);
       await bridge.setOperator(bob);
       // At this point alice is the owner of bridge and vault and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -45,14 +57,6 @@ contract('Vault', (accounts) => {
     });
 
     describe('Register Token', async () => {
-      it('Bridge native token gets register at 0 on construction', async () => {
-        const nativeToken = await MintableToken.new();
-        const bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-        const vault = await Vault.new(bridge.address);
-
-        const tokenZeroAddr = (await vault.tokens(0))[0];
-        tokenZeroAddr.should.be.equal(nativeToken.address);
-      });
 
       it('Owner can register ERC20 token', async () => {
         const newToken = await SimpleToken.new();
@@ -76,8 +80,7 @@ contract('Vault', (accounts) => {
 
       it('Non-owner can not register token', async () => {
         const newToken = await SimpleToken.new();
-
-        await vault.registerToken(newToken.address, {from : charlie}).should.be.rejectedWith(EVMRevert);
+        await vault.registerToken(newToken.address, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
     });
 

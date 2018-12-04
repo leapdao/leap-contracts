@@ -9,11 +9,9 @@
 pragma solidity 0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "./Initializable.sol";
 
-import "./MintableToken.sol";
-
-contract Bridge is Ownable {
+contract Bridge is Initializable {
 
   using SafeMath for uint256;
 
@@ -42,15 +40,10 @@ contract Bridge is Ownable {
   address public operator; // the operator contract
   address public exitHandler; // the exit handler contract
   uint256 public maxReward; // max reward per period
-  MintableToken public nativeToken; // plasma native token
 
   mapping(bytes32 => Period) public periods;
 
-  constructor(
-    uint256 _parentBlockInterval,
-    uint256 _maxReward,
-    MintableToken _nativeToken
-  ) public {
+  function initialize(uint256 _parentBlockInterval, uint256 _maxReward) public initializer {
     // init genesis preiod
     Period memory genesisPeriod = Period({
       parent: GENESIS,
@@ -66,12 +59,10 @@ contract Bridge is Ownable {
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
     maxReward = _maxReward;
-
-    nativeToken = _nativeToken;
-    nativeToken.init(address(this));
+    operator = msg.sender;
   }
 
-  function setOperator(address _operator) public onlyOwner {
+  function setOperator(address _operator) public ifAdmin {
     operator = _operator;
     emit NewOperator(_operator);
   }
@@ -104,18 +95,6 @@ contract Bridge is Ownable {
       children: new bytes32[](0)
     });
     periods[_root] = newPeriod;
-
-    // distribute rewards
-    uint256 totalSupply = nativeToken.totalSupply();
-    uint256 stakedSupply = nativeToken.balanceOf(operator);
-    reward = maxReward;
-    if (stakedSupply >= totalSupply.div(2)) {
-      // 4 x br x as x (ts - as)
-      // -----------------------
-      //        ts x ts
-      reward = totalSupply.sub(stakedSupply).mul(stakedSupply).mul(maxReward).mul(4).div(totalSupply.mul(totalSupply));
-    }
-    nativeToken.mint(operator, reward);
   }
 
 }

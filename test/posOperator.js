@@ -12,15 +12,17 @@ import chaiBigNumber from 'chai-bignumber';
 import chaiAsPromised from 'chai-as-promised';
 
 const Bridge = artifacts.require('Bridge');
+const Vault = artifacts.require('Vault');
 const MintableToken = artifacts.require('MockMintableToken');
 const POSoperator = artifacts.require('POSoperator');
+const AdminUpgradeabilityProxy = artifacts.require('AdminUpgradeabilityProxy');
 
 const should = chai
   .use(chaiAsPromised)
   .use(chaiBigNumber(web3.BigNumber))
   .should();
 
-contract('Bridge', (accounts) => {
+contract('PosOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
@@ -29,15 +31,30 @@ contract('Bridge', (accounts) => {
     let bridge;
     let nativeToken;
     let operator;
+    let vault;
     const maxReward = 50;
     const parentBlockInterval = 0;
     const epochLength = 3;
 
     before(async () => {
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      operator = await POSoperator.new(bridge.address, epochLength);
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let proxy = await AdminUpgradeabilityProxy.new(bridgeCont.address, data);
+      bridge = Bridge.at(proxy.address);
+
+      const vaultCont = await Vault.new();
+      data = await vaultCont.contract.initialize.getData(bridge.address);
+      proxy = await AdminUpgradeabilityProxy.new(vaultCont.address, data);
+      vault = Vault.at(proxy.address);
+
+      const opCont = await POSoperator.new();
+      data = await opCont.contract.initialize.getData(bridge.address, vault.address, epochLength);
+      proxy = await AdminUpgradeabilityProxy.new(opCont.address, data);
+      operator = POSoperator.at(proxy.address);
       await bridge.setOperator(operator.address);
+      // register first token
+      await vault.registerToken(nativeToken.address);
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
       nativeToken.transfer(bob, 1000);
@@ -75,8 +92,8 @@ contract('Bridge', (accounts) => {
 
         it('should prevent auctining for lower price', async () => {
           await nativeToken.approve(operator.address, 1000, {from: bob});
+          await operator.bet(0, 131, bob, bob, {from: bob}).should.be.fulfilled;
           await operator.bet(0, 129, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
-          await operator.bet(0, 131, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
         });
 
         it('should allow to auction for higer price',  async () => {
@@ -112,7 +129,7 @@ contract('Bridge', (accounts) => {
           const bal1 = await nativeToken.balanceOf(alice);
           await operator.activate(0);
           const bal2 = await nativeToken.balanceOf(alice);
-          assert.equal(bal1.add(200).toNumber(), bal2.toNumber());
+          assert.equal(bal1.add(100).toNumber(), bal2.toNumber());
           await operator.submitPeriod(0, p[6], '0x07', {from: bob}).should.be.fulfilled;
           p[7] = await bridge.tipHash();
         });
@@ -143,7 +160,7 @@ contract('Bridge', (accounts) => {
           const bal1 = await nativeToken.balanceOf(bob);
           await operator.activate(0);
           const bal2 = await nativeToken.balanceOf(bob);
-          assert.equal(bal1.add(220).toNumber(), bal2.toNumber());
+          assert.equal(bal1.add(170).toNumber(), bal2.toNumber());
           // including genesis period, we have submiteed 12 periods in total:
           // epoch 1: period 0 - 2
           // epoch 2: period 3 - 5
