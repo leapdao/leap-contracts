@@ -50,9 +50,10 @@ contract Bridge is Initializable, Ownable {
   function initialize(
     uint256 _parentBlockInterval,
     uint256 _maxReward,
-    MintableToken _nativeToken
+    MintableToken _nativeToken,
+    address _owner
   ) public initializer {
-    Ownable.initialize(msg.sender);
+    Ownable.initialize(_owner);
     // init genesis preiod
     Period memory genesisPeriod = Period({
       parent: GENESIS,
