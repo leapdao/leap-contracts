@@ -3,8 +3,8 @@ pragma solidity ^0.4.24;
 import "openzeppelin-eth/contracts/token/ERC721/ERC721.sol";
 import "zos-lib/contracts/Initializable.sol";
 import "./LeapBridge.sol";
-import "./TxLib.sol";
-import "./TransferrableToken.sol";
+import "../TxLib.sol";
+import "../TransferrableToken.sol";
 
 contract ExitToken is Initializable, ERC721 {
 

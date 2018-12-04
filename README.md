@@ -6,6 +6,41 @@
 yarn
 yarn test 
 ```
+# Contracts
+
+In this repository are the solidity smart contracts implementing LeapDAO's plasma leap. 
+
+There are 3 smart contracts that get deployed:
+
+* Bridge
+
+  The bridge is responsible for storing the period chain. It is the source of truth for the plasma chain.
+
+* Operator
+
+  The operator is the contract that is responsible for submitting new periods to the bridge.
+
+* ExitHandler
+
+  This contract is responsible for user funds. Explained in more detail below.
+
+![Layout](./img/layout.png)
+
+The ExitHandler is actually the final contract in an inheritance chain that goes as follows:
+
+* Vault 
+
+  The vault defines what types of assets are allowed on the plasma chain and is responsible for registration of these assets.
+
+* DepositHandler
+
+  The deposit handler is in general responsible for how funds get onto the plasma chain.
+
+* ExitHandler
+
+  The exit handler is in general responsible for how funds leave the plasma chain.
+
+![Inheritance chain](./img/inheritnace.png)
 
 ## LICENSE
 

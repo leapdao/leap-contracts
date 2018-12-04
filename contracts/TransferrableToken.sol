@@ -13,4 +13,5 @@ import "openzeppelin-eth/contracts/introspection/IERC165.sol";
 
 contract TransferrableToken is IERC165 {
   function transferFrom(address _from, address _to, uint256 _valueOrTokenId) public;
+  function approve(address _to, uint256 _value) public;
 }
