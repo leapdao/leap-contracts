@@ -5,7 +5,6 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 import EVMRevert from './helpers/EVMRevert';
 
@@ -85,8 +84,9 @@ contract('ExitHandler', (accounts) => {
 
         const transferProof = period.proof(transfer);
         const outputIndex = 1;
-
-        await exitHandler.startExit(transferProof, outputIndex);
+        const inputProof = period.proof(deposit);
+        const inputIndex = 0;
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
@@ -133,10 +133,11 @@ contract('ExitHandler', (accounts) => {
         await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;
 
         const proof = period.proof(transfer);
+        const inputProof = period.proof(deposit);
 
         // withdraw output
         assert.equal(await nftToken.ownerOf(tokenId), exitHandler.address);
-        const event = await exitHandler.startExit(proof, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()
@@ -171,8 +172,9 @@ contract('ExitHandler', (accounts) => {
 
         const transferProof = period.proof(transfer);
         const outputIndex = 1;
+        const inputProof = period.proof(deposit);
 
-        await exitHandler.startExit(transferProof, outputIndex, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, 0, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('Should allow to challenge exit', async () => {
@@ -207,9 +209,10 @@ contract('ExitHandler', (accounts) => {
 
         const transferProof = period.proof(transfer);
         const spendProof = period.proof(spend);
+        const inputProof = period.proof(deposit);
 
         // withdraw output
-        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()
@@ -278,9 +281,10 @@ contract('ExitHandler', (accounts) => {
 
         const transferProof = period.proof(transfer);
         const spendProof = period.proof(spend);
+        const inputProof = period.proof(deposit);
         
         // withdraw output
-        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
         const outpoint = new Outpoint(
           event.logs[0].args.txHash,
           event.logs[0].args.outIndex.toNumber()

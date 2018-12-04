@@ -57,33 +57,47 @@ contract ExitHandler is DepositHandler {
     exitStake = _exitStake;
   }
 
-  function startExit(bytes32[] _proof, uint256 _outputIndex) public payable {
+  function startExit(
+    bytes32[] _youngestInputProof, bytes32[] _proof,
+    uint256 _outputIndex, uint256 _inputIndex
+  ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
-
-    (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);
+    bytes32 parent;
+    uint32 timestamp;
+    (parent,,,) = bridge.periods(_proof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+    (parent,,, timestamp) = bridge.periods(_youngestInputProof[0]);
     require(parent > 0, "The referenced period was not submitted to bridge");
 
-    // validate proof
+    // check exiting tx inclusion in the root chain block
     bytes32 txHash;
-    bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32, _proof);
-    // parse tx and use data
-    TxLib.Output memory out = TxLib.parseTx(txData).outs[_outputIndex];
+    bytes memory txData;    
+    (, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
 
-    require(out.owner == msg.sender, "Only UTXO owner can start exit");
-    // TODO: Safe math needed? Our period timestamp is only uint32, maybe exploitable?
-    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    // parse exiting tx and check if it is exitable
+    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+    TxLib.Output memory out = exitingTx.outs[_outputIndex];
+
     bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
-
+    require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
 
+    // check youngest input tx inclusion in the root chain block
+    bytes32 inputTxHash;
+    (, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
+    require(
+      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+      "Input from the proof is not referenced in exiting tx"
+    );
+    
     uint256 priority;
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(utxoId);
       nftExitCounter++;
-    } else {
+    } else {      
       priority = (exitableAt << 128) | uint128(utxoId);
     }
 
