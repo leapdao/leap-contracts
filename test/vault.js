@@ -7,9 +7,6 @@
  */
 
 import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -17,17 +14,11 @@ const MintableToken = artifacts.require('MockMintableToken');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
-
 contract('Vault', (accounts) => {
-  const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
 
-  describe('Test', function() {
+  describe('Test', () => {
     let bridge;
     let vault;
     let nativeToken;
@@ -46,9 +37,9 @@ contract('Vault', (accounts) => {
 
     describe('Register Token', async () => {
       it('Bridge native token gets register at 0 on construction', async () => {
-        const nativeToken = await MintableToken.new();
-        const bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-        const vault = await Vault.new(bridge.address);
+        nativeToken = await MintableToken.new();
+        bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
+        vault = await Vault.new(bridge.address);
 
         const tokenZeroAddr = (await vault.tokens(0))[0];
         tokenZeroAddr.should.be.equal(nativeToken.address);
