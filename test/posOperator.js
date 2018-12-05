@@ -32,24 +32,24 @@ contract('PosOperator', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxyBridge = await AdminableProxy.new(bridgeCont.address, data);
+      let proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});
       bridge = Bridge.at(proxyBridge.address);
 
       const vaultCont = await Vault.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      let proxyVault = await AdminableProxy.new(vaultCont.address, data);
+      let proxyVault = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[3]});
       vault = Vault.at(proxyVault.address);
 
       const opCont = await POSoperator.new();
       data = await opCont.contract.initialize.getData(bridge.address, vault.address, epochLength);
-      let proxyPos = await AdminableProxy.new(opCont.address, data);
+      let proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
       operator = POSoperator.at(proxyPos.address);
 
       data = await bridge.contract.setOperator.getData(operator.address);
-      await proxyBridge.applyProposal(data, {from: accounts[2]});
+      await proxyBridge.applyProposal(data, {from: accounts[3]});
       // register first token
       data = await vault.contract.registerToken.getData(nativeToken.address);
-      await proxyVault.applyProposal(data, {from: accounts[2]});
+      await proxyVault.applyProposal(data, {from: accounts[3]});
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
       nativeToken.transfer(bob, 1000);

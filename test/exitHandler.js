@@ -243,7 +243,8 @@ contract('ExitHandler', (accounts) => {
 
         const data = await exitHandler.contract.registerToken.getData(nftToken.address);
         receipt = await proxy.applyProposal(data, {from: accounts[2]});
-        const nftColor = receipt.logs[0].args.color.toNumber();
+        // const nftColor = receipt.logs[0].args.color.toNumber();
+        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
         
         // deposit
         await nftToken.approve(exitHandler.address, tokenId);
