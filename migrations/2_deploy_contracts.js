@@ -72,6 +72,10 @@ module.exports = function(deployer, network, accounts) {
     console.log('ExitHandler: ', exitHandler.address);
     console.log('Token: ', nativeToken.address);
     
+    try {
+      fs.mkdirSync('./build/nodeFiles');
+    } catch {}
+
     writeAbi('bridgeAbi', Bridge.abi);
     writeAbi('exitHandler', FastExitHandler.abi);
     writeAbi('operator', POSoperator.abi);
