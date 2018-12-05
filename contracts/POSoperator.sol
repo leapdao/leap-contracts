@@ -17,35 +17,36 @@ contract POSoperator is Ownable {
   using SafeMath for uint256;
 
   event Epoch(uint256 epoch);
+  event EpochLength(uint256 epoch);
 
   event ValidatorJoin(
-    address indexed signerAddr, 
-    uint256 indexed slotId, 
-    bytes32 indexed tenderAddr, 
-    uint256 eventCounter, 
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    uint256 eventCounter,
     uint256 epoch
   );
-  
+
   event ValidatorLogout(
-    address indexed signerAddr, 
-    uint256 indexed slotId, 
-    bytes32 indexed tenderAddr, 
-    address newSigner, 
-    uint256 eventCounter, 
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    address newSigner,
+    uint256 eventCounter,
     uint256 epoch
   );
 
   event ValidatorLeave(
-    address indexed signerAddr, 
-    uint256 indexed slotId, 
-    bytes32 indexed tenderAddr, 
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
     uint256 epoch
   );
-  
+
   event ValidatorUpdate(
-    address indexed signerAddr, 
-    uint256 indexed slotId, 
-    bytes32 indexed tenderAddr, 
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
     uint256 eventCounter
   );
 
@@ -78,18 +79,20 @@ contract POSoperator is Ownable {
   constructor (Bridge _bridge, uint256 _epochLength) public {
     bridge = _bridge;
     epochLength = _epochLength;
+    emit EpochLength(epochLength);
   }
 
   function setEpochLength(uint256 _epochLength) public onlyOwner {
     epochLength = _epochLength;
+    emit EpochLength(epochLength);
   }
 
   // solium-disable security/no-tx-origin
   // TODO: consider not to use tx.origin
   function bet(
-    uint256 _slotId, 
-    uint256 _value, 
-    address _signerAddr, 
+    uint256 _slotId,
+    uint256 _value,
+    address _signerAddr,
     bytes32 _tenderAddr
   ) public {
     require(_slotId < epochLength);
@@ -100,11 +103,11 @@ contract POSoperator is Ownable {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
       emit ValidatorLogout(
-        slot.signer, 
-        _slotId, 
+        slot.signer,
+        _slotId,
         _tenderAddr,
-        0x0, 
-        slot.eventCounter, 
+        0x0,
+        slot.eventCounter,
         lastCompleteEpoch + 3
       );
       return;
@@ -129,17 +132,17 @@ contract POSoperator is Ownable {
       slot.eventCounter++;
       if (stake == 0) {
         emit ValidatorJoin(
-          slot.signer, 
-          _slotId, 
-          _tenderAddr, 
-          slot.eventCounter, 
+          slot.signer,
+          _slotId,
+          _tenderAddr,
+          slot.eventCounter,
           lastCompleteEpoch + 1
         );
       } else {
         emit ValidatorUpdate(
-          slot.signer, 
-          _slotId, 
-          _tenderAddr, 
+          slot.signer,
+          _slotId,
+          _tenderAddr,
           slot.eventCounter
         );
       }
@@ -155,11 +158,11 @@ contract POSoperator is Ownable {
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
       emit ValidatorLogout(
-        slot.signer, 
-        _slotId, 
-        _tenderAddr, 
-        _signerAddr, 
-        slot.eventCounter, 
+        slot.signer,
+        _slotId,
+        _tenderAddr,
+        _signerAddr,
+        slot.eventCounter,
         lastCompleteEpoch + 3
       );
     }
@@ -173,9 +176,9 @@ contract POSoperator is Ownable {
     if (slot.stake > 0) {
       ERC20(bridge.nativeToken()).transfer(slot.owner, slot.stake);
       emit ValidatorLeave(
-        slot.signer, 
-        _slotId, 
-        slot.tendermint, 
+        slot.signer,
+        _slotId,
+        slot.tendermint,
         lastCompleteEpoch + 1
       );
     }
@@ -191,10 +194,10 @@ contract POSoperator is Ownable {
     slot.eventCounter++;
     if (slot.stake > 0) {
       emit ValidatorJoin(
-        slot.signer, 
-        _slotId, 
-        slot.tendermint, 
-        slot.eventCounter, 
+        slot.signer,
+        _slotId,
+        slot.tendermint,
+        slot.eventCounter,
         lastCompleteEpoch + 1
       );
     }
