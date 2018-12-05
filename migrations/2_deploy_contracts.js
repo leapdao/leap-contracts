@@ -74,7 +74,7 @@ module.exports = function(deployer, network, accounts) {
     
     try {
       fs.mkdirSync('./build/nodeFiles');
-    } catch {}
+    } catch(error) {}
 
     writeAbi('bridgeAbi', Bridge.abi);
     writeAbi('exitHandler', FastExitHandler.abi);
