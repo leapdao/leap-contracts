@@ -6,7 +6,9 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
+import { Tx, Input, Output, Outpoint, Exit } from 'leap-core';
+
+import { submitNewPeriodWithTx } from './helpers';
 
 require('./helpers/setup');
 
@@ -30,6 +32,8 @@ contract('FastExitHandler', (accounts) => {
     const parentBlockInterval = 0;
     const exitDuration = 0;
     const exitStake = 0;
+
+    const submitNewPeriod = txs => submitNewPeriodWithTx(txs, bridge, { from: bob });
 
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
@@ -75,13 +79,7 @@ contract('FastExitHandler', (accounts) => {
       );
       transfer = transfer.sign([alicePriv]);
 
-      const p = [];
-      p[0] = await bridge.tipHash();
-      const block = new Block(33).addTx(deposit).addTx(transfer);
-      const period = new Period(p[0], [block]);
-      p[1] = period.merkleRoot();
-
-      await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
+      const period = await submitNewPeriod([deposit, transfer]);
 
       const transferProof = period.proof(transfer);
 
