@@ -33,6 +33,7 @@ contract ExitHandler is DepositHandler {
     address owner;
     bool finalized;
     uint256 stake;
+    uint256 priorityTimestamp;
   }
 
   uint256 public exitDuration;
@@ -108,7 +109,8 @@ contract ExitHandler is DepositHandler {
       color: out.color,
       amount: out.value,
       finalized: false,
-      stake: exitStake
+      stake: exitStake,
+      priorityTimestamp: timestamp
     });
     emit ExitStarted(
       txHash, 
@@ -190,6 +192,42 @@ contract ExitHandler is DepositHandler {
       );
       require(exits[utxoId].owner == signer);
     }
+
+    // award stake to challanger
+    msg.sender.transfer(exits[utxoId].stake);
+    // delete invalid exit
+    delete exits[utxoId];
+  }
+
+  function challengeYoungestInput(
+    bytes32[] _youngerInputProof,
+    bytes32[] _exitingTxProof, 
+    uint256 _outputIndex, 
+    uint256 _inputIndex
+  ) public {
+    // validate exiting input tx
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+
+    // check the exit exists
+    require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
+
+    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+
+    // validate younger input tx
+    (,txHash,) = TxLib.validateProof(96, _youngerInputProof);
+    
+    // check younger input is actually an input of exiting tx
+    require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
+    
+    bytes32 parent;
+    uint32 youngerInputTimestamp;
+    (parent,,,youngerInputTimestamp) = bridge.periods(_youngerInputProof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    require(exits[utxoId].priorityTimestamp < youngerInputTimestamp, "Challenged input should be older");
 
     // award stake to challanger
     msg.sender.transfer(exits[utxoId].stake);

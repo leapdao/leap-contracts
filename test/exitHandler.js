@@ -8,6 +8,9 @@
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 import EVMRevert from './helpers/EVMRevert';
 
+import { injectInTruffle } from "sol-trace";
+injectInTruffle(web3, artifacts);
+
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
@@ -138,7 +141,7 @@ contract('ExitHandler', (accounts) => {
 
         const transferProof = period.proof(transferTx);
         const outputIndex = 1;
-        const inputProof = period.proof(depositTx);
+        const inputProof = period.proof(depositTx); // transferTx spends depositTx
         const inputIndex = 0;
         await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
 
@@ -211,6 +214,66 @@ contract('ExitHandler', (accounts) => {
         const bal1 = await nativeToken.balanceOf(bob);
         await exitHandler.finalizeTopExit(0);
         const bal2 = await nativeToken.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
+      });
+
+      it('Should allow to challenge youngest input for exit', async () => {
+        // period1: depositTx, anotherDepositTx
+        // period2: tranferTx spending depositTx (priority 1)
+        // period3: spendTx spending transferTx (priority 2) and anotherDepositTx (priority 1). Thus spendTx has priority 2 (youngest)
+        const anotherDepositTx = Tx.deposit(depositId + 1, 50, bob);
+
+        const spendTx = Tx.transfer(
+          [
+            new Input(new Outpoint(transferTx.hash(), 0)),        // from period2 thus youngest
+            new Input(new Outpoint(anotherDepositTx.hash(), 0)),  // from period1
+          ],
+          [new Output(100, charlie)]
+        ).sign([bobPriv, bobPriv]);    
+        
+        const period1 = await submitNewPeriodWithTx([depositTx, anotherDepositTx]);
+        const period2 = await submitNewPeriodWithTx([transferTx]);
+        const period3 = await submitNewPeriodWithTx([spendTx]);
+  
+        const spendProof = period3.proof(spendTx);
+        const notReallyYoungestInputProof = period1.proof(anotherDepositTx);
+        const notReallyYoungestInputId = 1;
+        const youngestInputProof = period2.proof(transferTx);
+        const youngestInputId = 0;
+
+        // start exit with older input (priority 1)
+        const exitingOutput = 0;
+        const event = await exitHandler.startExit(
+          notReallyYoungestInputProof, spendProof, exitingOutput, notReallyYoungestInputId,
+          { from: charlie },
+        );
+        
+        const outpoint = new Outpoint(
+          event.logs[0].args.txHash,
+          event.logs[0].args.outIndex.toNumber()
+        );
+
+        assert.equal(
+          outpoint.getUtxoId(), new Outpoint(spendTx.hash(), exitingOutput).getUtxoId()
+        );
+
+        let exit = await exitHandler.exits(outpoint.getUtxoId());
+        assert.equal(exit[2], charlie);
+
+        // challenge exit with youngest input
+        await exitHandler.challengeYoungestInput(youngestInputProof, spendProof, exitingOutput, youngestInputId);
+
+        exit = await exitHandler.exits(outpoint.getUtxoId());
+        assert.equal((await exitHandler.tokens(0))[1], 1);
+        const bal1 = await nativeToken.balanceOf(charlie);
+
+        await exitHandler.finalizeTopExit(0);
+        
+        const bal2 = await nativeToken.balanceOf(charlie);
         // check transfer didn't happen
         assert.equal(bal1.toNumber(), bal2.toNumber());
         // check exit was evicted from PriorityQueue

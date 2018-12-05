@@ -59,7 +59,8 @@ contract FastExitHandler is ExitHandler {
       color: out.color,
       amount: out.value,
       finalized: false,
-      stake: exitStake
+      stake: exitStake,
+      priorityTimestamp: timestamp
     });
     emit ExitStarted(
       txHash, 
