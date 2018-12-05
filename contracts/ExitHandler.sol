@@ -6,6 +6,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+/* solium-disable security/no-block-members */
+
 pragma solidity 0.4.24;
 
 import "openzeppelin-eth/contracts/math/Math.sol";
@@ -148,16 +150,6 @@ contract ExitHandler is DepositHandler {
     exits[utxoId].finalized = true;
   }
 
-  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
-    uint256 priority = tokens[_color].getMin();
-    utxoId = bytes32(uint128(priority));
-    exitableAt = priority >> 128;
-  }
-
-  function isNft(uint16 _color) internal pure returns (bool) {
-    return _color > 32768; // 2^15
-  }
-
   function challengeExit(
     bytes32[] _proof, 
     bytes32[] _prevProof, 
@@ -235,6 +227,15 @@ contract ExitHandler is DepositHandler {
     delete exits[utxoId];
   }
 
+  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
+    uint256 priority = tokens[_color].getMin();
+    utxoId = bytes32(uint128(priority));
+    exitableAt = priority >> 128;
+  }
+
+  function isNft(uint16 _color) internal pure returns (bool) {
+    return _color > 32768; // 2^15
+  }
   // Use this to find calldata offset - you are looking for the number:
   // (offest of _proof in calldata (in bytes)) - 68
   // ಠ_ಠ

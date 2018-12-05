@@ -8,9 +8,6 @@
 import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
 import EVMRevert from './helpers/EVMRevert';
 
-import { injectInTruffle } from "sol-trace";
-injectInTruffle(web3, artifacts);
-
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
@@ -20,6 +17,7 @@ const PriorityQueue = artifacts.require('PriorityQueue');
 const MintableToken = artifacts.require('MockMintableToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
+const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
 
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
@@ -103,7 +101,7 @@ contract('ExitHandler', (accounts) => {
       const prevPeriodRoot = await bridge.tipHash();
       const period = new Period(prevPeriodRoot, [block]);
       const newPeriodRoot = period.merkleRoot();
-      
+
       await bridge.submitPeriod(prevPeriodRoot, newPeriodRoot, opts).should.be.fulfilled;
       return period;
     };
@@ -236,9 +234,11 @@ contract('ExitHandler', (accounts) => {
         ).sign([bobPriv, bobPriv]);    
         
         const period1 = await submitNewPeriodWithTx([depositTx, anotherDepositTx]);
+        await aSecond();
         const period2 = await submitNewPeriodWithTx([transferTx]);
+        await aSecond();
         const period3 = await submitNewPeriodWithTx([spendTx]);
-  
+
         const spendProof = period3.proof(spendTx);
         const notReallyYoungestInputProof = period1.proof(anotherDepositTx);
         const notReallyYoungestInputId = 1;
