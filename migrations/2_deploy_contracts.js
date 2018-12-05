@@ -32,7 +32,7 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
     "networkId": networkId,
     "peers": []
   }
-  fs.writeFile("./build/nodeFiles/generateConfig.json", JSON.stringify(config), function(err) {
+  fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), function(err) {
     if(err) {
       return console.log(err);
     }
