@@ -8,7 +8,7 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
 import "./Vault.sol";
 import "./Bridge.sol";
@@ -213,14 +213,12 @@ contract POSoperator is Adminable {
       require(lastCompleteEpoch.add(2) < slot.activationEpoch);
     }
 
-    (uint256 newHeight, uint256 reward) = bridge.submitPeriod(_prevHash, _root);
+    uint256 newHeight = bridge.submitPeriod(_prevHash, _root);
     // check if epoch completed
     if (newHeight >= lastEpochBlockHeight.add(epochLength)) {
       lastCompleteEpoch++;
       lastEpochBlockHeight = newHeight;
       emit Epoch(lastCompleteEpoch);
     }
-
-    slot.stake += uint64(reward);
   }
 }

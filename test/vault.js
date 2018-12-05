@@ -43,7 +43,7 @@ contract('Vault', (accounts) => {
       vault = Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address);
+      data = await vault.contract.registerToken.getData(nativeToken.address, false);
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
       // At this point alice is the owner of bridge and vault and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -55,7 +55,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC20 token', async () => {
         const newToken = await SimpleToken.new();
 
-        const data = await vault.contract.registerToken.getData(newToken.address);
+        const data = await vault.contract.registerToken.getData(newToken.address, false);
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         const tokenOneAddr = (await vault.tokens(1))[0];
@@ -65,7 +65,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC721 token', async () => {
         const newNFTtoken = await SpaceDustNFT.new();
 
-        const data = await vault.contract.registerToken.getData(newNFTtoken.address);
+        const data = await vault.contract.registerToken.getData(newNFTtoken.address, true);
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         // NFTs have their own space
@@ -76,7 +76,7 @@ contract('Vault', (accounts) => {
 
       it('Non-owner can not register token', async () => {
         const newToken = await SimpleToken.new();
-        await vault.registerToken(newToken.address, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await vault.registerToken(newToken.address, false, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
     });
 

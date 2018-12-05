@@ -8,7 +8,7 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
 
 contract Bridge is Adminable {
@@ -70,7 +70,7 @@ contract Bridge is Adminable {
   function submitPeriod(
     bytes32 _prevHash, 
     bytes32 _root) 
-  public onlyOperator returns (uint256 newHeight, uint256 reward) {
+  public onlyOperator returns (uint256 newHeight){
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
@@ -98,5 +98,4 @@ contract Bridge is Adminable {
     });
     periods[_root] = newPeriod;
   }
-
 }

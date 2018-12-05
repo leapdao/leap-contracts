@@ -54,11 +54,4 @@ contract Adminable is Initializable {
       adm := sload(slot)
     }
   }
-
-  /**
-   * @dev Changes the admin of the proxy.
-   * Only the current admin can call this function.
-   */
-  function changeAdmin(address) external ifAdmin {
-  }
 }

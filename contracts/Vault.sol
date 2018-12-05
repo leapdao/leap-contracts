@@ -8,11 +8,10 @@
 
 pragma solidity 0.4.24;
 
+import "./Bridge.sol";
 import "./Adminable.sol";
 import "./PriorityQueue.sol";
 import "./TransferrableToken.sol";
-import "./IntrospectionUtil.sol";
-import "./Bridge.sol";
 
 contract Vault is Adminable {
 
@@ -34,15 +33,17 @@ contract Vault is Adminable {
     return tokens[_color].addr;
   }
 
-  function registerToken(TransferrableToken _token) public ifAdmin {
+  function registerToken(TransferrableToken _token, bool _isERC721) public ifAdmin {
     // make sure token is not 0x0 and that it has not been registered yet
     require(_token != address(0), "Tried to register 0x0 address");
     require(!tokenColors[_token], "Token already registered");
     uint16 color;
-    if (IntrospectionUtil.isERC721(_token)) {
+    if (_isERC721) {
+      require(_token.supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
       color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
+      require(ERC20(_token).totalSupply() >= 0, "Not an ERC20 token");
       color = erc20TokenCount;
       erc20TokenCount += 1;
     }

@@ -48,7 +48,7 @@ contract('PosOperator', (accounts) => {
       data = await bridge.contract.setOperator.getData(operator.address);
       await proxyBridge.applyProposal(data, {from: accounts[3]});
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address);
+      data = await vault.contract.registerToken.getData(nativeToken.address, false);
       await proxyVault.applyProposal(data, {from: accounts[3]});
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified

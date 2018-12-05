@@ -8,7 +8,7 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
 
 contract BridgeUpgrTest is Adminable {
@@ -72,13 +72,13 @@ contract BridgeUpgrTest is Adminable {
   function submitPeriod(
     bytes32 _prevHash, 
     bytes32 _root) 
-  public onlyOperator returns (uint256 newHeight, uint256 reward) {
+  public onlyOperator {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
 
     // calculate height
-    newHeight = periods[_prevHash].height + 1;
+    uint256 newHeight = periods[_prevHash].height + 1;
     // do some magic if chain extended
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks

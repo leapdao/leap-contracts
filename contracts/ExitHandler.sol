@@ -8,7 +8,7 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/math/Math.sol";
+import "openzeppelin-eth/contracts/math/Math.sol";
 
 import "./DepositHandler.sol";
 import "./Bridge.sol";
@@ -72,7 +72,7 @@ contract ExitHandler is DepositHandler {
 
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     // TODO: Safe math needed? Our period timestamp is only uint32, maybe exploitable?
-    uint256 exitableAt = Math.max256(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
 
     require(out.value > 0, "UTXO has no value");

@@ -1,8 +1,8 @@
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-eth/contracts/token/ERC20/ERC20.sol";
 
-contract MintableToken is StandardToken {
+contract MintableToken is ERC20 {
   event Mint(address indexed to, uint256 amount);
   event MintFinished();
 
@@ -41,10 +41,8 @@ contract MintableToken is StandardToken {
     canMint
     returns (bool)
   {
-    totalSupply_ = totalSupply_.add(_amount);
-    balances[_to] = balances[_to].add(_amount);
+    _mint(_to, _amount);
     emit Mint(_to, _amount);
-    emit Transfer(address(0), _to, _amount);
     return true;
   }
 

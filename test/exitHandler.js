@@ -21,9 +21,9 @@ const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
-  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
+  const alicePriv = '0xa5a621a2fede6b94945c6837ae0776f3a083aaf9e8b4ff67b3d0d16d2ea57b4b';
   const bob = accounts[1];
-  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';;
+  const bobPriv = '0x1463daf6bbea35e529e9612841164a8c1d252169fe1ed5f3f2215a3ed680def7';
   const charlie = accounts[2];
 
   describe('Test', () => {
@@ -53,7 +53,7 @@ contract('ExitHandler', (accounts) => {
       exitHandler = ExitHandler.at(proxy.address);
 
       // register first token
-      data = await exitHandler.contract.registerToken.getData(nativeToken.address);
+      data = await exitHandler.contract.registerToken.getData(nativeToken.address, false);
       await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -105,7 +105,7 @@ contract('ExitHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        const data = await exitHandler.contract.registerToken.getData(nftToken.address);
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
         receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
         const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
         
@@ -241,7 +241,7 @@ contract('ExitHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        const data = await exitHandler.contract.registerToken.getData(nftToken.address);
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
         receipt = await proxy.applyProposal(data, {from: accounts[2]});
         // const nftColor = receipt.logs[0].args.color.toNumber();
         const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);

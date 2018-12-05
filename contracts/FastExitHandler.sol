@@ -45,7 +45,7 @@ contract FastExitHandler is ExitHandler {
     require(exits[utxoIdSigned].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoIdSigned].finalized, "The exit for UTXO has already been finalized");
 
-    uint256 exitableAt = Math.max256(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
     
     // pay the seller

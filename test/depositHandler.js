@@ -44,7 +44,7 @@ contract('DepositHandler', (accounts) => {
       depositHandler = DepositHandler.at(proxy.address);
 
       // register first token
-      data = await depositHandler.contract.registerToken.getData(nativeToken.address);
+      data = await depositHandler.contract.registerToken.getData(nativeToken.address, false);
       await proxy.applyProposal(data, {from: accounts[2]});
 
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
@@ -75,7 +75,7 @@ contract('DepositHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
-        const data = await depositHandler.contract.registerToken.getData(nftToken.address);
+        const data = await depositHandler.contract.registerToken.getData(nftToken.address, true);
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});
