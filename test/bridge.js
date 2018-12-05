@@ -15,14 +15,17 @@ contract('Bridge', (accounts) => {
 
   describe('Test', () => {
     let bridge;
+    let proxy;
     const maxReward = 50;
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
       const bridgeCont = await Bridge.new();
-      const data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      const proxy = await AdminableProxy.new(bridgeCont.address, data);
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(accounts[0]);
+      await proxy.applyProposal(data, {from: accounts[2]});
     });
 
     describe('Submit Period', async () => {
@@ -37,7 +40,8 @@ contract('Bridge', (accounts) => {
       });
 
       it('Operator can be set', async() => {
-        await bridge.setOperator(accounts[1]);
+        const data = await bridge.contract.setOperator.getData(accounts[1]);
+        await proxy.applyProposal(data, {from: accounts[2]});
         const prevPeriodHash = await bridge.tipHash();
         const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
 

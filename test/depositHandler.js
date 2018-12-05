@@ -24,6 +24,7 @@ contract('DepositHandler', (accounts) => {
   describe('Test', () => {
     let bridge;
     let depositHandler;
+    let proxy;
     let nativeToken;
     const maxReward = 50;
     const parentBlockInterval = 0;
@@ -32,17 +33,20 @@ contract('DepositHandler', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminableProxy.new(bridgeCont.address, data);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await DepositHandler.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      proxy = await AdminableProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
       depositHandler = DepositHandler.at(proxy.address);
 
       // register first token
-      await depositHandler.registerToken(nativeToken.address);
-      await bridge.setOperator(bob);
+      data = await depositHandler.contract.registerToken.getData(nativeToken.address);
+      await proxy.applyProposal(data, {from: accounts[2]});
+
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
@@ -71,7 +75,8 @@ contract('DepositHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
-        await depositHandler.registerToken(nftToken.address).should.be.fulfilled;
+        const data = await depositHandler.contract.registerToken.getData(nftToken.address);
+        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});
 

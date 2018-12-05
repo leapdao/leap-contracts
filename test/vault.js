@@ -30,12 +30,12 @@ contract('Vault', (accounts) => {
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminableProxy.new(bridgeCont.address, data);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
 
       const vaultCont = await Vault.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      proxy = await AdminableProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
       vault = Vault.at(proxy.address);
 
       // register first token

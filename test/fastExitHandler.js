@@ -38,17 +38,19 @@ contract('FastExitHandler', (accounts) => {
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminableProxy.new(bridgeCont.address, data);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await FastExitHandler.new();
       data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
-      proxy = await AdminableProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
       fastExitHandler = FastExitHandler.at(proxy.address);
 
       // register first token
-      await fastExitHandler.registerToken(nativeToken.address);
-      await bridge.setOperator(bob);
+      data = await fastExitHandler.contract.registerToken.getData(nativeToken.address);
+      await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and fastExitHandler and has 10000 tokens
       // Bob is the bridge operator and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified

@@ -30,6 +30,7 @@ contract('ExitHandler', (accounts) => {
     let bridge;
     let exitHandler;
     let nativeToken;
+    let proxy;
     const maxReward = 50;
     const parentBlockInterval = 0;
     const exitDuration = 0;
@@ -41,17 +42,19 @@ contract('ExitHandler', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminableProxy.new(bridgeCont.address, data);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await ExitHandler.new();
       data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
-      proxy = await AdminableProxy.new(vaultCont.address, data);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
       exitHandler = ExitHandler.at(proxy.address);
 
       // register first token
-      await exitHandler.registerToken(nativeToken.address);
-      await bridge.setOperator(bob);
+      data = await exitHandler.contract.registerToken.getData(nativeToken.address);
+      await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
@@ -102,8 +105,9 @@ contract('ExitHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
-        const nftColor = receipt.logs[0].args.color.toNumber();
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address);
+        receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
         
         // deposit
         await nftToken.approve(exitHandler.address, tokenId);
@@ -237,7 +241,8 @@ contract('ExitHandler', (accounts) => {
         const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address);
+        receipt = await proxy.applyProposal(data, {from: accounts[2]});
         const nftColor = receipt.logs[0].args.color.toNumber();
         
         // deposit
