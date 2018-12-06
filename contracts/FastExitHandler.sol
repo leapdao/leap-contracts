@@ -20,7 +20,8 @@ contract FastExitHandler is ExitHandler {
     // validate proof
     bytes32 txHash;
     bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(64, _proof);
+    uint64 txPos;
+    (txPos, txHash, txData) = TxLib.validateProof(64, _proof);
     // parse tx and use data
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     TxLib.Output memory out = txn.outs[_oindex];
@@ -45,8 +46,7 @@ contract FastExitHandler is ExitHandler {
     require(exits[utxoIdSigned].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoIdSigned].finalized, "The exit for UTXO has already been finalized");
 
-    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
+    uint256 priority = getERC20ExitPriority(timestamp, utxoIdSigned, txPos);
     
     // pay the seller
     tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);

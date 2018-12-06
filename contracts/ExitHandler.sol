@@ -89,19 +89,19 @@ contract ExitHandler is DepositHandler {
 
     // check youngest input tx inclusion in the root chain block
     bytes32 inputTxHash;
-    (, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
+    uint64 inputTxPos;
+    (inputTxPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
     require(
       inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
       "Input from the proof is not referenced in exiting tx"
     );
     
     uint256 priority;
-    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(utxoId);
       nftExitCounter++;
     } else {      
-      priority = (exitableAt << 128) | uint128(utxoId);
+      priority = getERC20ExitPriority(timestamp, utxoId, inputTxPos);
     }
 
     tokens[out.color].insert(priority);
@@ -230,12 +230,20 @@ contract ExitHandler is DepositHandler {
   function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
     uint256 priority = tokens[_color].getMin();
     utxoId = bytes32(uint128(priority));
-    exitableAt = priority >> 128;
+    exitableAt = priority >> 192;
   }
 
   function isNft(uint16 _color) internal pure returns (bool) {
     return _color > 32768; // 2^15
   }
+
+  function getERC20ExitPriority(
+    uint32 timestamp, bytes32 utxoId, uint64 txPos
+  ) internal view returns (uint256 priority) {
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    return (exitableAt << 192) | (txPos << 128) | uint128(utxoId);
+  }
+
   // Use this to find calldata offset - you are looking for the number:
   // (offest of _proof in calldata (in bytes)) - 68
   // ಠ_ಠ
