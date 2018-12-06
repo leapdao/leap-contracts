@@ -33,8 +33,7 @@ contract Adminable is Initializable {
 
   /**
    * @dev Modifier to check whether the `msg.sender` is the admin.
-   * If it is, it will run the function. Otherwise, it will delegate the call
-   * to the implementation.
+   * If it is, it will run the function. Otherwise, fails.
    */
   modifier ifAdmin() {
     require(msg.sender == _admin());
