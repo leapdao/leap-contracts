@@ -221,7 +221,7 @@ contract('ExitHandler', (accounts) => {
             new Input(new Outpoint(transferTx.hash(), 0)),        // from period2 thus youngest
             new Input(new Outpoint(anotherDepositTx.hash(), 0)),  // from period1
           ],
-          [new Output(100, charlie)]
+          [new Output(100, alice)]
         ).sign([bobPriv, bobPriv]);    
         
         const period1 = await submitNewPeriod([depositTx, anotherDepositTx]);
@@ -240,7 +240,7 @@ contract('ExitHandler', (accounts) => {
         const exitingOutput = 0;
         const event = await exitHandler.startExit(
           notReallyYoungestInputProof, spendProof, exitingOutput, notReallyYoungestInputId,
-          { from: charlie },
+          { from: alice },
         );
 
         const utxoId = exitUtxoId(event);
@@ -248,18 +248,18 @@ contract('ExitHandler', (accounts) => {
         assert.equal(utxoId, new Outpoint(spendTx.hash(), exitingOutput).getUtxoId());
 
         let exit = await exitHandler.exits(utxoId);
-        assert.equal(exit[2], charlie);
+        assert.equal(exit[2], alice);
 
         // challenge exit with youngest input
         await exitHandler.challengeYoungestInput(youngestInputProof, spendProof, exitingOutput, youngestInputId);
 
         exit = await exitHandler.exits(utxoId);
         assert.equal((await exitHandler.tokens(0))[1], 1);
-        const bal1 = await nativeToken.balanceOf(charlie);
+        const bal1 = await nativeToken.balanceOf(alice);
 
         await exitHandler.finalizeTopExit(0);
         
-        const bal2 = await nativeToken.balanceOf(charlie);
+        const bal2 = await nativeToken.balanceOf(alice);
         // check transfer didn't happen
         assert.equal(bal1.toNumber(), bal2.toNumber());
         // check exit was evicted from PriorityQueue
