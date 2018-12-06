@@ -17,7 +17,7 @@ contract POSoperator is Ownable {
   using SafeMath for uint256;
 
   event Epoch(uint256 epoch);
-  event EpochLength(uint256 epoch);
+  event EpochLength(uint256 epochLength);
 
   event ValidatorJoin(
     address indexed signerAddr,
