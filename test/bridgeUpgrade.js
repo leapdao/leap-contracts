@@ -29,7 +29,7 @@ contract('Bridge', (accounts) => {
     let proxy;
     const operator = accounts[0];
     const user = accounts[1];
-    const admin = accounts[9];
+    const admin = accounts[2];
     const imp = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3';
 
     before(async () => {
@@ -69,7 +69,7 @@ contract('Bridge', (accounts) => {
       });
 
       it('Operator can be set', async() => {
-        const data = await bridge.contract.setOperator.getData(accounts[1]);
+        const data = await bridge.contract.setOperator.getData(user);
         const receipt = await proxy.applyProposal(data, {from: admin});
         const logMsg = receipt.receipt.logs[1].topics[0];
         logMsg.should.be.equal("0x96561394bac381230de4649200e8831afcab1f451881bbade9ef209f6dd30480");
