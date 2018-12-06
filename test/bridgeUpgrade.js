@@ -7,18 +7,12 @@
  */
 
 import EVMRevert from './helpers/EVMRevert';
-import chai from 'chai';
-import chaiBigNumber from 'chai-bignumber';
-import chaiAsPromised from 'chai-as-promised';
+
+require('./helpers/setup');
 
 const Bridge = artifacts.require('Bridge');
 const BridgeNew = artifacts.require('BridgeUpgrTest');
 const AdminableProxy = artifacts.require('AdminableProxy');
-
-const should = chai
-  .use(chaiAsPromised)
-  .use(chaiBigNumber(web3.BigNumber))
-  .should();
 
 contract('Bridge', (accounts) => {
 
