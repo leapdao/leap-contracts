@@ -42,7 +42,7 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
 module.exports = function(deployer, network, accounts) {
   const maxReward = 50;
   const parentBlockInterval = 0;
-  const epochLength = 3;
+  const epochLength = 5;
   const exitDuration = 0;
   const exitStake = 0;
   let bridge, nativeToken, operator, pqLib, exitHandler;
