@@ -10,6 +10,7 @@ import EVMRevert from './helpers/EVMRevert';
 
 require('./helpers/setup');
 
+const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const MintableToken = artifacts.require('MockMintableToken');
@@ -23,15 +24,29 @@ contract('DepositHandler', (accounts) => {
   describe('Test', () => {
     let bridge;
     let depositHandler;
+    let proxy;
     let nativeToken;
     const maxReward = 50;
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      depositHandler = await DepositHandler.new(bridge.address);
-      await bridge.setOperator(bob);
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
+
+      const vaultCont = await DepositHandler.new();
+      data = await vaultCont.contract.initialize.getData(bridge.address);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
+      depositHandler = DepositHandler.at(proxy.address);
+
+      // register first token
+      data = await depositHandler.contract.registerToken.getData(nativeToken.address, false);
+      await proxy.applyProposal(data, {from: accounts[2]});
+
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
@@ -57,10 +72,11 @@ contract('DepositHandler', (accounts) => {
       it('Can deposit ERC721 and depositHandler becomes owner', async () => {
         const nftToken = await SpaceDustNFT.new();
         const receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
-        await depositHandler.registerToken(nftToken.address).should.be.fulfilled;
+        const data = await depositHandler.contract.registerToken.getData(nftToken.address, true);
+        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});
 

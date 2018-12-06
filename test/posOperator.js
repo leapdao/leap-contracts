@@ -9,10 +9,12 @@
 import EVMRevert from './helpers/EVMRevert';
 
 const Bridge = artifacts.require('Bridge');
+const Vault = artifacts.require('Vault');
 const MintableToken = artifacts.require('MockMintableToken');
 const POSoperator = artifacts.require('POSoperator');
+const AdminableProxy = artifacts.require('AdminableProxy');
 
-contract('Bridge', (accounts) => {
+contract('PosOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
@@ -21,15 +23,33 @@ contract('Bridge', (accounts) => {
     let bridge;
     let nativeToken;
     let operator;
+    let vault;
     const maxReward = 50;
     const parentBlockInterval = 0;
     const epochLength = 3;
 
     before(async () => {
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      operator = await POSoperator.new(bridge.address, epochLength);
-      await bridge.setOperator(operator.address);
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});
+      bridge = Bridge.at(proxyBridge.address);
+
+      const vaultCont = await Vault.new();
+      data = await vaultCont.contract.initialize.getData(bridge.address);
+      const proxyVault = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[3]});
+      vault = Vault.at(proxyVault.address);
+
+      const opCont = await POSoperator.new();
+      data = await opCont.contract.initialize.getData(bridge.address, vault.address, epochLength);
+      const proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
+      operator = POSoperator.at(proxyPos.address);
+
+      data = await bridge.contract.setOperator.getData(operator.address);
+      await proxyBridge.applyProposal(data, {from: accounts[3]});
+      // register first token
+      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      await proxyVault.applyProposal(data, {from: accounts[3]});
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
       nativeToken.transfer(bob, 1000);
@@ -67,8 +87,8 @@ contract('Bridge', (accounts) => {
 
         it('should prevent auctining for lower price', async () => {
           await nativeToken.approve(operator.address, 1000, {from: bob});
+          await operator.bet(0, 131, bob, bob, {from: bob}).should.be.fulfilled;
           await operator.bet(0, 129, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
-          await operator.bet(0, 131, bob, bob, {from: bob}).should.be.rejectedWith(EVMRevert);
         });
 
         it('should allow to auction for higer price',  async () => {
@@ -104,7 +124,7 @@ contract('Bridge', (accounts) => {
           const bal1 = await nativeToken.balanceOf(alice);
           await operator.activate(0);
           const bal2 = await nativeToken.balanceOf(alice);
-          assert.equal(bal1.add(200).toNumber(), bal2.toNumber());
+          assert.equal(bal1.add(100).toNumber(), bal2.toNumber());
           await operator.submitPeriod(0, p[6], '0x07', {from: bob}).should.be.fulfilled;
           p[7] = await bridge.tipHash();
         });
@@ -135,7 +155,7 @@ contract('Bridge', (accounts) => {
           const bal1 = await nativeToken.balanceOf(bob);
           await operator.activate(0);
           const bal2 = await nativeToken.balanceOf(bob);
-          assert.equal(bal1.add(220).toNumber(), bal2.toNumber());
+          assert.equal(bal1.add(170).toNumber(), bal2.toNumber());
           // including genesis period, we have submiteed 12 periods in total:
           // epoch 1: period 0 - 2
           // epoch 2: period 3 - 5

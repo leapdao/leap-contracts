@@ -14,13 +14,6 @@ import "./TxLib.sol";
 
 contract FastExitHandler is ExitHandler {
 
-  constructor(
-    Bridge _bridge, 
-    uint256 _exitDuration, 
-    uint256 _exitStake) 
-  ExitHandler(_bridge, _exitDuration, _exitStake) public {
-  }
-
   function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public payable {
 
     (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);
@@ -52,7 +45,7 @@ contract FastExitHandler is ExitHandler {
     require(exits[utxoIdSigned].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoIdSigned].finalized, "The exit for UTXO has already been finalized");
 
-    uint256 exitableAt = Math.max256(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     uint256 priority = (exitableAt << 128) | uint128(utxoIdSigned);
     
     // pay the seller

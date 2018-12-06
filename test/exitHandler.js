@@ -11,6 +11,7 @@ import EVMRevert from './helpers/EVMRevert';
 
 require('./helpers/setup');
 
+const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -22,13 +23,14 @@ contract('ExitHandler', (accounts) => {
   // This is from ganache GUI version
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
-  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';;
+  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
 
   describe('Test', () => {
     let bridge;
     let exitHandler;
     let nativeToken;
+    let proxy;
     const maxReward = 50;
     const parentBlockInterval = 0;
     const exitDuration = 0;
@@ -38,9 +40,21 @@ contract('ExitHandler', (accounts) => {
       const pqLib = await PriorityQueue.new();
       ExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      exitHandler = await ExitHandler.new(bridge.address, exitDuration, exitStake);
-      await bridge.setOperator(bob);
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
+
+      const vaultCont = await ExitHandler.new();
+      data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
+      exitHandler = ExitHandler.at(proxy.address);
+
+      // register first token
+      data = await exitHandler.contract.registerToken.getData(nativeToken.address, false);
+      await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
@@ -88,11 +102,12 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
-        const nftColor = receipt.logs[0].args.color.toNumber();
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
+        receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
         
         // deposit
         await nftToken.approve(exitHandler.address, tokenId);
@@ -223,11 +238,13 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
-        receipt = await exitHandler.registerToken(nftToken.address);
-        const nftColor = receipt.logs[0].args.color.toNumber();
+        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
+        receipt = await proxy.applyProposal(data, {from: accounts[2]});
+        // const nftColor = receipt.logs[0].args.color.toNumber();
+        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
         
         // deposit
         await nftToken.approve(exitHandler.address, tokenId);

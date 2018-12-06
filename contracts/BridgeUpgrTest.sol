@@ -11,7 +11,7 @@ pragma solidity 0.4.24;
 import "openzeppelin-eth/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
 
-contract Bridge is Adminable {
+contract BridgeUpgrTest is Adminable {
 
   using SafeMath for uint256;
 
@@ -22,6 +22,7 @@ contract Bridge is Adminable {
 
   event NewHeight(uint256 height, bytes32 indexed root);
   event NewOperator(address operator);
+  event LogMessage(string msg);
 
   struct Period {
     bytes32 parent; // the id of the parent node
@@ -65,25 +66,25 @@ contract Bridge is Adminable {
   function setOperator(address _operator) public ifAdmin {
     operator = _operator;
     emit NewOperator(_operator);
+    emit LogMessage("This is upgraded Bridge contract");
   }
 
   function submitPeriod(
     bytes32 _prevHash, 
     bytes32 _root) 
-  public onlyOperator returns (uint256 newHeight){
+  public onlyOperator {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
 
     // calculate height
-    newHeight = periods[_prevHash].height + 1;
+    uint256 newHeight = periods[_prevHash].height + 1;
     // do some magic if chain extended
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
       require(
         block.number >= lastParentBlock + parentBlockInterval, 
-        "Tried to submit new period too soon"
-      );
+        "Tried to submit new period too soon");
       tipHash = _root;
       lastParentBlock = uint64(block.number);
       emit NewHeight(newHeight, _root);
@@ -97,5 +98,11 @@ contract Bridge is Adminable {
       children: new bytes32[](0)
     });
     periods[_root] = newPeriod;
+    emit LogMessage("This is upgraded Bridge contract");
   }
+
+  function isUpgraded() public pure returns (bool) {
+    return true;
+  }
+
 }

@@ -9,24 +9,23 @@
 require('./helpers/setup');
 
 const Bridge = artifacts.require('Bridge');
-const MintableToken = artifacts.require('MockMintableToken');
+const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('Bridge', (accounts) => {
-  const bob = accounts[1];
 
   describe('Test', () => {
     let bridge;
-    let nativeToken;
+    let proxy;
     const maxReward = 50;
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
-      nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      await bridge.setOperator(bob);
-      // At this point alice is the owner of bridge and has 10000 tokens
-      // Bob is the bridge operator and exitHandler and has 0 tokens
-      // Note: all txs in these tests originate from alice unless otherwise specified
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(accounts[0]);
+      await proxy.applyProposal(data, {from: accounts[2]});
     });
 
     describe('Submit Period', async () => {
@@ -34,18 +33,22 @@ contract('Bridge', (accounts) => {
         const prevPeriodHash = await bridge.tipHash();
         const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
 
-        const bobBalanceBefore = await nativeToken.balanceOf(bob);
-        // this is to assure correct reward calculation
-        bobBalanceBefore.should.be.bignumber.equal(0);
-
-        await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: bob}).should.be.fulfilled;
+        await bridge.submitPeriod(prevPeriodHash, newPeriodHash).should.be.fulfilled;
 
         const newTip = await bridge.tipHash();
         newTip.should.be.equal(newPeriodHash);
-        const bobBalanceAfter = await nativeToken.balanceOf(bob);
-        const bobBalanceDiff = bobBalanceAfter.minus(bobBalanceBefore);
-        // At this point the total stake is 0 (bob's balance) so bob should receive maxReward
-        bobBalanceDiff.should.be.bignumber.equal(maxReward);
+      });
+
+      it('Operator can be set', async() => {
+        const data = await bridge.contract.setOperator.getData(accounts[1]);
+        await proxy.applyProposal(data, {from: accounts[2]});
+        const prevPeriodHash = await bridge.tipHash();
+        const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
+
+        await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: accounts[1]}).should.be.fulfilled;
+
+        const newTip = await bridge.tipHash();
+        newTip.should.be.equal(newPeriodHash);
       });
     });
   });

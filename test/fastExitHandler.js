@@ -10,6 +10,7 @@ import { Period, Block, Tx, Input, Output, Outpoint, Exit } from 'leap-core';
 
 require('./helpers/setup');
 
+const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -34,9 +35,22 @@ contract('FastExitHandler', (accounts) => {
       const pqLib = await PriorityQueue.new();
       FastExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await MintableToken.new();
-      bridge = await Bridge.new(parentBlockInterval, maxReward, nativeToken.address);
-      fastExitHandler = await FastExitHandler.new(bridge.address, exitDuration, exitStake);
-      await bridge.setOperator(bob);
+
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setOperator.getData(bob);
+      await proxy.applyProposal(data, {from: accounts[2]});
+
+      const vaultCont = await FastExitHandler.new();
+      data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
+      fastExitHandler = FastExitHandler.at(proxy.address);
+
+      // register first token
+      data = await fastExitHandler.contract.registerToken.getData(nativeToken.address, false);
+      await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and fastExitHandler and has 10000 tokens
       // Bob is the bridge operator and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
