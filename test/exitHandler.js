@@ -21,9 +21,9 @@ const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
-  const alicePriv = '0xa5a621a2fede6b94945c6837ae0776f3a083aaf9e8b4ff67b3d0d16d2ea57b4b';
+  const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
-  const bobPriv = '0x1463daf6bbea35e529e9612841164a8c1d252169fe1ed5f3f2215a3ed680def7';
+  const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
 
   describe('Test', () => {
