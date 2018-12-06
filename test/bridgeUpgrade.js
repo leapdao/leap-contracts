@@ -16,7 +16,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('Bridge', (accounts) => {
 
-  describe('Upgrade', function() {
+  describe('Upgrade', () => {
     let bridge;
     const maxReward = 50;
     const parentBlockInterval = 0;
@@ -40,11 +40,11 @@ contract('Bridge', (accounts) => {
             const logicAddr = await web3.eth.getStorageAt(proxy.address, imp);
             const bridgeNew = await BridgeNew.new();
             bridge = BridgeNew.at(proxy.address);
-            await bridge.isUpgraded().should.be.rejectedWith(EVMRevert); //new function (isUpgraded()) cannot be called before actual uprgade
+            await bridge.isUpgraded().should.be.rejectedWith(EVMRevert); // new function (isUpgraded()) cannot be called before actual uprgade
             await proxy.upgradeTo(bridgeNew.address, {from: admin}).should.be.fulfilled;
             const logicAddrNew = await web3.eth.getStorageAt(proxy.address, imp);
             logicAddrNew.should.not.be.equal(logicAddr);
-            const bridgeUpgraded = await bridge.isUpgraded(); //new function (isUpgraded()) can be called after actual uprgade
+            const bridgeUpgraded = await bridge.isUpgraded(); // new function (isUpgraded()) can be called after actual uprgade
             assert.equal(bridgeUpgraded,true);
         })
     })
@@ -56,7 +56,7 @@ contract('Bridge', (accounts) => {
 
         const receipt = await bridge.submitPeriod(prevPeriodHash, newPeriodHash);
         const logMsg = receipt.logs[1].event;
-        assert.equal(logMsg,"LogMessage"); //Check if new line of code emitting log event is working
+        assert.equal(logMsg,"LogMessage"); // Check if new line of code emitting log event is working
 
         const newTip = await bridge.tipHash();
         newTip.should.be.equal(newPeriodHash);
@@ -67,13 +67,13 @@ contract('Bridge', (accounts) => {
         const receipt = await proxy.applyProposal(data, {from: admin});
         const logMsg = receipt.receipt.logs[1].topics[0];
         logMsg.should.be.equal("0x96561394bac381230de4649200e8831afcab1f451881bbade9ef209f6dd30480");
-        //const prevPeriodHash = await bridge.tipHash();
-        //const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
+        // const prevPeriodHash = await bridge.tipHash();
+        // const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
 
-        //await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: accounts[1]}).should.be.fulfilled;
+        // await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: accounts[1]}).should.be.fulfilled;
 
-        //const newTip = await bridge.tipHash();
-        //newTip.should.be.equal(newPeriodHash);
+        // const newTip = await bridge.tipHash();
+        // newTip.should.be.equal(newPeriodHash);
       });
     });
   });

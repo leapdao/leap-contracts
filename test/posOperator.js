@@ -32,17 +32,17 @@ contract('PosOperator', (accounts) => {
       nativeToken = await MintableToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});
+      const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});
       bridge = Bridge.at(proxyBridge.address);
 
       const vaultCont = await Vault.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
-      let proxyVault = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[3]});
+      const proxyVault = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[3]});
       vault = Vault.at(proxyVault.address);
 
       const opCont = await POSoperator.new();
       data = await opCont.contract.initialize.getData(bridge.address, vault.address, epochLength);
-      let proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
+      const proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
       operator = POSoperator.at(proxyPos.address);
 
       data = await bridge.contract.setOperator.getData(operator.address);

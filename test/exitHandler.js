@@ -102,7 +102,7 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
         const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
@@ -238,7 +238,7 @@ contract('ExitHandler', (accounts) => {
         const nftToken = await SpaceDustNFT.new();
 
         let receipt = await nftToken.mint(alice, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const tokenIdStr = tokenId.toString(10);
 
         const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);

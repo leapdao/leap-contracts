@@ -72,7 +72,7 @@ contract('DepositHandler', (accounts) => {
       it('Can deposit ERC721 and depositHandler becomes owner', async () => {
         const nftToken = await SpaceDustNFT.new();
         const receipt = await nftToken.mint(bob, 10, true, 2);
-        const tokenId = receipt.logs[0].args._tokenId; // eslint-disable-line no-underscore-dangle
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
         const data = await depositHandler.contract.registerToken.getData(nftToken.address, true);
