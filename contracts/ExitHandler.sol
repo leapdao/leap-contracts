@@ -10,7 +10,7 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-eth/contracts/math/Math.sol";
+import "../node_modules/openzeppelin-eth/contracts/math/Math.sol";
 
 import "./DepositHandler.sol";
 import "./Bridge.sol";
@@ -34,8 +34,8 @@ contract ExitHandler is DepositHandler {
     uint16 color;
     address owner;
     bool finalized;
+    uint32 priorityTimestamp;
     uint256 stake;
-    uint256 priorityTimestamp;
   }
 
   uint256 public exitDuration;
