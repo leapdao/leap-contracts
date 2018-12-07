@@ -61,4 +61,5 @@ contract DepositHandler is Vault {
     );
   }
 
+  uint256[50] private ______gap;
 }
