@@ -57,4 +57,6 @@ contract Vault is Adminable {
     emit NewToken(_token, color);
   }
 
+  uint256[50] private ______gap;
+
 }

@@ -199,4 +199,5 @@ contract ExitHandler is DepositHandler {
     emit Debug(callData);
   }
 
+  uint256[50] private ______gap;
 }
