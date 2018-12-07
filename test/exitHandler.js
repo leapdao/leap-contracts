@@ -5,9 +5,8 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-
-import { Period, Block, Tx, Input, Output, Outpoint } from 'leap-core';
-import EVMRevert from './helpers/EVMRevert';
+import { Tx, Input, Output, Outpoint } from 'leap-core';
+import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 
 require('./helpers/setup');
 
@@ -18,6 +17,13 @@ const PriorityQueue = artifacts.require('PriorityQueue');
 const MintableToken = artifacts.require('MockMintableToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
+const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
+
+const exitUtxoId = (exitEvent) => {
+  const { txHash, outIndex } = exitEvent.logs[0].args;
+  return new Outpoint(txHash, outIndex.toNumber()).getUtxoId();
+};
+
 contract('ExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
@@ -27,14 +33,69 @@ contract('ExitHandler', (accounts) => {
   const charlie = accounts[2];
 
   describe('Test', () => {
+    // contracts
     let bridge;
     let exitHandler;
-    let nativeToken;
     let proxy;
+
+    // ERC20 token stuff
+    let nativeToken;
+    const nativeTokenColor = 0;
+    let depositTx;
+    let transferTx;
+    const depositAmount = 100;
+    const depositId = 0;
+
+    // ERC721 token stuff
+    let nftToken;
+    let nftColor;
+    let nftTokenId;
+    let nftTokenIdStr;
+    let nftDepositTx;
+    let nftTransferTx;
+
     const maxReward = 50;
     const parentBlockInterval = 0;
     const exitDuration = 0;
-    const exitStake = 0;
+    const exitStake = 0;    
+
+    const seedTxs = async () => {
+      await nativeToken.approve(exitHandler.address, 1000);
+      await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
+
+      depositTx = Tx.deposit(depositId, depositAmount, alice);
+      transferTx = Tx.transfer(
+        [new Input(new Outpoint(depositTx.hash(), 0))],
+        [new Output(50, bob), new Output(50, alice)]
+      ).sign([alicePriv]);
+    };
+
+    const seedNftTxs = async () => {
+      nftToken = await SpaceDustNFT.new();
+      
+      let receipt = await nftToken.mint(alice, 10, true, 2);
+      
+      nftTokenId = receipt.logs[0].args.tokenId;
+      nftTokenIdStr = nftTokenId.toString(10);
+
+      const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
+      receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+      nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
+      
+      // deposit
+      await nftToken.approve(exitHandler.address, nftTokenId);
+      receipt = await exitHandler.deposit(alice, nftTokenId, nftColor, { from: alice }).should.be.fulfilled;        
+      const nftDepositId = receipt.logs[0].args.depositId.toNumber();
+
+      nftDepositTx = Tx.deposit(nftDepositId, nftTokenIdStr, alice, nftColor);
+      // transfer to bob
+      nftTransferTx = Tx.transfer(
+        [new Input(new Outpoint(nftDepositTx.hash(), 0))],
+        [new Output(nftTokenIdStr, bob, nftColor)]
+      ).sign([alicePriv]);
+    }
+
+    const submitNewPeriod = txs => submitNewPeriodWithTx(txs, bridge, { from: bob });
 
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
@@ -58,35 +119,20 @@ contract('ExitHandler', (accounts) => {
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
+
+      await seedTxs();
+      await seedNftTxs();
     });
 
     describe('Start exit', async () => {
       it('Should allow to exit valid utxo', async () => {
-        const depositAmount = 100;
-        const nativeTokenColor = 0;
+        const period = await submitNewPeriod([depositTx, transferTx]);
 
-        await nativeToken.approve(exitHandler.address, 1000);
-        await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
-
-        const deposit = Tx.deposit(0, depositAmount, alice);
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob), new Output(50, alice)]
-        );
-        transfer = transfer.sign([alicePriv]);
-
-        const p = [];
-        p[0] = await bridge.tipHash();
-        const block = new Block(33).addTx(deposit).addTx(transfer);
-        const period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
-
-        await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
-
-        const transferProof = period.proof(transfer);
+        const transferProof = period.proof(transferTx);
         const outputIndex = 1;
-
-        await exitHandler.startExit(transferProof, outputIndex);
+        const inputProof = period.proof(depositTx); // transferTx spends depositTx
+        const inputIndex = 0;
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
@@ -99,133 +145,121 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit NFT utxo', async () => {
-        const nftToken = await SpaceDustNFT.new();
+        const period = await submitNewPeriod([nftDepositTx, nftTransferTx]);
 
-        let receipt = await nftToken.mint(alice, 10, true, 2);
-        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
-        const tokenIdStr = tokenId.toString(10);
-
-        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
-        receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
-        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
-        
-        // deposit
-        await nftToken.approve(exitHandler.address, tokenId);
-        receipt = await exitHandler.deposit(alice, tokenId, nftColor, { from: alice }).should.be.fulfilled;        
-        const depositId = receipt.logs[0].args.depositId.toNumber();
-
-
-        const deposit = Tx.deposit(depositId, tokenIdStr, alice, nftColor);
-        // transfer to bob
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(tokenIdStr, bob, nftColor)]
-        );
-        transfer = transfer.sign([alicePriv]);
-
-        // include in block and period
-        const p = [];
-        p[0] = await bridge.tipHash();
-        const block = new Block(33).addTx(deposit).addTx(transfer);
-        const period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
-
-        await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;
-
-        const proof = period.proof(transfer);
+        const proof = period.proof(nftTransferTx);
+        const inputProof = period.proof(nftDepositTx);
 
         // withdraw output
-        assert.equal(await nftToken.ownerOf(tokenId), exitHandler.address);
-        const event = await exitHandler.startExit(proof, 0, { from: bob });
-        const outpoint = new Outpoint(
-          event.logs[0].args.txHash,
-          event.logs[0].args.outIndex.toNumber()
-        );
+        assert.equal(await nftToken.ownerOf(nftTokenId), exitHandler.address);
+        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob });
+
         await exitHandler.finalizeTopExit(nftColor);
-        assert.equal(await nftToken.ownerOf(tokenId), bob);
+
+        assert.equal(await nftToken.ownerOf(nftTokenId), bob);
         // exit was markeed as finalized
-        assert.equal((await exitHandler.exits(outpoint.getUtxoId()))[3], true);
+        assert.equal((await exitHandler.exits(exitUtxoId(event)))[3], true);
       });
 
       it('Should allow to exit only for utxo owner', async () => {
-        const depositAmount = 100;
-        const nativeTokenColor = 0;
+        const period = await submitNewPeriod([depositTx, transferTx]);
 
-        await nativeToken.approve(exitHandler.address, 1000);
-        await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
-
-        const deposit = Tx.deposit(0, depositAmount, alice);
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob), new Output(50, alice)]
-        );
-        transfer = transfer.sign([alicePriv]);
-
-        const p = [];
-        p[0] = await bridge.tipHash();
-        const block = new Block(33).addTx(deposit).addTx(transfer);
-        const period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
-
-        await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
-
-        const transferProof = period.proof(transfer);
+        const transferProof = period.proof(transferTx);
         const outputIndex = 1;
+        const inputProof = period.proof(depositTx);
 
-        await exitHandler.startExit(transferProof, outputIndex, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, 0, { from: bob }).should.be.rejectedWith(EVMRevert);
       });
 
       it('Should allow to challenge exit', async () => {
-        const depositAmount = 100;
-        const nativeTokenColor = 0;
-        const depositId = 0;
-
-        await nativeToken.approve(exitHandler.address, 1000);
-        await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
-
-        const deposit = Tx.deposit(depositId, depositAmount, alice);
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(50, bob), new Output(50, alice)]
-        );
-        transfer = transfer.sign([alicePriv]);
-
         // utxo that will have spend exit utxo
-        let spend = Tx.transfer(
-          [new Input(new Outpoint(transfer.hash(), 0))],
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 0))],
           [new Output(50, charlie)]
-        );
-        spend = spend.sign([bobPriv]);
+        ).sign([bobPriv]);
 
-        const p = [];
-        p[0] = await bridge.tipHash();
-        const block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
-        const period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
+        const period = await submitNewPeriod([ depositTx, transferTx, spendTx]);
 
-        await bridge.submitPeriod(p[0], p[1], {from: bob}).should.be.fulfilled;
-
-        const transferProof = period.proof(transfer);
-        const spendProof = period.proof(spend);
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const inputProof = period.proof(depositTx);
 
         // withdraw output
-        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
-        const outpoint = new Outpoint(
-          event.logs[0].args.txHash,
-          event.logs[0].args.outIndex.toNumber()
-        );
-        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
-
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        
+        const utxoId = exitUtxoId(event);
+        assert.equal(utxoId, spendTx.inputs[0].prevout.getUtxoId());
 
         // challenge exit and make sure exit is removed
-        let exit = await exitHandler.exits(outpoint.getUtxoId());
-        assert.equal(exit[2], bob);
+        assert.equal((await exitHandler.exits(utxoId))[2], bob);
+        
         await exitHandler.challengeExit(spendProof, transferProof, 0, 0);
-        exit = await exitHandler.exits(outpoint.getUtxoId());
+        
+        assert.equal((await exitHandler.exits(utxoId))[2], '0x0000000000000000000000000000000000000000');
         assert.equal((await exitHandler.tokens(0))[1], 1);
+        
         const bal1 = await nativeToken.balanceOf(bob);
+
         await exitHandler.finalizeTopExit(0);
+        
         const bal2 = await nativeToken.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        
+      });
+
+      it('Should allow to challenge youngest input for exit', async () => {
+        // period1: depositTx, anotherDepositTx
+        // period2: tranferTx spending depositTx (priority 1)
+        // period3: spendTx spending transferTx (priority 2) and anotherDepositTx (priority 1). Thus spendTx has priority 2 (youngest)
+        const anotherDepositTx = Tx.deposit(depositId + 1, 50, bob);
+
+        const spendTx = Tx.transfer(
+          [
+            new Input(new Outpoint(transferTx.hash(), 0)),        // from period2 thus youngest
+            new Input(new Outpoint(anotherDepositTx.hash(), 0)),  // from period1
+          ],
+          [new Output(100, alice)]
+        ).sign([bobPriv, bobPriv]);    
+        
+        const period1 = await submitNewPeriod([depositTx, anotherDepositTx]);
+        await aSecond();
+        const period2 = await submitNewPeriod([transferTx]);
+        await aSecond();
+        const period3 = await submitNewPeriod([spendTx]);
+
+        const spendProof = period3.proof(spendTx);
+        const notReallyYoungestInputProof = period1.proof(anotherDepositTx);
+        const notReallyYoungestInputId = 1;
+        const youngestInputProof = period2.proof(transferTx);
+        const youngestInputId = 0;
+
+        // start exit with older input (priority 1)
+        const exitingOutput = 0;
+        const event = await exitHandler.startExit(
+          notReallyYoungestInputProof, spendProof, exitingOutput, notReallyYoungestInputId,
+          { from: alice },
+        );
+
+        const utxoId = exitUtxoId(event);
+        
+        assert.equal(utxoId, new Outpoint(spendTx.hash(), exitingOutput).getUtxoId());
+
+        let exit = await exitHandler.exits(utxoId);
+        assert.equal(exit[2], alice);
+
+        // challenge exit with youngest input
+        await exitHandler.challengeYoungestInput(youngestInputProof, spendProof, exitingOutput, youngestInputId);
+
+        exit = await exitHandler.exits(utxoId);
+        assert.equal((await exitHandler.tokens(0))[1], 1);
+        const bal1 = await nativeToken.balanceOf(alice);
+
+        await exitHandler.finalizeTopExit(0);
+        
+        const bal2 = await nativeToken.balanceOf(alice);
         // check transfer didn't happen
         assert.equal(bal1.toNumber(), bal2.toNumber());
         // check exit was evicted from PriorityQueue
@@ -234,64 +268,30 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge NFT exit', async () => {
-
-        const nftToken = await SpaceDustNFT.new();
-
-        let receipt = await nftToken.mint(alice, 10, true, 2);
-        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
-        const tokenIdStr = tokenId.toString(10);
-
-        const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
-        receipt = await proxy.applyProposal(data, {from: accounts[2]});
-        // const nftColor = receipt.logs[0].args.color.toNumber();
-        const nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
-        
-        // deposit
-        await nftToken.approve(exitHandler.address, tokenId);
-        receipt = await exitHandler.deposit(alice, tokenId, nftColor, { from: alice }).should.be.fulfilled;        
-        const depositId = receipt.logs[0].args.depositId.toNumber();
-
-        const deposit = Tx.deposit(depositId, tokenIdStr, alice, nftColor);
-        
-        // transfer to bob
-        let transfer = Tx.transfer(
-          [new Input(new Outpoint(deposit.hash(), 0))],
-          [new Output(tokenIdStr, bob, nftColor)]
-        );
-        transfer = transfer.sign([alicePriv]);
-
         // utxo that will have spend exit utxo
         let spend = Tx.transfer(
-          [new Input(new Outpoint(transfer.hash(), 0))],
-          [new Output(tokenIdStr, charlie, nftColor)]
+          [new Input(new Outpoint(nftTransferTx.hash(), 0))],
+          [new Output(nftTokenIdStr, charlie, nftColor)]
         );
         spend = spend.sign([bobPriv]);
 
-         // include in block and period
-        const p = [];
-        p[0] = await bridge.tipHash();
-        const block = new Block(33).addTx(deposit).addTx(transfer).addTx(spend);
-        const period = new Period(p[0], [block]);
-        p[1] = period.merkleRoot();
+        const period = await submitNewPeriod([nftDepositTx, nftTransferTx, spend]);
 
-        await bridge.submitPeriod(p[0], p[1], { from: bob }).should.be.fulfilled;
-
-        const transferProof = period.proof(transfer);
+        const transferProof = period.proof(nftTransferTx);
         const spendProof = period.proof(spend);
+        const inputProof = period.proof(nftDepositTx);
         
         // withdraw output
-        const event = await exitHandler.startExit(transferProof, 0, { from: bob });
-        const outpoint = new Outpoint(
-          event.logs[0].args.txHash,
-          event.logs[0].args.outIndex.toNumber()
-        );
-        assert.equal(outpoint.getUtxoId(), spend.inputs[0].prevout.getUtxoId());
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        const utxoId = exitUtxoId(event);
+
+        assert.equal(utxoId, spend.inputs[0].prevout.getUtxoId());
         // challenge exit and make sure exit is removed
-        let exit = await exitHandler.exits(outpoint.getUtxoId());
+        let exit = await exitHandler.exits(utxoId);
         assert.equal(exit[2], bob);
         
         await exitHandler.challengeExit(spendProof, transferProof, 0, 0);        
-        exit = await exitHandler.exits(outpoint.getUtxoId());
+        exit = await exitHandler.exits(utxoId);
         // check that exit was deleted
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });

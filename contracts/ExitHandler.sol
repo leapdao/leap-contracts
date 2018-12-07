@@ -6,9 +6,11 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+/* solium-disable security/no-block-members */
+
 pragma solidity 0.4.24;
 
-import "openzeppelin-eth/contracts/math/Math.sol";
+import "../node_modules/openzeppelin-eth/contracts/math/Math.sol";
 
 import "./DepositHandler.sol";
 import "./Bridge.sol";
@@ -32,6 +34,7 @@ contract ExitHandler is DepositHandler {
     uint16 color;
     address owner;
     bool finalized;
+    uint32 priorityTimestamp;
     uint256 stake;
   }
 
@@ -57,34 +60,48 @@ contract ExitHandler is DepositHandler {
     exitStake = _exitStake;
   }
 
-  function startExit(bytes32[] _proof, uint256 _outputIndex) public payable {
+  function startExit(
+    bytes32[] _youngestInputProof, bytes32[] _proof,
+    uint256 _outputIndex, uint256 _inputIndex
+  ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
-
-    (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);
+    bytes32 parent;
+    uint32 timestamp;
+    (parent,,,) = bridge.periods(_proof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+    (parent,,, timestamp) = bridge.periods(_youngestInputProof[0]);
     require(parent > 0, "The referenced period was not submitted to bridge");
 
-    // validate proof
+    // check exiting tx inclusion in the root chain block
     bytes32 txHash;
-    bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32, _proof);
-    // parse tx and use data
-    TxLib.Output memory out = TxLib.parseTx(txData).outs[_outputIndex];
+    bytes memory txData;    
+    (, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
 
-    require(out.owner == msg.sender, "Only UTXO owner can start exit");
-    // TODO: Safe math needed? Our period timestamp is only uint32, maybe exploitable?
-    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    // parse exiting tx and check if it is exitable
+    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+    TxLib.Output memory out = exitingTx.outs[_outputIndex];
+
     bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
-
+    require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
 
+    // check youngest input tx inclusion in the root chain block
+    bytes32 inputTxHash;
+    uint64 inputTxPos;
+    (inputTxPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
+    require(
+      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+      "Input from the proof is not referenced in exiting tx"
+    );
+    
     uint256 priority;
     if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(utxoId);
       nftExitCounter++;
-    } else {
-      priority = (exitableAt << 128) | uint128(utxoId);
+    } else {      
+      priority = getERC20ExitPriority(timestamp, utxoId, inputTxPos);
     }
 
     tokens[out.color].insert(priority);
@@ -94,7 +111,8 @@ contract ExitHandler is DepositHandler {
       color: out.color,
       amount: out.value,
       finalized: false,
-      stake: exitStake
+      stake: exitStake,
+      priorityTimestamp: timestamp
     });
     emit ExitStarted(
       txHash, 
@@ -130,16 +148,6 @@ contract ExitHandler is DepositHandler {
 
     tokens[currentExit.color].delMin();
     exits[utxoId].finalized = true;
-  }
-
-  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
-    uint256 priority = tokens[_color].getMin();
-    utxoId = bytes32(uint128(priority));
-    exitableAt = priority >> 128;
-  }
-
-  function isNft(uint16 _color) internal pure returns (bool) {
-    return _color > 32768; // 2^15
   }
 
   function challengeExit(
@@ -181,6 +189,59 @@ contract ExitHandler is DepositHandler {
     msg.sender.transfer(exits[utxoId].stake);
     // delete invalid exit
     delete exits[utxoId];
+  }
+
+  function challengeYoungestInput(
+    bytes32[] _youngerInputProof,
+    bytes32[] _exitingTxProof, 
+    uint256 _outputIndex, 
+    uint256 _inputIndex
+  ) public {
+    // validate exiting input tx
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+
+    // check the exit exists
+    require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
+
+    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+
+    // validate younger input tx
+    (,txHash,) = TxLib.validateProof(96, _youngerInputProof);
+    
+    // check younger input is actually an input of exiting tx
+    require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
+    
+    bytes32 parent;
+    uint32 youngerInputTimestamp;
+    (parent,,,youngerInputTimestamp) = bridge.periods(_youngerInputProof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    require(exits[utxoId].priorityTimestamp < youngerInputTimestamp, "Challenged input should be older");
+
+    // award stake to challanger
+    msg.sender.transfer(exits[utxoId].stake);
+    // delete invalid exit
+    delete exits[utxoId];
+  }
+
+  function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
+    uint256 priority = tokens[_color].getMin();
+    utxoId = bytes32(uint128(priority));
+    exitableAt = priority >> 192;
+  }
+
+  function isNft(uint16 _color) internal pure returns (bool) {
+    return _color > 32768; // 2^15
+  }
+
+  function getERC20ExitPriority(
+    uint32 timestamp, bytes32 utxoId, uint64 txPos
+  ) internal view returns (uint256 priority) {
+    uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
+    return (exitableAt << 192) | (txPos << 128) | uint128(utxoId);
   }
 
   // Use this to find calldata offset - you are looking for the number:
