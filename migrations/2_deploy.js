@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const fs = require('fs');
 const truffleConfig = require('../truffle.js');
 
@@ -9,21 +10,19 @@ const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
+const logError = err => { if (err) { console.log(err); } }
+
 function abiFileString(abi) {
-  return 'module.exports = ' + JSON.stringify(abi);
+  return `module.exports = ${JSON.stringify(abi)}`;
 }
 
 function writeAbi(name, abi) {
-  fs.writeFile("./build/nodeFiles/" + name + ".js", abiFileString(abi), function(err) {
-    if(err) {
-      return console.log(err);
-    }
-  });
+  fs.writeFile(`./build/nodeFiles/${name}.js`, abiFileString(abi), logError);
 }
 
 function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
   const networkData = truffleConfig.networks[network];
-  const rootNetwork = 'http://' + networkData.host + ':' + networkData.port;
+  const rootNetwork = `http://${networkData.host}:${networkData.port}`;
   const networkId = Math.floor(Math.random() * Math.floor(1000000000));
   const config = {
     "bridgeAddr": bridgeAddr,
@@ -34,14 +33,10 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
     "networkId": networkId,
     "peers": []
   }
-  fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), function(err) {
-    if(err) {
-      return console.log(err);
-    }
-  });
+  fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), logError);
 }
 
-module.exports = function (deployer, network, accounts) {
+module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
 
   const maxReward = 50;
@@ -80,7 +75,9 @@ module.exports = function (deployer, network, accounts) {
 
     try {
       fs.mkdirSync('./build/nodeFiles');
-    } catch(error) {}
+    } catch(error) {
+      console.log(error);
+    }
 
     writeAbi('bridgeAbi', Bridge.abi);
     writeAbi('exitHandler', ExitHandler.abi);
