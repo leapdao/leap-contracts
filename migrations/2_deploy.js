@@ -76,7 +76,7 @@ module.exports = (deployer, network, accounts) => {
     try {
       fs.mkdirSync('./build/nodeFiles');
     } catch(error) {
-      console.log(error);
+      // we don;t care
     }
 
     writeAbi('bridgeAbi', Bridge.abi);
