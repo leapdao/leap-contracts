@@ -36,9 +36,7 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
   fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), logError);
 }
 
-module.exports = (deployer, network, accounts) => {
-  const admin = accounts[1];
-
+module.exports = (deployer, network) => {
   const maxReward = 50;
   const parentBlockInterval = 0;
   const epochLength = 5;
@@ -52,26 +50,26 @@ module.exports = (deployer, network, accounts) => {
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-    const bridgeProxy = await deployer.deploy(AdminableProxy, bridgeCont.address, data, {from: admin});
+    const bridgeProxy = await deployer.deploy(AdminableProxy, bridgeCont.address, data);
 
     const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
     data = await exitHandlerCont.contract.initializeWithExit.getData(bridgeProxy.address, exitDuration, exitStake);
-    const exitHandlerProxy = await deployer.deploy(AdminableProxy, exitHandlerCont.address, data, {from: admin});
+    const exitHandlerProxy = await deployer.deploy(AdminableProxy, exitHandlerCont.address, data);
 
     const operatorCont = await deployer.deploy(POSoperator);
     data = await operatorCont.contract.initialize.getData(bridgeProxy.address, exitHandlerProxy.address, epochLength);
-    const operatorProxy = await deployer.deploy(AdminableProxy, operatorCont.address, data, {from: admin});
+    const operatorProxy = await deployer.deploy(AdminableProxy, operatorCont.address, data);
 
     const bridge = Bridge.at(bridgeProxy.address);
     data = await bridge.contract.setOperator.getData(operatorProxy.address);
-    await bridgeProxy.applyProposal(data, {from: admin});
+    await bridgeProxy.applyProposal(data);
 
     const vault = Vault.at(exitHandlerProxy.address);
     data = await vault.contract.registerToken.getData(nativeToken.address, false);
-    await exitHandlerProxy.applyProposal(data, {from: admin});
+    await exitHandlerProxy.applyProposal(data);
 
     try {
       fs.mkdirSync('./build/nodeFiles');
