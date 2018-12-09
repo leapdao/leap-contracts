@@ -58,7 +58,7 @@ module.exports = (deployer, network, accounts) => {
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
-    data = await exitHandlerCont.contract.initializeWithExit.getData(bridgeCont.address, exitDuration, exitStake);
+    data = await exitHandlerCont.contract.initializeWithExit.getData(bridgeProxy.address, exitDuration, exitStake);
     const exitHandlerProxy = await deployer.deploy(AdminableProxy, exitHandlerCont.address, data, {from: admin});
 
     const operatorCont = await deployer.deploy(POSoperator);
