@@ -136,6 +136,42 @@ contract ExitHandler is DepositHandler {
     );
   }
 
+  function startDepositExit(uint256 _depositId) public payable {
+    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    // check that deposit exits
+    Deposit deposit = deposits[uint32(_depositId)];
+    require(deposit.owner == msg.sender, "Only deposit owner can start exit");
+    require(deposit.amount > 0, "deposit has no value");
+    require(exits[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
+    require(!exits[bytes32(_depositId)].finalized, "The exit for deposit has already been finalized");
+    
+    uint256 priority;
+    if (isNft(deposit.color)) {
+      priority = (nftExitCounter << 128) | uint128(_depositId);
+      nftExitCounter++;
+    } else {      
+      priority = getERC20ExitPriority(uint32(now), bytes32(_depositId), 0);
+    }
+
+    tokens[deposit.color].insert(priority);
+
+    exits[bytes32(_depositId)] = Exit({
+      owner: deposit.owner,
+      color: deposit.color,
+      amount: deposit.amount,
+      finalized: false,
+      stake: exitStake,
+      priorityTimestamp: uint32(now)
+    });
+    emit ExitStarted(
+      bytes32(_depositId), 
+      0, 
+      deposit.color, 
+      deposit.owner, 
+      deposit.amount
+    );
+  }
+
   // @dev Finalizes exit for the chosen color with the highest priority
   function finalizeTopExit(uint16 _color) public {
     bytes32 utxoId;
