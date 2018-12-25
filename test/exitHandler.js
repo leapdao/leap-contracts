@@ -144,6 +144,24 @@ contract('ExitHandler', (accounts) => {
 
       });
 
+      it('Should allow to exit deposit utxo', async () => {
+        const period = await submitNewPeriod([depositTx]);
+
+        const proof = period.proof(depositTx);
+        const outputIndex = 0;
+        const inputIndex = 0;
+        await exitHandler.startExit([], proof, outputIndex, inputIndex);
+
+        const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        const aliceBalanceAfter = await nativeToken.balanceOf(alice);
+
+        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+
+      });
+
       it('Should allow to exit NFT utxo', async () => {
         const period = await submitNewPeriod([nftDepositTx, nftTransferTx]);
 
