@@ -208,31 +208,53 @@ contract ExitHandler is DepositHandler {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
-    (, txHash1, ) = TxLib.validateProof(offset + 64, _prevProof);
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
-
-    require(exits[utxoId].amount > 0);
-
-    // validate spending tx
     bytes memory txData;
-    (, , txData) = TxLib.validateProof(96, _proof);
-    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
+    
+    TxLib.Tx memory txn;
+    if (_proof.length > 0) {
+      // validate spending tx
+      (, , txData) = TxLib.validateProof(96, _proof);
+      txn = TxLib.parseTx(txData);
 
-    // make sure one is spending the other one
-    require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
-    require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+      // make sure one is spending the other one
+      require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
+      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
 
-    // if transfer, make sure signature correct
-    if (txn.txType == TxLib.TxType.Transfer) {
-      bytes32 sigHash = TxLib.getSigHash(txData);
-      address signer = ecrecover(
-        sigHash, 
-        txn.ins[_inputIndex].v, 
-        txn.ins[_inputIndex].r, 
-        txn.ins[_inputIndex].s
-      );
-      require(exits[utxoId].owner == signer);
+      // if transfer, make sure signature correct
+      if (txn.txType == TxLib.TxType.Transfer) {
+        bytes32 sigHash = TxLib.getSigHash(txData);
+        address signer = ecrecover(
+          sigHash, 
+          txn.ins[_inputIndex].v, 
+          txn.ins[_inputIndex].r, 
+          txn.ins[_inputIndex].s
+        );
+        require(exits[utxoId].owner == signer);
+      } else {
+        revert("unknown tx type");
+      }
+    } else {
+      // challenging deposit exit
+      txn = TxLib.parseTx(txData);
+      utxoId = txn.ins[_inputIndex].outpoint.hash;
+      if (txn.txType == TxLib.TxType.Deposit) {
+        // check that deposit was included correctly
+        // only then it should be usable for challenge
+        Deposit deposit = deposits[uint32(utxoId)];
+        require(deposit.amount == txn.outs[0].value, "value mismatch");
+        require(deposit.owner == txn.outs[0].owner, "owner mismatch");
+        require(deposit.color == txn.outs[0].color, "color mismatch");
+        // todo: check timely inclusion of deposit tx
+        // this will prevent grieving attacks by the operator
+      } else {
+        revert("unexpected tx type");
+      }
     }
+
+    require(exits[utxoId].amount > 0, "exit not found");
+    require(!exits[utxoId].finalized, "The exit has already been finalized");
 
     // award stake to challanger
     msg.sender.transfer(exits[utxoId].stake);

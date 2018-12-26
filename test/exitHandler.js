@@ -44,7 +44,7 @@ contract('ExitHandler', (accounts) => {
     let depositTx;
     let transferTx;
     const depositAmount = 100;
-    const depositId = 0;
+    const depositId = 1;
 
     // ERC721 token stuff
     let nftToken;
@@ -172,6 +172,24 @@ contract('ExitHandler', (accounts) => {
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+      });
+
+
+      it('Should allow to challenge exiting deposit', async () => {
+        await exitHandler.startDepositExit(1);
+
+        const period = await submitNewPeriod([depositTx]);
+        const one = '0x0000000000000000000000000000000000000000000000000000000000000001';
+        const proof = period.proof(depositTx);
+
+        // challenge exit and make sure exit is removed
+        let exit = await exitHandler.exits(one);
+        assert.equal(exit[2], alice);
+        
+        await exitHandler.challengeExit([], proof, 0, 0);        
+        exit = await exitHandler.exits(one);
+        // check that exit was deleted
+        assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
       });
 
       it('Should allow to exit NFT utxo', async () => {
