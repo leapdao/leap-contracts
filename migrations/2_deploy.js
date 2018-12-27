@@ -63,6 +63,9 @@ module.exports = (deployer, network) => {
     data = await operatorCont.contract.initialize.getData(bridgeProxy.address, exitHandlerProxy.address, epochLength);
     const operatorProxy = await deployer.deploy(AdminableProxy, operatorCont.address, data);
 
+    await bridgeProxy.changeAdmin(bridgeProxy.address);
+    await exitHandlerProxy.changeAdmin(exitHandlerProxy.address);
+
     const bridge = Bridge.at(bridgeProxy.address);
     data = await bridge.contract.setOperator.getData(operatorProxy.address);
     await bridgeProxy.applyProposal(data);
