@@ -67,7 +67,7 @@ contract ExitHandler is DepositHandler {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     bytes32 parent;
     uint32 timestamp;
-    (parent,,,) = bridge.periods(_proof[0]);
+    (parent,,, timestamp) = bridge.periods(_proof[0]);
     require(parent > 0, "The referenced period was not submitted to bridge");
 
     if (_youngestInputProof.length > 0) {
