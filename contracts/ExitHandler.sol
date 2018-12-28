@@ -150,7 +150,7 @@ contract ExitHandler is DepositHandler {
       priority = (nftExitCounter << 128) | uint128(_depositId);
       nftExitCounter++;
     } else {      
-      priority = getERC20ExitPriority(uint32(now), bytes32(_depositId), 0);
+      priority = getERC20ExitPriority(uint32(deposit.time), bytes32(_depositId), 0);
     }
 
     tokens[deposit.color].insert(priority);
