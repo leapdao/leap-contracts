@@ -21,7 +21,7 @@ contract DepositHandler is Vault {
   );
 
   struct Deposit {
-    uint64 height;
+    uint64 time;
     uint16 color;
     address owner;
     uint256 amount;
@@ -44,11 +44,12 @@ contract DepositHandler is Vault {
     tokens[_color].addr.transferFrom(_owner, this, _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
-    (,uint32 height,,) = bridge.periods(tipHash);
+    uint256 timestamp;
+    (,,, timestamp) = bridge.periods(tipHash);
 
     depositCount++;
     deposits[depositCount] = Deposit({
-      height: height,
+      time: uint32(timestamp),
       owner: _owner,
       color: _color,
       amount: _amountOrTokenId
