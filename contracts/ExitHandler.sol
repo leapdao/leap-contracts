@@ -67,15 +67,19 @@ contract ExitHandler is DepositHandler {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     bytes32 parent;
     uint32 timestamp;
-    (parent,,,) = bridge.periods(_proof[0]);
+    (parent,,, timestamp) = bridge.periods(_proof[0]);
     require(parent > 0, "The referenced period was not submitted to bridge");
-    (parent,,, timestamp) = bridge.periods(_youngestInputProof[0]);
-    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    if (_youngestInputProof.length > 0) {
+      (parent,,, timestamp) = bridge.periods(_youngestInputProof[0]);
+      require(parent > 0, "The referenced period was not submitted to bridge");
+    }
 
     // check exiting tx inclusion in the root chain block
     bytes32 txHash;
-    bytes memory txData;    
-    (, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
+    bytes memory txData;
+    uint64 txPos;
+    (txPos, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
 
     // parse exiting tx and check if it is exitable
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
@@ -87,21 +91,30 @@ contract ExitHandler is DepositHandler {
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
 
-    // check youngest input tx inclusion in the root chain block
-    bytes32 inputTxHash;
-    uint64 inputTxPos;
-    (inputTxPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
-    require(
-      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
-      "Input from the proof is not referenced in exiting tx"
-    );
-    
     uint256 priority;
-    if (isNft(out.color)) {
-      priority = (nftExitCounter << 128) | uint128(utxoId);
-      nftExitCounter++;
-    } else {      
-      priority = getERC20ExitPriority(timestamp, utxoId, inputTxPos);
+    if (_youngestInputProof.length > 0) {
+      // check youngest input tx inclusion in the root chain block
+      bytes32 inputTxHash;
+      (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
+      require(
+        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+        "Input from the proof is not referenced in exiting tx"
+      );
+      
+      if (isNft(out.color)) {
+        priority = (nftExitCounter << 128) | uint128(utxoId);
+        nftExitCounter++;
+      } else {      
+        priority = getERC20ExitPriority(timestamp, utxoId, txPos);
+      }
+    } else {
+      require(exitingTx.txType == TxLib.TxType.Deposit, "Expected deposit tx");
+      if (isNft(out.color)) {
+        priority = (nftExitCounter << 128) | uint128(utxoId);
+        nftExitCounter++;
+      } else {      
+        priority = getERC20ExitPriority(timestamp, utxoId, txPos);
+      }
     }
 
     tokens[out.color].insert(priority);
