@@ -1,10 +1,10 @@
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 //copied from zos-lib due to import fix needed: 
 //import "openzeppelin-solidity/contracts/AddressUtils.sol" -> import "openzeppelin-solidity/contracts/utils/Address.sol"
 
-import "zos-lib/contracts/upgradeability/Proxy.sol";
-import "openzeppelin-solidity/contracts/utils/Address.sol";
+import "../../node_modules/zos-lib/contracts/upgradeability/Proxy.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/utils/Address.sol";
 
 /**
  * @title UpgradeabilityProxy

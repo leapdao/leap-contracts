@@ -8,10 +8,10 @@
 
 pragma solidity 0.4.24;
 
-import "openzeppelin-eth/contracts/math/SafeMath.sol";
-import "./Adminable.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "../Adminable.sol";
 
-contract BridgeUpgrTest is Adminable {
+contract BridgeUpgradeTest is Adminable {
 
   using SafeMath for uint256;
 

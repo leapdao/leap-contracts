@@ -13,7 +13,7 @@ require('./helpers/setup');
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
-const MintableToken = artifacts.require('MockMintableToken');
+const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 
@@ -30,7 +30,7 @@ contract('DepositHandler', (accounts) => {
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});

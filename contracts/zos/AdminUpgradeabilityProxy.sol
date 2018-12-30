@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 //Copied from zos-lib due to import fix needed in UpgradeabilityProxy.sol
 
