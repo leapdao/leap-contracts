@@ -10,7 +10,7 @@
 
 pragma solidity 0.4.24;
 
-import "../node_modules/openzeppelin-eth/contracts/math/Math.sol";
+import "../node_modules/openzeppelin-solidity/contracts/math/Math.sol";
 
 import "./DepositHandler.sol";
 import "./Bridge.sol";

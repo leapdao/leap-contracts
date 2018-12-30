@@ -1,6 +1,6 @@
 pragma solidity 0.4.24;
 
-import "openzeppelin-eth/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 contract MintableToken is ERC20 {
   event Mint(address indexed to, uint256 amount);
