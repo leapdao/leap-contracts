@@ -6,9 +6,9 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
-import "zos-lib/contracts/Initializable.sol";
+import "../node_modules/zos-lib/contracts/Initializable.sol";
 
 /**
  * @title Adminable

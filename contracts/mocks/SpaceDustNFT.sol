@@ -6,8 +6,8 @@
  */
 pragma solidity 0.4.24;
 
-import "openzeppelin-solidity/contracts/token/ERC721/ERC721Metadata.sol";
-import "openzeppelin-solidity/contracts/access/roles/MinterRole.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Metadata.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRole.sol";
 
 /**
  * @title SpaceDustNFT

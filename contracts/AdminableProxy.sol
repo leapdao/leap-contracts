@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.4.24;
 
 //import "zos-lib/contracts/upgradeability/AdminUpgradeabilityProxy.sol"; - should be changed back once zos-lib will update import
 import "./AdminUpgradeabilityProxy.sol";
