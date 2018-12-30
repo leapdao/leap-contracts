@@ -10,7 +10,7 @@ import EVMRevert from './helpers/EVMRevert';
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
-const MintableToken = artifacts.require('MockMintableToken');
+const SimpleToken = artifacts.require('SimpleToken');
 const POSoperator = artifacts.require('POSoperator');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
@@ -29,7 +29,7 @@ contract('PosOperator', (accounts) => {
     const epochLength = 3;
 
     before(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});

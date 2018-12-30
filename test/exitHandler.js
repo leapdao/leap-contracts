@@ -14,7 +14,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
-const MintableToken = artifacts.require('MockMintableToken');
+const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
@@ -100,7 +100,7 @@ contract('ExitHandler', (accounts) => {
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
       ExitHandler.link('PriorityQueue', pqLib.address);
-      nativeToken = await MintableToken.new();
+      nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});

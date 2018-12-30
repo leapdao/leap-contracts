@@ -16,7 +16,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
-const MintableToken = artifacts.require('MockMintableToken');
+const SimpleToken = artifacts.require('SimpleToken');
 
 contract('FastExitHandler', (accounts) => {
   const alice = accounts[0];
@@ -38,7 +38,7 @@ contract('FastExitHandler', (accounts) => {
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
       FastExitHandler.link('PriorityQueue', pqLib.address);
-      nativeToken = await MintableToken.new();
+      nativeToken = await SimpleToken.new();
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
