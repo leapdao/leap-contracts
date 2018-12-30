@@ -140,7 +140,7 @@ contract ExitHandler is DepositHandler {
   function startDepositExit(uint256 _depositId) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     // check that deposit exits
-    Deposit deposit = deposits[uint32(_depositId)];
+    Deposit memory deposit = deposits[uint32(_depositId)];
     require(deposit.owner == msg.sender, "Only deposit owner can start exit");
     require(deposit.amount > 0, "deposit has no value");
     require(exits[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
@@ -243,7 +243,7 @@ contract ExitHandler is DepositHandler {
       if (txn.txType == TxLib.TxType.Deposit) {
         // check that deposit was included correctly
         // only then it should be usable for challenge
-        Deposit deposit = deposits[uint32(utxoId)];
+        Deposit memory deposit = deposits[uint32(utxoId)];
         require(deposit.amount == txn.outs[0].value, "value mismatch");
         require(deposit.owner == txn.outs[0].owner, "owner mismatch");
         require(deposit.color == txn.outs[0].color, "color mismatch");
