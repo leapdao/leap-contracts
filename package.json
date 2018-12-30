@@ -42,7 +42,7 @@
     "husky": "^1.2.0",
     "leap-core": "^0.19.4",
     "solium": "^1.1.8",
-    "truffle": "^4.1.13",
+    "truffle": "4.1.13",
     "truffle-hdwallet-provider": "0.0.6"
   },
   "dependencies": {
