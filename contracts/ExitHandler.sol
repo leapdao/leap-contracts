@@ -65,28 +65,27 @@ contract ExitHandler is DepositHandler {
     uint256 _outputIndex, uint256 _inputIndex
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
-    bytes32 hash;
+    bytes32 parent;
     uint32 timestamp;
-    // use of hash as parentHash
-    (hash,,, timestamp) = bridge.periods(_proof[0]);
-    require(hash > 0, "The referenced period was not submitted to bridge");
+    (parent,,, timestamp) = bridge.periods(_proof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
 
     if (_youngestInputProof.length > 0) {
-      (hash,,, timestamp) = bridge.periods(_youngestInputProof[0]);
-      require(hash > 0, "The referenced period was not submitted to bridge");
+      (parent,,, timestamp) = bridge.periods(_youngestInputProof[0]);
+      require(parent > 0, "The referenced period was not submitted to bridge");
     }
 
     // check exiting tx inclusion in the root chain block
+    bytes32 txHash;
     bytes memory txData;
     uint64 txPos;
-    // use of hash as transaction hash
-    (txPos, hash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
+    (txPos, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
 
     // parse exiting tx and check if it is exitable
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(hash));
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
@@ -95,10 +94,10 @@ contract ExitHandler is DepositHandler {
     uint256 priority;
     if (_youngestInputProof.length > 0) {
       // check youngest input tx inclusion in the root chain block
-      bytes32 inputhash;
-      (txPos, inputhash,) = TxLib.validateProof(96, _youngestInputProof);
+      bytes32 inputTxHash;
+      (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
       require(
-        inputhash == exitingTx.ins[_inputIndex].outpoint.hash, 
+        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
         "Input from the proof is not referenced in exiting tx"
       );
       
@@ -129,7 +128,7 @@ contract ExitHandler is DepositHandler {
       priorityTimestamp: timestamp
     });
     emit ExitStarted(
-      hash, 
+      txHash, 
       _outputIndex, 
       out.color, 
       out.owner, 
