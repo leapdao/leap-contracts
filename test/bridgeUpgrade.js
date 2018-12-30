@@ -11,7 +11,7 @@ import EVMRevert from './helpers/EVMRevert';
 require('./helpers/setup');
 
 const Bridge = artifacts.require('Bridge');
-const BridgeNew = artifacts.require('BridgeUpgrTest');
+const BridgeNew = artifacts.require('BridgeUpgradeTest');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('Bridge', (accounts) => {
