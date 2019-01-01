@@ -161,24 +161,24 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit consolidate utxo', async () => {
-        const transferTx1 = Tx.transfer(
+        transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]
         ).sign([alicePriv]);
-        const transferTx2 = Tx.transfer(
-          [new Input(new Outpoint(transferTx1.hash(), 1))],
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
           [new Output(25, alice), new Output(25, alice)]
         ).sign([alicePriv]);
         const consolidateTx = Tx.consolidate([
-          new Input(new Outpoint(transferTx1.hash(), 0)),
-          new Input(new Outpoint(transferTx2.hash(), 0)),
-          new Input(new Outpoint(transferTx2.hash(), 1))
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 1))
         ], new Output(100, alice));
-        const period = await submitNewPeriod([depositTx, transferTx1, transferTx2, consolidateTx]);
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
 
         const proof = period.proof(consolidateTx);
         const outputIndex = 0;
-        const inputProof = period.proof(transferTx2);
+        const inputProof = period.proof(spendTx);
         const inputIndex = 2;
         await exitHandler.startExit(inputProof, proof, outputIndex, inputIndex);
 
@@ -288,7 +288,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit by verified tx', async () => {
-        const transferTx = Tx.transfer(
+        transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]
         ).sign([alicePriv]);
@@ -308,7 +308,7 @@ contract('ExitHandler', (accounts) => {
         const consolidateProof = period.proof(consolidateTx);
 
         // withdraw output
-        const event = await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
+        await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
         
         await exitHandler.challengeExitByVerified(consolidateProof, spendProof, 1, 2);
         
