@@ -309,6 +309,8 @@ contract('ExitHandler', (accounts) => {
 
         // withdraw output
         await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
+
+        await exitHandler.startVerification(consolidateProof);
         
         await exitHandler.challengeExitByVerified(consolidateProof, spendProof, 1, 2);
         

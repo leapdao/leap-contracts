@@ -47,6 +47,86 @@ contract ExitHandler is DepositHandler {
    */
   mapping(bytes32 => Exit) public exits;
 
+  struct Verification {
+    uint32 startTime;
+    uint224 stake;
+  }
+
+  event VerificationStarted(bytes32 indexed txHash);
+  /**
+   * txHash -> Verification Start Time mapping.
+   * Used to verify consolidate and computation transactions
+   * before they can be used to challenge exits.
+   */
+  mapping(bytes32 => Verification) public verifications;
+
+  function startVerification(bytes32[] _proof) public payable {
+    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    bytes32 parent;
+    uint32 timestamp;
+    (parent,,, timestamp) = bridge.periods(_proof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    // check exiting tx inclusion in the root chain block
+    bytes32 txHash;
+    (, txHash, ) = TxLib.validateProof(0, _proof);
+    require(verifications[txHash].stake == 0, "Transaction already registered");
+
+    verifications[txHash] = Verification(uint32(block.timestamp), uint224(msg.value));
+    emit VerificationStarted(txHash);
+  }
+
+  // consolidate tx inputs are unsigned
+  // hence the operator can create invalid consolidate txns to challenge valid exits.
+  // the following are possible:
+  // - consolidates with out-of-no-where inputs (TODO)
+  // - inputs from utxos of other owners
+  // - inputs from spent utxos of same owner
+  function challengeConsolidateOwner(
+    bytes32[] _inputProof, bytes32[] _consolidateProof,
+    uint256 _outputIndex, uint256 _inputIndex) public {
+    // output owner of consolidate proof different then owner of some input
+    bytes32 parent;
+    (parent,,,) = bridge.periods(_inputProof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+    (parent,,,) = bridge.periods(_consolidateProof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    // check consolidate tx inclusion in the root chain block
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(32 * (_inputProof.length + 2) + 64, _consolidateProof);
+    Verification memory verification = verifications[txHash];
+    require(verification.stake > 0, "Transaction not registered for verification");
+    require(
+      block.timestamp < verification.startTime + (exitDuration / 2),
+      "Transaction passed challenge duration"
+    );
+    // parse consolidate tx
+    TxLib.Tx memory consolidateTx = TxLib.parseTx(txData);
+
+    bytes32 inputTxHash;
+    (, inputTxHash, txData) = TxLib.validateProof(96, _inputProof);
+    // parse input tx
+    TxLib.Tx memory inputTx = TxLib.parseTx(txData);
+
+    require(
+      inputTxHash == consolidateTx.ins[_inputIndex].outpoint.hash,
+      "Input from the proof is not referenced in consolidate tx"
+    );
+    require(inputTx.outs[consolidateTx.ins[_inputIndex].outpoint.pos].owner != consolidateTx.outs[0].owner,
+      "Owners of input and output match, consolidate is valid"
+    );
+    // award stake to challanger
+    msg.sender.transfer(verification.stake);
+    // delete invalid exit
+    delete verifications[txHash];
+  }
+
+  function challengeConsolidateSpent(bytes32[] _proof) public {
+    // an input to the consolidate tx has been spent by some other tx
+  }
+
   function initializeWithExit(
     Bridge _bridge, 
     uint256 _exitDuration, 
@@ -280,8 +360,10 @@ contract ExitHandler is DepositHandler {
       // validate spending tx
       bytes32 txHash2;
       (, txHash2, txData) = TxLib.validateProof(96, _proof);
-      // TODO:
-      // make sure txHash2 has been verified by enforcer
+      // check that transaction verified
+      uint256 verificationTime = verifications[txHash2].startTime;
+      require(verificationTime > 0, "Transaction not verified");
+      require(block.timestamp >= verificationTime + (exitDuration / 2), "Transaction still in verification");
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
