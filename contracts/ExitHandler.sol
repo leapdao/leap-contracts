@@ -61,16 +61,34 @@ contract ExitHandler is DepositHandler {
   mapping(bytes32 => Verification) public verifications;
 
   function startVerification(bytes32[] _proof) public payable {
-    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
     bytes32 parent;
-    uint32 timestamp;
-    (parent,,, timestamp) = bridge.periods(_proof[0]);
+    (parent,,,) = bridge.periods(_proof[0]);
     require(parent > 0, "The referenced period was not submitted to bridge");
 
     // check exiting tx inclusion in the root chain block
     bytes32 txHash;
-    (, txHash, ) = TxLib.validateProof(0, _proof);
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(0, _proof);
     require(verifications[txHash].stake == 0, "Transaction already registered");
+
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+
+    if (txn.txType == TxLib.TxType.Consolidate) {
+      // itterate over all inputs
+      // make sure these inputs have been registered for verification
+      // fail if not
+      // if yes, then delete them all and return stakes
+      for (uint i = 0; i < txn.ins.length; i++) {
+        require(verifications[txn.ins[i].outpoint.hash].startTime > 0, "Input not found");
+      }
+      uint256 stake = 0;
+      for (i = 0; i < txn.ins.length; i++) {
+        stake += verifications[txn.ins[i].outpoint.hash].stake;
+        delete verifications[txn.ins[i].outpoint.hash];
+      }
+      msg.sender.transfer(stake);
+    }
 
     verifications[txHash] = Verification(uint32(block.timestamp), uint224(msg.value));
     emit VerificationStarted(txHash);
@@ -79,12 +97,12 @@ contract ExitHandler is DepositHandler {
   // consolidate tx inputs are unsigned
   // hence the operator can create invalid consolidate txns to challenge valid exits.
   // the following are possible:
-  // - consolidates with out-of-no-where inputs (TODO)
+  // - consolidates with out-of-no-where inputs
   // - inputs from utxos of other owners
   // - inputs from spent utxos of same owner
   function challengeConsolidateOwner(
     bytes32[] _inputProof, bytes32[] _consolidateProof,
-    uint256 _outputIndex, uint256 _inputIndex) public {
+    uint256 _inputIndex) public {
     // output owner of consolidate proof different then owner of some input
     bytes32 parent;
     (parent,,,) = bridge.periods(_inputProof[0]);
@@ -95,31 +113,33 @@ contract ExitHandler is DepositHandler {
     // check consolidate tx inclusion in the root chain block
     bytes32 txHash;
     bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32 * (_inputProof.length + 2) + 64, _consolidateProof);
+    (, txHash, txData) = TxLib.validateProof(32 * (_inputProof.length + 2) + 32, _consolidateProof);
     Verification memory verification = verifications[txHash];
-    require(verification.stake > 0, "Transaction not registered for verification");
+    require(verification.startTime > 0, "Transaction not registered for verification");
     require(
-      block.timestamp < verification.startTime + (exitDuration / 2),
+      block.timestamp <= verification.startTime + (exitDuration / 2),
       "Transaction passed challenge duration"
     );
     // parse consolidate tx
     TxLib.Tx memory consolidateTx = TxLib.parseTx(txData);
+    TxLib.Outpoint memory outpoint = consolidateTx.ins[_inputIndex].outpoint;
 
     bytes32 inputTxHash;
-    (, inputTxHash, txData) = TxLib.validateProof(96, _inputProof);
+    (, inputTxHash, txData) = TxLib.validateProof(64, _inputProof);
     // parse input tx
     TxLib.Tx memory inputTx = TxLib.parseTx(txData);
 
     require(
-      inputTxHash == consolidateTx.ins[_inputIndex].outpoint.hash,
+      inputTxHash == outpoint.hash,
       "Input from the proof is not referenced in consolidate tx"
     );
-    require(inputTx.outs[consolidateTx.ins[_inputIndex].outpoint.pos].owner != consolidateTx.outs[0].owner,
+    require(
+      inputTx.outs[outpoint.pos].owner != consolidateTx.outs[0].owner,
       "Owners of input and output match, consolidate is valid"
     );
     // award stake to challanger
     msg.sender.transfer(verification.stake);
-    // delete invalid exit
+    // delete invalid tx
     delete verifications[txHash];
   }
 

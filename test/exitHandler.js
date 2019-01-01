@@ -310,6 +310,8 @@ contract('ExitHandler', (accounts) => {
         // withdraw output
         await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
 
+        await exitHandler.startVerification(transferProof);
+        await exitHandler.startVerification(spendProof);
         await exitHandler.startVerification(consolidateProof);
         
         await exitHandler.challengeExitByVerified(consolidateProof, spendProof, 1, 2);
@@ -324,6 +326,32 @@ contract('ExitHandler', (accounts) => {
         // check exit was evicted from PriorityQueue
         assert.equal((await exitHandler.tokens(0))[1], 0);
         
+      });
+
+      it('Should allow to challenge invalid consolidate tx', async () => {
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(25, bob), new Output(25, bob)] // invalid input to consolidate
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)), // input alice
+          new Input(new Outpoint(spendTx.hash(), 1)) // input bob
+        ], new Output(75, alice));
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        await exitHandler.startVerification(transferProof);
+        await exitHandler.startVerification(spendProof);
+        await exitHandler.startVerification(consolidateProof);
+
+        await exitHandler.challengeConsolidateOwner(spendProof, consolidateProof, 1);
       });
 
       it('Should allow to challenge youngest input for exit', async () => {
