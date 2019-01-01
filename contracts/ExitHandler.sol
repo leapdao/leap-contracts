@@ -262,6 +262,49 @@ contract ExitHandler is DepositHandler {
     delete exits[utxoId];
   }
 
+
+  function challengeExitByVerified(
+    bytes32[] _proof, 
+    bytes32[] _prevProof, 
+    uint256 _outputIndex, 
+    uint256 _inputIndex
+  ) public {
+    // validate exiting tx
+    bytes32 txHash1;
+    bytes memory txData;
+    (, txHash1, txData) = TxLib.validateProof(32 * (_proof.length + 2) + 64, _prevProof);
+    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
+    
+    TxLib.Tx memory txn;
+    if (_proof.length > 0) {
+      // validate spending tx
+      bytes32 txHash2;
+      (, txHash2, txData) = TxLib.validateProof(96, _proof);
+      // TODO:
+      // make sure txHash2 has been verified by enforcer
+      txn = TxLib.parseTx(txData);
+
+      // make sure one is spending the other one
+      require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
+      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+
+      // if consolidate, make sure owner matches
+      if (txn.txType == TxLib.TxType.Consolidate) {
+        require(exits[utxoId].owner == txn.outs[0].owner);
+      } else {
+        revert("unknown tx type");
+      }
+    }
+
+    require(exits[utxoId].amount > 0, "exit not found");
+    require(!exits[utxoId].finalized, "The exit has already been finalized");
+
+    // award stake to challanger
+    msg.sender.transfer(exits[utxoId].stake);
+    // delete invalid exit
+    delete exits[utxoId];
+  }
+
   function challengeYoungestInput(
     bytes32[] _youngerInputProof,
     bytes32[] _exitingTxProof, 

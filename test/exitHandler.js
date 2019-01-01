@@ -141,7 +141,6 @@ contract('ExitHandler', (accounts) => {
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         aliceBalanceBefore.plus(50).should.be.bignumber.equal(aliceBalanceAfter);
-
       });
 
       it('Should allow to exit deposit utxo', async () => {
@@ -159,7 +158,37 @@ contract('ExitHandler', (accounts) => {
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+      });
 
+      it('Should allow to exit consolidate utxo', async () => {
+        const transferTx1 = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const transferTx2 = Tx.transfer(
+          [new Input(new Outpoint(transferTx1.hash(), 1))],
+          [new Output(25, alice), new Output(25, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx1.hash(), 0)),
+          new Input(new Outpoint(transferTx2.hash(), 0)),
+          new Input(new Outpoint(transferTx2.hash(), 1))
+        ], new Output(100, alice));
+        const period = await submitNewPeriod([depositTx, transferTx1, transferTx2, consolidateTx]);
+
+        const proof = period.proof(consolidateTx);
+        const outputIndex = 0;
+        const inputProof = period.proof(transferTx2);
+        const inputIndex = 2;
+        await exitHandler.startExit(inputProof, proof, outputIndex, inputIndex);
+
+        const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        const aliceBalanceAfter = await nativeToken.balanceOf(alice);
+
+        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
       });
 
       it('Should allow to exit deposit', async () => {
@@ -251,6 +280,43 @@ contract('ExitHandler', (accounts) => {
         await exitHandler.finalizeTopExit(0);
         
         const bal2 = await nativeToken.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        
+      });
+
+      it('Should allow to challenge exit by verified tx', async () => {
+        const transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(25, alice), new Output(25, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 1))
+        ], new Output(100, alice));
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        // withdraw output
+        const event = await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
+        
+        await exitHandler.challengeExitByVerified(consolidateProof, spendProof, 1, 2);
+        
+        const bal1 = await nativeToken.balanceOf(alice);
+
+        await exitHandler.finalizeTopExit(0);
+        
+        const bal2 = await nativeToken.balanceOf(alice);
         // check transfer didn't happen
         assert.equal(bal1.toNumber(), bal2.toNumber());
         // check exit was evicted from PriorityQueue
