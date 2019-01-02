@@ -7,6 +7,7 @@
  */
 import { Tx, Input, Output, Outpoint } from 'leap-core';
 import { EVMRevert, submitNewPeriodWithTx } from './helpers';
+
 const time = require('./helpers/time');
 require('./helpers/setup');
 
