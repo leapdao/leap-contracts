@@ -7,7 +7,7 @@
  */
 import { Tx, Input, Output, Outpoint } from 'leap-core';
 import { EVMRevert, submitNewPeriodWithTx } from './helpers';
-
+const time = require('./helpers/time');
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
@@ -56,7 +56,7 @@ contract('ExitHandler', (accounts) => {
 
     const maxReward = 50;
     const parentBlockInterval = 0;
-    const exitDuration = 0;
+    const exitDuration = 5;
     const exitStake = 0;    
 
     const seedTxs = async () => {
@@ -126,6 +126,7 @@ contract('ExitHandler', (accounts) => {
 
     describe('Start exit', async () => {
       it('Should allow to exit valid utxo', async () => {
+        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx, transferTx]);
 
         const transferProof = period.proof(transferTx);
@@ -136,6 +137,9 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
@@ -144,6 +148,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit deposit utxo', async () => {
+        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx]);
 
         const proof = period.proof(depositTx);
@@ -153,6 +158,9 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
@@ -161,6 +169,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit consolidate utxo', async () => {
+        await time.advanceBlock();
         transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]
@@ -184,6 +193,9 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
@@ -192,9 +204,13 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit deposit', async () => {
+        await time.advanceBlock();
         await exitHandler.startDepositExit(1);
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
 
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
@@ -249,6 +265,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit', async () => {
+        await time.advanceBlock();
         // utxo that will have spend exit utxo
         const spendTx = Tx.transfer(
           [new Input(new Outpoint(transferTx.hash(), 0))],
@@ -277,6 +294,9 @@ contract('ExitHandler', (accounts) => {
         
         const bal1 = await nativeToken.balanceOf(bob);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(0);
         
         const bal2 = await nativeToken.balanceOf(bob);
@@ -288,6 +308,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit by verified tx', async () => {
+        await time.advanceBlock();
         transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]
@@ -314,10 +335,17 @@ contract('ExitHandler', (accounts) => {
         await exitHandler.startVerification(spendProof, 0);
         await exitHandler.startVerification(spendProof, 1);
         await exitHandler.startVerification(consolidateProof, 0);
+
+        const startTime = await time.latest();
+        let exitTime = startTime + time.duration.seconds(exitDuration);
+        await time.increaseTo(exitTime);
         
         await exitHandler.challengeExit(consolidateProof, spendProof, 1, 2);
         
         const bal1 = await nativeToken.balanceOf(alice);
+
+        exitTime = startTime + time.duration.seconds(exitDuration * 2);
+        await time.increaseTo(exitTime);
 
         await exitHandler.finalizeTopExit(0);
         
@@ -433,6 +461,9 @@ contract('ExitHandler', (accounts) => {
         exit = await exitHandler.exits(utxoId);
         assert.equal((await exitHandler.tokens(0))[1], 1);
         const bal1 = await nativeToken.balanceOf(alice);
+
+        const exitTime = (await time.latest()) + time.duration.seconds(2 * exitDuration);
+        await time.increaseTo(exitTime);
 
         await exitHandler.finalizeTopExit(0);
         
