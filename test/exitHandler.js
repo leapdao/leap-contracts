@@ -310,11 +310,12 @@ contract('ExitHandler', (accounts) => {
         // withdraw output
         await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
 
-        await exitHandler.startVerification(transferProof);
-        await exitHandler.startVerification(spendProof);
-        await exitHandler.startVerification(consolidateProof);
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(spendProof, 0);
+        await exitHandler.startVerification(spendProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0);
         
-        await exitHandler.challengeExitByVerified(consolidateProof, spendProof, 1, 2);
+        await exitHandler.challengeExit(consolidateProof, spendProof, 1, 2);
         
         const bal1 = await nativeToken.balanceOf(alice);
 
@@ -347,11 +348,43 @@ contract('ExitHandler', (accounts) => {
         const spendProof = period.proof(spendTx);
         const consolidateProof = period.proof(consolidateTx);
 
-        await exitHandler.startVerification(transferProof);
-        await exitHandler.startVerification(spendProof);
-        await exitHandler.startVerification(consolidateProof);
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(spendProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0);
 
         await exitHandler.challengeConsolidateOwner(spendProof, consolidateProof, 1);
+        // check that verification deleted
+        const verification = await exitHandler.verifications(consolidateTx.hash());
+        assert.equal(verification[0], 0);
+      });
+
+      it('Should allow to challenge doublespent consolidate tx', async () => {
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(transferTx.hash(), 1))
+        ], new Output(100, alice));
+        const doublespendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(50, bob)]
+        ).sign([alicePriv]);
+        const period = await submitNewPeriod([depositTx, transferTx, consolidateTx, doublespendTx]);
+
+        const transferProof = period.proof(transferTx);
+        const doublespendProof = period.proof(doublespendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(transferProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0);
+
+        await exitHandler.challengeConsolidateDoublespent(doublespendProof, consolidateProof, 0, 1);
+        // check that verification deleted
+        const verification = await exitHandler.verifications(consolidateTx.hash());
+        assert.equal(verification[0], 0);
       });
 
       it('Should allow to challenge youngest input for exit', async () => {
