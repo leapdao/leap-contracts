@@ -39,11 +39,10 @@ contract Bridge is Adminable {
   uint64 public lastParentBlock; // last ethereum block when epoch was submitted
   address public operator; // the operator contract
   address public exitHandler; // the exit handler contract
-  uint256 public maxReward; // max reward per period
 
   mapping(bytes32 => Period) public periods;
 
-  function initialize(uint256 _parentBlockInterval, uint256 _maxReward) public initializer {
+  function initialize(uint256 _parentBlockInterval) public initializer {
     // init genesis preiod
     Period memory genesisPeriod = Period({
       parent: GENESIS,
@@ -58,7 +57,6 @@ contract Bridge is Adminable {
 
     parentBlockInterval = _parentBlockInterval;
     lastParentBlock = uint64(block.number);
-    maxReward = _maxReward;
     operator = msg.sender;
   }
 

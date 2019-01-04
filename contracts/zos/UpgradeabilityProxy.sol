@@ -34,7 +34,7 @@ contract UpgradeabilityProxy is Proxy {
    * https://solidity.readthedocs.io/en/v0.4.24/abi-spec.html#function-selector-and-argument-encoding.
    * This parameter is optional, if no data is given the initialization call to proxied contract will be skipped.
    */
-  constructor(address _implementation, bytes _data) public payable {
+  constructor(address _implementation, bytes memory _data) public payable {
     assert(IMPLEMENTATION_SLOT == keccak256("org.zeppelinos.proxy.implementation"));
     _setImplementation(_implementation);
     if (_data.length > 0) {

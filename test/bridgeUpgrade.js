@@ -18,7 +18,6 @@ contract('Bridge', (accounts) => {
 
   describe('Upgrade', () => {
     let bridge;
-    const maxReward = 50;
     const parentBlockInterval = 0;
     let proxy;
     const operator = accounts[0];
@@ -28,7 +27,7 @@ contract('Bridge', (accounts) => {
 
     before(async () => {
         const bridgeCont = await Bridge.new();
-        let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+        let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
         proxy = await AdminableProxy.new(bridgeCont.address, data, {from: admin});
         bridge = Bridge.at(proxy.address);
         data = await bridge.contract.setOperator.getData(operator);
@@ -56,7 +55,7 @@ contract('Bridge', (accounts) => {
 
         const receipt = await bridge.submitPeriod(prevPeriodHash, newPeriodHash);
         const logMsg = receipt.logs[1].event;
-        assert.equal(logMsg,"LogMessage"); // Check if new line of code emitting log event is working
+        assert.equal(logMsg, "LogMessage"); // Check if new line of code emitting log event is working
 
         const newTip = await bridge.tipHash();
         newTip.should.be.equal(newPeriodHash);
