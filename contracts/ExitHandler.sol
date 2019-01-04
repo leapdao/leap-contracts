@@ -49,7 +49,8 @@ contract ExitHandler is DepositHandler {
 
   struct Verification {
     uint32 startTime;
-    uint224 stake;
+    address owner;
+    uint256 stake;
   }
 
   event VerificationStarted(bytes32 indexed txHash);
@@ -95,6 +96,7 @@ contract ExitHandler is DepositHandler {
 
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     require(_outputIndex < txn.outs.length, "Output index out of range");
+    address owner = txn.outs[_outputIndex].owner;
 
     if (txn.txType == TxLib.TxType.Consolidate) {
        // iterate over all inputs
@@ -107,59 +109,19 @@ contract ExitHandler is DepositHandler {
         if (txn.ins[i].outpoint.pos > 0) {
           prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(txn.ins[i].outpoint.hash));
         }
-        require(verifications[prevUtxoId].startTime > 0, "Input not found");
-        stake += verifications[prevUtxoId].stake;
+        Verification memory prevVerification = verifications[prevUtxoId];
+        require(prevVerification.startTime > 0, "Input not found");
+        require(prevVerification.owner == owner, "Input belongs to different owner");
+        stake += prevVerification.stake;
         delete verifications[prevUtxoId];
       }
       msg.sender.transfer(stake);
     }
 
-    verifications[utxoId] = Verification(uint32(block.timestamp), uint216(msg.value));
+    verifications[utxoId] = Verification(uint32(block.timestamp), txn.outs[_outputIndex].owner, msg.value);
     emit VerificationStarted(utxoId);
   }
 
-  function challengeConsolidateOwner(
-    bytes32[] _inputProof, bytes32[] _consolidateProof,
-    uint256 _inputIndex) public {
-    // output owner of consolidate proof different then owner of some input
-    bytes32 parent;
-    (parent,,,) = bridge.periods(_inputProof[0]);
-    require(parent > 0, "The referenced period was not submitted to bridge");
-    (parent,,,) = bridge.periods(_consolidateProof[0]);
-    require(parent > 0, "The referenced period was not submitted to bridge");
-
-    // check consolidate tx inclusion in the root chain block
-    bytes32 txHash;
-    bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32 * (_inputProof.length + 2) + 32, _consolidateProof);
-    Verification memory verification = verifications[txHash];
-    require(verification.startTime > 0, "Transaction not registered for verification");
-    require(
-      block.timestamp <= verification.startTime + (exitDuration / 2),
-      "Transaction passed challenge duration"
-    );
-    // parse consolidate tx
-    TxLib.Tx memory consolidateTx = TxLib.parseTx(txData);
-    TxLib.Outpoint memory outpoint = consolidateTx.ins[_inputIndex].outpoint;
-
-    bytes32 inputTxHash;
-    (, inputTxHash, txData) = TxLib.validateProof(64, _inputProof);
-    // parse input tx
-    TxLib.Tx memory inputTx = TxLib.parseTx(txData);
-
-    require(
-      inputTxHash == outpoint.hash,
-      "Input from the proof is not referenced in consolidate tx"
-    );
-    require(
-      inputTx.outs[outpoint.pos].owner != consolidateTx.outs[0].owner,
-      "Owners of input and output match, consolidate is valid"
-    );
-    // award stake to challanger
-    msg.sender.transfer(verification.stake);
-    // delete invalid tx
-    delete verifications[txHash];
-  }
   /**
    * An input to the consolidate tx has been spent by some other tx.
    * Because consolidate inputs are not signed, the other transaction takes precedence,
@@ -171,9 +133,9 @@ contract ExitHandler is DepositHandler {
     // output owner of consolidate proof different then owner of some input
     bytes32 parent;
     (parent,,,) = bridge.periods(_doublespendProof[0]);
-    require(parent > 0, "The referenced period was not submitted to bridge");
+    require(parent > 0, "The period referenced in doublespendProof was not submitted to bridge");
     (parent,,,) = bridge.periods(_consolidateProof[0]);
-    require(parent > 0, "The referenced period was not submitted to bridge");
+    require(parent > 0, "The period referenced in consolidateProof was not submitted to bridge");
 
     // check consolidate tx inclusion in the root chain block
     bytes32 txHash;

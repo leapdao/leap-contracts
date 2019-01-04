@@ -379,10 +379,9 @@ contract('ExitHandler', (accounts) => {
 
         await exitHandler.startVerification(transferProof, 0);
         await exitHandler.startVerification(spendProof, 1);
-        await exitHandler.startVerification(consolidateProof, 0);
+        await exitHandler.startVerification(consolidateProof, 0).should.be.rejectedWith(EVMRevert);
 
-        await exitHandler.challengeConsolidateOwner(spendProof, consolidateProof, 1);
-        // check that verification deleted
+        // check that consolidate verification not initiated
         const verification = await exitHandler.verifications(consolidateTx.hash());
         assert.equal(verification[0], 0);
       });
