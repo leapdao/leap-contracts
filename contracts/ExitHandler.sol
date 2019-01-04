@@ -153,7 +153,7 @@ contract ExitHandler is DepositHandler {
     (, doublespendTxHash, txData) = TxLib.validateProof(96, _doublespendProof);
     // parse input tx
     TxLib.Outpoint memory pointD = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
-     require(doublespendTxHash != txHash, "consolidate and doublespend are same tx");
+    require(doublespendTxHash != txHash, "consolidate and doublespend are same tx");
     require(
       pointC.hash == pointD.hash && pointC.pos == pointD.pos,
       "Doublespend is not a doublespend"
