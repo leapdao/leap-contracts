@@ -23,7 +23,7 @@ contract ExitHandler is DepositHandler {
 
   event ExitStarted(
     bytes32 indexed txHash, 
-    uint256 indexed outIndex, 
+    uint8 indexed outIndex, 
     uint256 indexed color, 
     address exitor, 
     uint256 amount
@@ -79,7 +79,7 @@ contract ExitHandler is DepositHandler {
    * to be used in an exit challenge. We use this verification process to scrutinize 
    * the validity of complex transactions (consolidate and spending conditions).
    */
-  function startVerification(bytes32[] _proof, uint256 _outputIndex) public payable {
+  function startVerification(bytes32[] _proof, uint8 _outputIndex) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
     bytes32 parent;
     (parent,,,) = bridge.periods(_proof[0]);
@@ -90,7 +90,7 @@ contract ExitHandler is DepositHandler {
     bytes memory txData;
     (, utxoId, txData) = TxLib.validateProof(32, _proof);
     if (_outputIndex > 0) {
-      utxoId = bytes32((_outputIndex << 248) | uint248(utxoId));
+      utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(utxoId));
     }
     require(verifications[utxoId].stake == 0, "Transaction already registered");
 
@@ -129,7 +129,7 @@ contract ExitHandler is DepositHandler {
    */
   function challengeConsolidateDoublespent(
     bytes32[] _doublespendProof, bytes32[] _consolidateProof,
-    uint256 _inputIndex, uint256 _consolidateInputIndex) public {
+    uint8 _inputIndex, uint8 _consolidateInputIndex) public {
     // output owner of consolidate proof different then owner of some input
     bytes32 parent;
     (parent,,,) = bridge.periods(_doublespendProof[0]);
@@ -179,7 +179,7 @@ contract ExitHandler is DepositHandler {
 
   function startExit(
     bytes32[] _youngestInputProof, bytes32[] _proof,
-    uint256 _outputIndex, uint256 _inputIndex
+    uint8 _outputIndex, uint8 _inputIndex
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     bytes32 parent;
@@ -202,7 +202,7 @@ contract ExitHandler is DepositHandler {
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
@@ -319,15 +319,15 @@ contract ExitHandler is DepositHandler {
   function challengeExit(
     bytes32[] _proof, 
     bytes32[] _prevProof, 
-    uint256 _outputIndex, 
-    uint256 _inputIndex
+    uint8 _outputIndex,
+    uint8 _inputIndex
   ) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
     bytes memory txData;
     (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash1));
     
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
@@ -393,14 +393,14 @@ contract ExitHandler is DepositHandler {
   function challengeYoungestInput(
     bytes32[] _youngerInputProof,
     bytes32[] _exitingTxProof, 
-    uint256 _outputIndex, 
-    uint256 _inputIndex
+    uint8 _outputIndex, 
+    uint8 _inputIndex
   ) public {
     // validate exiting input tx
     bytes32 txHash;
     bytes memory txData;
     (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
 
     // check the exit exists
     require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
@@ -440,7 +440,7 @@ contract ExitHandler is DepositHandler {
     uint32 timestamp, bytes32 utxoId, uint64 txPos
   ) internal view returns (uint256 priority) {
     uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    return (exitableAt << 192) | (txPos << 128) | uint128(utxoId);
+    return (exitableAt << 192) | uint256(txPos) << 128 | uint128(utxoId);
   }
 
   // Use this to find calldata offset - you are looking for the number:
