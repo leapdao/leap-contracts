@@ -31,7 +31,12 @@ contract SwapRegistry is Adminable {
   uint256 inflationCap; // in perMil (500 = 50% inflation per year)
   mapping(uint256 => uint256) slotToHeight;
 
-  function initialize(address _bridge, address _nativeToken, uint256 _taxRate, uint256 _claimsPerYear) public initializer {
+  function initialize(
+    address _bridge,
+    address _nativeToken,
+    uint256 _taxRate,
+    uint256 _claimsPerYear
+  ) public initializer {
     require(_bridge != 0, "invalid bridge address");
     bridge = Bridge(_bridge);
     require(_nativeToken != 0, "invalid token address");
@@ -46,7 +51,7 @@ contract SwapRegistry is Adminable {
   function claim(uint256 _slotId, bytes32[] memory _roots) public {
     uint256 maxHeight = slotToHeight[_slotId];
     uint256 claimCount = 0;
-    for (uint256 i = 0; i < _roots.length; i+= 2) {
+    for (uint256 i = 0; i < _roots.length; i += 2) {
       require(_slotId == uint256(_roots[i+1] >> 160), "unexpected slotId");
       require(msg.sender == address(_roots[i+1]), "unexpected claimant");
       uint256 height;

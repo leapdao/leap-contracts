@@ -8,6 +8,7 @@
 
 import ethUtil from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
+
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
@@ -82,7 +83,7 @@ contract('SwapRegistry', (accounts) => {
       it('should receive no reward if all staked', async () => {
         await nativeToken.transfer(bob, 1000000000000);
         const prevPeriodHash = await bridge.tipHash();
-        const txRoot = '0x0202020202020202020202020202020202020202020202020202020202020202';
+        const txRoot = '0x0101010101010101010101010101010101010101010101010101010101010101';
         const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
         const buffer = Buffer.alloc(64, 0);
         buffer.write(txRoot.replace('0x', ''), 'hex');
@@ -106,7 +107,7 @@ contract('SwapRegistry', (accounts) => {
       it('should receive less than inflation cap if more than 50% staked', async () => {
         await nativeToken.transfer(bob, 750000000000);
         const prevPeriodHash = await bridge.tipHash();
-        const txRoot = '0x0202020202020202020202020202020202020202020202020202020202020202';
+        const txRoot = '0x0101010101010101010101010101010101010101010101010101010101010101';
         const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
         const buffer = Buffer.alloc(64, 0);
         buffer.write(txRoot.replace('0x', ''), 'hex');
@@ -128,6 +129,29 @@ contract('SwapRegistry', (accounts) => {
 
         assert.equal(taxBalBefore.add(reward * taxRate).toNumber(), taxBalAfter.toNumber());
         assert.equal(bobBalBefore.add(reward - (reward * taxRate)).toNumber(), bobBalAfter.toNumber());
+      });
+
+      it('should allow to claim multiple at once', async () => {
+        const periodHash0 = await bridge.tipHash();
+        const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
+        const oracleRoot1 = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        let buffer = Buffer.alloc(64, 0);
+        buffer.write(txRoot1.replace('0x', ''), 'hex');
+        buffer.write(oracleRoot1.replace('0x', ''), 32, 'hex');
+        const periodHash1 = `0x${ethUtil.keccak256(buffer).toString('hex')}`;
+
+        await bridge.submitPeriod(periodHash0, periodHash1, {from: bob}).should.be.fulfilled;
+
+        const txRoot2 = '0x0202020202020202020202020202020202020202020202020202020202020202';
+        const oracleRoot2 = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        buffer = Buffer.alloc(64, 0);
+        buffer.write(txRoot2.replace('0x', ''), 'hex');
+        buffer.write(oracleRoot2.replace('0x', ''), 32, 'hex');
+        const periodHash2 = `0x${ethUtil.keccak256(buffer).toString('hex')}`;
+
+        await bridge.submitPeriod(periodHash1, periodHash2, {from: bob}).should.be.fulfilled;
+
+        await swapRegistry.claim(3, [txRoot1, oracleRoot1, txRoot2, oracleRoot2], {from: bob}).should.be.fulfilled;
       });
     });
 
