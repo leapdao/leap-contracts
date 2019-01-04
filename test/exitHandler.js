@@ -8,6 +8,7 @@
 import { Tx, Input, Output, Outpoint } from 'leap-core';
 import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 
+const time = require('./helpers/time');
 require('./helpers/setup');
 
 const AdminableProxy = artifacts.require('AdminableProxy');
@@ -56,7 +57,7 @@ contract('ExitHandler', (accounts) => {
 
     const maxReward = 50;
     const parentBlockInterval = 0;
-    const exitDuration = 0;
+    const exitDuration = 5;
     const exitStake = 0;    
 
     const seedTxs = async () => {
@@ -126,6 +127,7 @@ contract('ExitHandler', (accounts) => {
 
     describe('Start exit', async () => {
       it('Should allow to exit valid utxo', async () => {
+        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx, transferTx]);
 
         const transferProof = period.proof(transferTx);
@@ -136,15 +138,18 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         aliceBalanceBefore.plus(50).should.be.bignumber.equal(aliceBalanceAfter);
-
       });
 
       it('Should allow to exit deposit utxo', async () => {
+        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx]);
 
         const proof = period.proof(depositTx);
@@ -154,18 +159,59 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+      });
 
+      it('Should allow to exit consolidate utxo', async () => {
+        await time.advanceBlock();
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(25, alice), new Output(25, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 1))
+        ], new Output(100, alice));
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
+
+        const proof = period.proof(consolidateTx);
+        const outputIndex = 0;
+        const inputProof = period.proof(spendTx);
+        const inputIndex = 2;
+        await exitHandler.startExit(inputProof, proof, outputIndex, inputIndex);
+
+        const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        const aliceBalanceAfter = await nativeToken.balanceOf(alice);
+
+        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
       });
 
       it('Should allow to exit deposit', async () => {
+        await time.advanceBlock();
         await exitHandler.startDepositExit(1);
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
 
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
@@ -220,6 +266,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit', async () => {
+        await time.advanceBlock();
         // utxo that will have spend exit utxo
         const spendTx = Tx.transfer(
           [new Input(new Outpoint(transferTx.hash(), 0))],
@@ -248,6 +295,9 @@ contract('ExitHandler', (accounts) => {
         
         const bal1 = await nativeToken.balanceOf(bob);
 
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
         await exitHandler.finalizeTopExit(0);
         
         const bal2 = await nativeToken.balanceOf(bob);
@@ -256,6 +306,113 @@ contract('ExitHandler', (accounts) => {
         // check exit was evicted from PriorityQueue
         assert.equal((await exitHandler.tokens(0))[1], 0);
         
+      });
+
+      it('Should allow to challenge exit by verified tx', async () => {
+        await time.advanceBlock();
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(25, alice), new Output(25, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 0)),
+          new Input(new Outpoint(spendTx.hash(), 1))
+        ], new Output(100, alice));
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        // withdraw output
+        await exitHandler.startExit(transferProof, spendProof, 1, 0, { from: alice });
+
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(spendProof, 0);
+        await exitHandler.startVerification(spendProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0);
+
+        const startTime = await time.latest();
+        let exitTime = startTime + time.duration.seconds(exitDuration);
+        await time.increaseTo(exitTime);
+        
+        await exitHandler.challengeExit(consolidateProof, spendProof, 1, 2);
+        
+        const bal1 = await nativeToken.balanceOf(alice);
+
+        exitTime = startTime + time.duration.seconds(exitDuration * 2);
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(0);
+        
+        const bal2 = await nativeToken.balanceOf(alice);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        
+      });
+
+      it('Should allow to challenge invalid consolidate tx', async () => {
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(25, bob), new Output(25, bob)] // invalid input to consolidate
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)), // input alice
+          new Input(new Outpoint(spendTx.hash(), 1)) // input bob
+        ], new Output(75, alice));
+        const period = await submitNewPeriod([depositTx, transferTx, spendTx, consolidateTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(spendProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0).should.be.rejectedWith(EVMRevert);
+
+        // check that consolidate verification not initiated
+        const verification = await exitHandler.verifications(consolidateTx.hash());
+        assert.equal(verification[0], 0);
+      });
+
+      it('Should allow to challenge doublespent consolidate tx', async () => {
+        transferTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, alice), new Output(50, alice)]
+        ).sign([alicePriv]);
+        const consolidateTx = Tx.consolidate([
+          new Input(new Outpoint(transferTx.hash(), 0)),
+          new Input(new Outpoint(transferTx.hash(), 1))
+        ], new Output(100, alice));
+        const doublespendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(50, bob)]
+        ).sign([alicePriv]);
+        const period = await submitNewPeriod([depositTx, transferTx, consolidateTx, doublespendTx]);
+
+        const transferProof = period.proof(transferTx);
+        const doublespendProof = period.proof(doublespendTx);
+        const consolidateProof = period.proof(consolidateTx);
+
+        await exitHandler.startVerification(transferProof, 0);
+        await exitHandler.startVerification(transferProof, 1);
+        await exitHandler.startVerification(consolidateProof, 0);
+
+        await exitHandler.challengeConsolidateDoublespent(doublespendProof, consolidateProof, 0, 1);
+        // check that verification deleted
+        const verification = await exitHandler.verifications(consolidateTx.hash());
+        assert.equal(verification[0], 0);
       });
 
       it('Should allow to challenge youngest input for exit', async () => {
@@ -304,6 +461,9 @@ contract('ExitHandler', (accounts) => {
         exit = await exitHandler.exits(utxoId);
         assert.equal((await exitHandler.tokens(0))[1], 1);
         const bal1 = await nativeToken.balanceOf(alice);
+
+        const exitTime = (await time.latest()) + time.duration.seconds(2 * exitDuration);
+        await time.increaseTo(exitTime);
 
         await exitHandler.finalizeTopExit(0);
         

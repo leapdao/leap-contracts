@@ -14,7 +14,7 @@ import "./TxLib.sol";
 
 contract FastExitHandler is ExitHandler {
 
-  function startBoughtExit(bytes32[] _proof, uint256 _oindex, bytes32[] signedData) public payable {
+  function startBoughtExit(bytes32[] _proof, uint8 _oindex, bytes32[] signedData) public payable {
 
     (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);
     // validate proof
@@ -39,7 +39,7 @@ contract FastExitHandler is ExitHandler {
       "Signer was not the previous owenr of UTXO"
     );
     require(
-      bytes32((_oindex << 120) | uint120(txHash)) == utxoIdSigned, 
+      bytes32(uint256(_oindex) << 120 | uint120(txHash)) == utxoIdSigned, 
       "The signed utxoid does not match the one in the proof"
     );
     require(out.value > 0, "Exit has no value");

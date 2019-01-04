@@ -23,7 +23,7 @@ contract ExitHandler is DepositHandler {
 
   event ExitStarted(
     bytes32 indexed txHash, 
-    uint256 indexed outIndex, 
+    uint8 indexed outIndex, 
     uint256 indexed color, 
     address exitor, 
     uint256 amount
@@ -47,6 +47,123 @@ contract ExitHandler is DepositHandler {
    */
   mapping(bytes32 => Exit) public exits;
 
+  struct Verification {
+    uint32 startTime;
+    address owner;
+    uint256 stake;
+  }
+
+  event VerificationStarted(bytes32 indexed txHash);
+  /**
+   * txHash -> Verification Start Time mapping.
+   * Used to verify consolidate and computation transactions
+   * before they can be used to challenge exits.
+   */
+  mapping(bytes32 => Verification) public verifications;
+
+  /**
+   * Consolidate tx inputs are unsigned, hence an operator
+   * could create and include invalid consolidate txns to:
+   * a) challenge valid exits.
+   * b) decrease the priority of funds in exit queue by consolidating them,
+   *    putting the priority lower than his own transaction in the latest block.
+   *
+   * The following invalid txns are possible:
+   * - consolidates with out-of-no-where inputs. (a,b)
+   * - consolidates with inputs from utxos of other owners. (a,b)
+   * - consolidates with inputs from spent utxos of same owner. (a)
+   * - consolidates with duplicate inputs. (a)
+   *
+   * A verification process is introduced with half the duration of the exit procedure.
+   * During this verification a transaction can be challenged before it is whitelisted
+   * to be used in an exit challenge. We use this verification process to scrutinize 
+   * the validity of complex transactions (consolidate and spending conditions).
+   */
+  function startVerification(bytes32[] _proof, uint8 _outputIndex) public payable {
+    require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
+    bytes32 parent;
+    (parent,,,) = bridge.periods(_proof[0]);
+    require(parent > 0, "The referenced period was not submitted to bridge");
+
+    // check exiting tx inclusion in the root chain block
+    bytes32 utxoId;
+    bytes memory txData;
+    (, utxoId, txData) = TxLib.validateProof(32, _proof);
+    if (_outputIndex > 0) {
+      utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(utxoId));
+    }
+    require(verifications[utxoId].stake == 0, "Transaction already registered");
+
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    require(_outputIndex < txn.outs.length, "Output index out of range");
+    address owner = txn.outs[_outputIndex].owner;
+
+    if (txn.txType == TxLib.TxType.Consolidate) {
+       // iterate over all inputs
+      // make sure these inputs have been registered for verification
+      // fail if not
+      // if yes, then delete them all and return stakes
+      uint256 stake = 0;
+      for (uint i = 0; i < txn.ins.length; i++) {
+        bytes32 prevUtxoId = txn.ins[i].outpoint.hash;
+        if (txn.ins[i].outpoint.pos > 0) {
+          prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(txn.ins[i].outpoint.hash));
+        }
+        Verification memory prevVerification = verifications[prevUtxoId];
+        require(prevVerification.startTime > 0, "Input not found");
+        require(prevVerification.owner == owner, "Input belongs to different owner");
+        stake += prevVerification.stake;
+        delete verifications[prevUtxoId];
+      }
+      msg.sender.transfer(stake);
+    }
+
+    verifications[utxoId] = Verification(uint32(block.timestamp), txn.outs[_outputIndex].owner, msg.value);
+    emit VerificationStarted(utxoId);
+  }
+
+  /**
+   * An input to the consolidate tx has been spent by some other tx.
+   * Because consolidate inputs are not signed, the other transaction takes precedence,
+   * and the consolidate transaction should not be usable in a challenge.
+   */
+  function challengeConsolidateDoublespent(
+    bytes32[] _doublespendProof, bytes32[] _consolidateProof,
+    uint8 _inputIndex, uint8 _consolidateInputIndex) public {
+    // output owner of consolidate proof different then owner of some input
+    bytes32 parent;
+    (parent,,,) = bridge.periods(_doublespendProof[0]);
+    require(parent > 0, "The period referenced in doublespendProof was not submitted to bridge");
+    (parent,,,) = bridge.periods(_consolidateProof[0]);
+    require(parent > 0, "The period referenced in consolidateProof was not submitted to bridge");
+
+    // check consolidate tx inclusion in the root chain block
+    bytes32 txHash;
+    bytes memory txData;
+    (, txHash, txData) = TxLib.validateProof(32 * (_doublespendProof.length + 2) + 64, _consolidateProof);
+    Verification memory verification = verifications[txHash];
+    require(verification.startTime > 0, "Transaction not registered for verification");
+    require(
+      block.timestamp <= verification.startTime + (exitDuration / 2),
+      "Transaction passed challenge duration"
+    );
+    // parse consolidate tx
+    TxLib.Outpoint memory pointC = TxLib.parseTx(txData).ins[_consolidateInputIndex].outpoint;
+    bytes32 doublespendTxHash;
+    (, doublespendTxHash, txData) = TxLib.validateProof(96, _doublespendProof);
+    // parse input tx
+    TxLib.Outpoint memory pointD = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
+    require(doublespendTxHash != txHash, "consolidate and doublespend are same tx");
+    require(
+      pointC.hash == pointD.hash && pointC.pos == pointD.pos,
+      "Doublespend is not a doublespend"
+    );
+    // award stake to challanger
+    msg.sender.transfer(verification.stake);
+    // delete invalid tx
+    delete verifications[txHash];
+  }
+
   function initializeWithExit(
     Bridge _bridge, 
     uint256 _exitDuration, 
@@ -62,7 +179,7 @@ contract ExitHandler is DepositHandler {
 
   function startExit(
     bytes32[] _youngestInputProof, bytes32[] _proof,
-    uint256 _outputIndex, uint256 _inputIndex
+    uint8 _outputIndex, uint8 _inputIndex
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     bytes32 parent;
@@ -85,7 +202,7 @@ contract ExitHandler is DepositHandler {
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
@@ -202,20 +319,21 @@ contract ExitHandler is DepositHandler {
   function challengeExit(
     bytes32[] _proof, 
     bytes32[] _prevProof, 
-    uint256 _outputIndex, 
-    uint256 _inputIndex
+    uint8 _outputIndex,
+    uint8 _inputIndex
   ) public {
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
     bytes memory txData;
     (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash1));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash1));
     
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
       // validate spending tx
-      (, , txData) = TxLib.validateProof(96, _proof);
+      bytes32 txHash;
+      (, txHash, txData) = TxLib.validateProof(96, _proof);
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
@@ -233,7 +351,17 @@ contract ExitHandler is DepositHandler {
         );
         require(exits[utxoId].owner == signer);
       } else {
-        revert("unknown tx type");
+        // check that transaction verified
+        uint256 verificationTime = verifications[txHash].startTime;
+        require(verificationTime > 0, "Transaction not verified");
+        require(block.timestamp >= verificationTime + (exitDuration / 2), "Transaction still in verification");
+
+        // if consolidate, make sure owner matches
+        if (txn.txType == TxLib.TxType.Consolidate) {
+          require(exits[utxoId].owner == txn.outs[0].owner);
+        } else {
+          revert("unknown tx type");
+        }
       }
     } else {
       // challenging deposit exit
@@ -265,14 +393,14 @@ contract ExitHandler is DepositHandler {
   function challengeYoungestInput(
     bytes32[] _youngerInputProof,
     bytes32[] _exitingTxProof, 
-    uint256 _outputIndex, 
-    uint256 _inputIndex
+    uint8 _outputIndex, 
+    uint8 _inputIndex
   ) public {
     // validate exiting input tx
     bytes32 txHash;
     bytes memory txData;
     (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
-    bytes32 utxoId = bytes32((_outputIndex << 120) | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
 
     // check the exit exists
     require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
@@ -312,7 +440,7 @@ contract ExitHandler is DepositHandler {
     uint32 timestamp, bytes32 utxoId, uint64 txPos
   ) internal view returns (uint256 priority) {
     uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    return (exitableAt << 192) | (txPos << 128) | uint128(utxoId);
+    return (exitableAt << 192) | uint256(txPos) << 128 | uint128(utxoId);
   }
 
   // Use this to find calldata offset - you are looking for the number:
