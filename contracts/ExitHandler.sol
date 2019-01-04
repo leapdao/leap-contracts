@@ -97,7 +97,7 @@ contract ExitHandler is DepositHandler {
     require(_outputIndex < txn.outs.length, "Output index out of range");
 
     if (txn.txType == TxLib.TxType.Consolidate) {
-      // itterate over all inputs
+       // iterate over all inputs
       // make sure these inputs have been registered for verification
       // fail if not
       // if yes, then delete them all and return stakes
@@ -191,7 +191,7 @@ contract ExitHandler is DepositHandler {
     (, doublespendTxHash, txData) = TxLib.validateProof(96, _doublespendProof);
     // parse input tx
     TxLib.Outpoint memory pointD = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
-    require(doublespendTxHash != txHash, "consolidate and doublespend are some tx");
+     require(doublespendTxHash != txHash, "consolidate and doublespend are same tx");
     require(
       pointC.hash == pointD.hash && pointC.pos == pointD.pos,
       "Doublespend is not a doublespend"
