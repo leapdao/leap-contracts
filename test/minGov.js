@@ -1,5 +1,5 @@
 import chai from 'chai';
-import util from 'ethereumjs-util';
+
 const time = require('./helpers/time');
 
 const Bridge = artifacts.require('./mocks/BridgeMock.sol');
@@ -58,7 +58,7 @@ contract('MinGov', (accounts) => {
     await gov.finalize();
 
     // check values after
-    let minGasPrice = await operator.minGasPrice();
+    const minGasPrice = await operator.minGasPrice();
     assert.equal(minGasPrice.toNumber(), 200);
     const epochLength = await operator.epochLength();
     assert.equal(epochLength.toNumber(), 32);

@@ -35,14 +35,14 @@ contract MinGov is Ownable {
     size = 0;
   }
 
-  function propose(address _subject, bytes memory _msgData) onlyOwner() public {
+  function propose(address _subject, bytes memory _msgData) public onlyOwner() {
     require(size < 5);
     proposals[first + size] = Proposal(_subject, uint32(now), false, _msgData);
     emit NewProposal(first + size, _subject, _msgData);
     size++;
   }
   
-  function cancel(uint256 _proposalId) onlyOwner() public {
+  function cancel(uint256 _proposalId) public onlyOwner() {
     Proposal storage prop = proposals[_proposalId];
     require(prop.created > 0);
     require(prop.canceled == false);
@@ -59,11 +59,9 @@ contract MinGov is Ownable {
       if (prop.created + proposalTime <= now) {
         if (!prop.canceled) {
           bool rv;
-          if (
-            // changeAdmin(address)
-            getSig(prop.msgData) == 0x8f283970 || 
-            // upgradeTo(address)
-            getSig(prop.msgData) == 0x3659cfe6) {
+          if ( getSig(prop.msgData) == 0x8f283970 || // changeAdmin(address)
+            getSig(prop.msgData) == 0x3659cfe6 // upgradeTo(address)
+          ) {
             // this changes proxy parameters 
             rv = prop.subject.call(prop.msgData);
             // use this for 0.5
