@@ -19,7 +19,9 @@ const MintableToken = artifacts.require('MintableToken');
 contract('SwapRegistry', (accounts) => {
   const bob = accounts[1];
   const taxRate = 0.5;
-  const claimPerYear = 100000;
+
+  const initialTotalSupply = new web3.BigNumber(10).pow(12); // 10 * 10^4 * 10^8
+  const periodsPerYear = 262800; // 30 * 24 * 365
   const inflationCap = 0.5;
 
   describe('Test', () => {
@@ -41,7 +43,7 @@ contract('SwapRegistry', (accounts) => {
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
-      data = await swapRegistry.contract.initialize.getData(bridge.address, nativeToken.address, taxRate * 1000, claimPerYear);
+      data = await swapRegistry.contract.initialize.getData(bridge.address, nativeToken.address, taxRate * 1000, periodsPerYear, initialTotalSupply);
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
       swapRegistry = SwapRegistry.at(proxy.address);
 
@@ -65,19 +67,19 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
-        const total = (await nativeToken.totalSupply()).toNumber();
 
         await swapRegistry.claim(3, [txRoot, oracleRoot], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        const reward = (total * inflationCap) / claimPerYear;
-        assert.equal(taxBalBefore.add(reward * taxRate).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(reward - (reward * taxRate)).toNumber(), bobBalAfter.toNumber());
+        const reward = initialTotalSupply.mul(inflationCap).div(periodsPerYear).toNumber();
+
+        assert.equal(taxBalBefore.add(Math.round(reward * taxRate)).toNumber(), taxBalAfter.toNumber());
+        assert.equal(bobBalBefore.add(Math.floor(reward - (reward * taxRate))).toNumber(), bobBalAfter.toNumber());
 
         await swapRegistry.claim(3, [txRoot, oracleRoot], {from: bob}).should.be.rejectedWith(EVMRevert);
 
-        assert.equal(reward * claimPerYear, total * inflationCap);
+        assert.equal(reward * periodsPerYear, initialTotalSupply.mul(inflationCap).toNumber());
       });
 
       it('should receive no reward if all staked', async () => {
@@ -118,17 +120,16 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
-        const total = (await nativeToken.totalSupply()).toNumber();
         const staked = bobBalBefore.toNumber();
 
         await swapRegistry.claim(3, [txRoot, oracleRoot], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        const reward = ((2 * staked) / claimPerYear) - ((2 * staked * staked) / (total * claimPerYear));
+        const reward = initialTotalSupply.sub(staked).mul(staked).mul(4).mul(inflationCap).div(initialTotalSupply).div(periodsPerYear).toNumber();
 
-        assert.equal(taxBalBefore.add(reward * taxRate).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(reward - (reward * taxRate)).toNumber(), bobBalAfter.toNumber());
+        assert.equal(taxBalBefore.add(Math.round(reward * taxRate)).toNumber(), taxBalAfter.toNumber());
+        assert.equal(bobBalBefore.add(Math.round(reward - (reward * taxRate))).toNumber(), bobBalAfter.toNumber());
       });
 
       it('should allow to claim multiple at once', async () => {

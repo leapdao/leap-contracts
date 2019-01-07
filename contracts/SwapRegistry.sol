@@ -26,16 +26,19 @@ contract SwapRegistry is Adminable {
 
   // Claim Related
   Bridge bridge;
-  uint256 taxRate; // as perMil (1000 == 100%, 1 == 0.1%)
-  uint256 claimsPerYear;
-  uint256 inflationCap; // in perMil (500 = 50% inflation per year)
+  uint32 taxRate; // as perMil (1000 == 100%, 1 == 0.1%)
+  uint256 lastYearTotalSupply;
+  uint32 periodsClaimed; // a counter between 0 and periodsPerYear
+  uint32 periodsPerYear;
+  uint16 inflationCap; // as totalSupply / x (2 = 50%, 10 = 10%)
   mapping(uint256 => uint256) slotToHeight;
 
   function initialize(
     address _bridge,
     address _nativeToken,
-    uint256 _taxRate,
-    uint256 _claimsPerYear
+    uint32 _taxRate,
+    uint32 _periodsPerYear,
+    uint256 _initialTotalSupply
   ) public initializer {
     require(_bridge != 0, "invalid bridge address");
     bridge = Bridge(_bridge);
@@ -44,13 +47,15 @@ contract SwapRegistry is Adminable {
     idToToken[0] = _nativeToken;
     tokenCount = 0;
     taxRate = _taxRate;
-    claimsPerYear = _claimsPerYear;
-    inflationCap = 500;
+    periodsPerYear = _periodsPerYear;
+    inflationCap = 2;
+    periodsClaimed = 0;
+    lastYearTotalSupply = _initialTotalSupply;
   }
 
   function claim(uint256 _slotId, bytes32[] memory _roots) public {
     uint256 maxHeight = slotToHeight[_slotId];
-    uint256 claimCount = 0;
+    uint32 claimCount = 0;
     for (uint256 i = 0; i < _roots.length; i += 2) {
       require(_slotId == uint256(_roots[i+1] >> 160), "unexpected slotId");
       require(msg.sender == address(_roots[i+1]), "unexpected claimant");
@@ -61,20 +66,37 @@ contract SwapRegistry is Adminable {
       claimCount += 1;
     }
     slotToHeight[_slotId] = maxHeight;
-    // calculate token amount
-    // according to https://ethresear.ch/t/riss-reflexive-inflation-through-staked-supply/3633
     ERC20Mintable token = ERC20Mintable(idToToken[0]);
-    uint256 staked = token.balanceOf(bridge.operator());
     uint256 total = token.totalSupply();
+    uint256 staked = token.balanceOf(bridge.operator());
+    
+    // update lastYearTotalSupply if year passed
+    periodsClaimed = claimCount + periodsClaimed;
+    if (periodsClaimed >= periodsPerYear) {
+      periodsClaimed = periodsClaimed % periodsPerYear;
+      lastYearTotalSupply = total;
+    }
+    // calculate reward according to:
+    // https://ethresear.ch/t/riss-reflexive-inflation-through-staked-supply/3633
     uint256 reward;
     if (staked < total.div(2)) {
-      reward = total.mul(inflationCap).div(1000).div(claimsPerYear);
+      //             total
+      //  --------------------------
+      //  inflation * periodsPerYear
+      reward = lastYearTotalSupply.div(inflationCap).div(periodsPerYear);
     } else {
-      reward = staked.mul(total).mul(2).sub(staked.mul(staked).mul(2)).div(total).div(claimsPerYear);
+      if (lastYearTotalSupply < total) {
+        // adjust stake proportial to last years supply
+        staked = staked.mul(lastYearTotalSupply).div(total);
+      }
+      //    4 * staked * (total - staked)
+      //  ----------------------------------
+      //  total * inflation * periodsPerYear
+      reward = lastYearTotalSupply.sub(staked).mul(staked).mul(4).div(lastYearTotalSupply).div(inflationCap).div(periodsPerYear);
     }
     reward = reward.mul(claimCount);
-    total = reward;
-    reward = reward.mul(taxRate).div(1000);
+    total = reward; // reuse total for temp variable to save on stack members
+    reward = reward.mul(taxRate).div(1000);  // taxRate perMil (1000 == 100%, 1 == 0.1%)
     // mint tokens
     token.mint(msg.sender, reward);
     token.mint(bridge.admin(), total.sub(reward));
@@ -106,8 +128,8 @@ contract SwapRegistry is Adminable {
     return idToToken[_tokenId];
   }
 
-  function getClaimsPerYear() public view returns(uint256) {
-    return claimsPerYear;
+  function getPeriodsPerYear() public view returns(uint256) {
+    return periodsPerYear;
   }
 
   function getTaxRate() public view returns(uint256) {
