@@ -2,10 +2,24 @@
 [![Build Status](https://travis-ci.org/leapdao/leap-contracts.svg?branch=master)](https://travis-ci.org/leapdao/leap-contracts)
 # Development
 
+## Getting started
+
 ```
 yarn
 yarn test 
 ```
+
+## Deploying contracts
+
+> All the commands support any truffle options like `--network` or `--reset`.
+
+**Deploy token and plasma contracts:** 
+```yarn deploy```.
+
+**Redeploy plasma contracts (reusing token):** `yarn deploy:plasma`
+
+
+
 # Contracts
 
 In this repository are the solidity smart contracts implementing LeapDAO's plasma leap. 
