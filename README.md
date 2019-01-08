@@ -13,12 +13,21 @@ yarn test
 
 > All the commands support any truffle options like `--network` or `--reset`.
 
-**Deploy token and plasma contracts:** 
-```yarn deploy```.
+Set `PROPOSAL_TIME` env variable to customize proposal time for Governance contract (in seconds). Default is 14 days. E.g. to set 10 minutes: `PROPOSAL_TIME=600 yarn deploy:governance`
 
-**Redeploy plasma contracts (reusing token):** `yarn deploy:plasma`
+### Deploy everything
 
+```
+yarn deploy
+```
 
+This will deploy deploy token, plasma and governance contracts.
+
+### Deploy only plasma and governance contracts (reusing token)
+
+```
+yarn deploy:plasma
+```
 
 # Contracts
 
