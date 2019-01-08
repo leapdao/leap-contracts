@@ -14,62 +14,108 @@ import "./TxLib.sol";
 
 contract FastExitHandler is ExitHandler {
 
-  function startBoughtExit(bytes32[] _proof, uint8 _oindex, bytes32[] signedData) public payable {
-
-    (bytes32 parent,,,uint32 timestamp) = bridge.periods(_proof[0]);
-    // validate proof
+  struct Data {
+    bytes32 parent;
+    uint32 timestamp;
     bytes32 txHash;
-    bytes memory txData;
     uint64 txPos;
-    (txPos, txHash, txData) = TxLib.validateProof(64, _proof);
-    // parse tx and use data
-    TxLib.Tx memory txn = TxLib.parseTx(txData);
-    TxLib.Output memory out = txn.outs[_oindex];
+    bytes32 utxoId;
+  }
+
+  function startBoughtExit(
+    bytes32[] _youngestInputProof, bytes32[] _proof,
+    uint8 _outputIndex, uint8 _inputIndex, bytes32[] signedData
+  ) public payable {
+    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    Data memory data;
+
+    (data.parent,,, data.timestamp) = bridge.periods(_proof[0]);
+    require(data.parent > 0, "The referenced period was not submitted to bridge");
+
+    if (_youngestInputProof.length > 0) {
+      (data.parent,,, data.timestamp) = bridge.periods(_youngestInputProof[0]);
+      require(data.parent > 0, "The referenced period was not submitted to bridge");
+    }
+
+    // check exiting tx inclusion in the root chain block
+    bytes memory txData;
+    (data.txPos, data.txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 96, _proof);
+
+    // parse exiting tx and check if it is exitable
+    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+    TxLib.Output memory out = exitingTx.outs[_outputIndex];
+    data.utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(data.txHash));
+
     (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
 
-    require(parent > 0, "Proof root was not submitted as period");
-    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     require(!isNft(out.color), "Can not fast exit NFTs");
     require(out.owner == address(this), "Funds were not sent to this contract");
     require(
       ecrecover(
         TxLib.getSigHash(txData), 
-        txn.ins[0].v, txn.ins[0].r, txn.ins[0].s
+        exitingTx.ins[0].v, exitingTx.ins[0].r, exitingTx.ins[0].s
       ) == signer,
       "Signer was not the previous owenr of UTXO"
     );
     require(
-      bytes32(uint256(_oindex) << 120 | uint120(txHash)) == utxoIdSigned, 
+      data.utxoId == utxoIdSigned, 
       "The signed utxoid does not match the one in the proof"
     );
-    require(out.value > 0, "Exit has no value");
-    require(exits[utxoIdSigned].amount == 0, "The exit for UTXO has already been started");
-    require(!exits[utxoIdSigned].finalized, "The exit for UTXO has already been finalized");
 
-    uint256 priority = getERC20ExitPriority(timestamp, utxoIdSigned, txPos);
-    
-    // pay the seller
+    require(out.value > 0, "UTXO has no value");
+    require(exits[data.utxoId].amount == 0, "The exit for UTXO has already been started");
+    require(!exits[data.utxoId].finalized, "The exit for UTXO has already been finalized");
+
+    uint256 priority;
+    if (_youngestInputProof.length > 0) {
+      // check youngest input tx inclusion in the root chain block
+      bytes32 inputTxHash;
+      (data.txPos, inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
+      require(
+        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+        "Input from the proof is not referenced in exiting tx"
+      );
+      
+      if (isNft(out.color)) {
+        priority = (nftExitCounter << 128) | uint128(data.utxoId);
+        nftExitCounter++;
+      } else {      
+        priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
+      }
+    } else {
+      require(exitingTx.txType == TxLib.TxType.Deposit, "Expected deposit tx");
+      if (isNft(out.color)) {
+        priority = (nftExitCounter << 128) | uint128(data.utxoId);
+        nftExitCounter++;
+      } else {      
+        priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
+      }
+    }
+
+    emit Debug(signer);
+
     tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
 
     tokens[out.color].insert(priority);
 
-    // give exit to buyer
-    exits[utxoIdSigned] = Exit({
+    exits[data.utxoId] = Exit({
       owner: msg.sender,
       color: out.color,
       amount: out.value,
       finalized: false,
       stake: exitStake,
-      priorityTimestamp: timestamp
+      priorityTimestamp: data.timestamp
     });
     emit ExitStarted(
-      txHash, 
-      _oindex, 
+      data.txHash, 
+      _outputIndex, 
       out.color, 
-      out.owner, 
+      msg.sender, 
       out.value
     );
   }
+
+  event Debug(address alice);
 
   function unpackSignedData(
     bytes32[] signedData
