@@ -8,7 +8,9 @@ const LeapToken = artifacts.require('LeapToken');
 const POSoperator = artifacts.require('POSoperator');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
-const AdminableProxy = artifacts.require('AdminableProxy');
+const BridgeProxy = artifacts.require('BridgeProxy');
+const OperatorProxy = artifacts.require('OperatorProxy');
+const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
 const logError = err => { if (err) { console.log(err); } }
 
@@ -52,18 +54,18 @@ module.exports = (deployer, network, accounts) => {
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
-    const bridgeProxy = await deployer.deploy(AdminableProxy, bridgeCont.address, data, {from: admin});
+    const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin });
 
     const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
-    const exitHandlerProxy = await deployer.deploy(AdminableProxy, exitHandlerCont.address, data, {from: admin});
+    const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(POSoperator);
     data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
-    const operatorProxy = await deployer.deploy(AdminableProxy, operatorCont.address, data, {from: admin});
+    const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);
     data = await bridgeCont.contract.methods.setOperator(operatorProxy.address).encodeABI();

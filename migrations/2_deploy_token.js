@@ -9,7 +9,7 @@
 
 const LeapToken = artifacts.require('LeapToken');
 
-module.exports = (deployer, network, accounts) => {
+module.exports = (deployer) => {
   deployer.then(async () => {
     const leapToken = await deployer.deploy(LeapToken);
     console.log('Deployed LEAP Token at', leapToken.address);

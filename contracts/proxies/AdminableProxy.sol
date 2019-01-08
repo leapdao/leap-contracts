@@ -9,7 +9,7 @@
 pragma solidity 0.5.2;
 
 //import "zos-lib/contracts/upgradeability/AdminUpgradeabilityProxy.sol"; - should be changed back once zos-lib will update import
-import "./zos/AdminUpgradeabilityProxy.sol";
+import "../zos/AdminUpgradeabilityProxy.sol";
 
 /**
  * @title AdminUpgradeabilityProxy

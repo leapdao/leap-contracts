@@ -10,7 +10,7 @@ pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import "./AdminableProxy.sol";
+import "./proxies/AdminableProxy.sol";
 
 contract MinGov is Ownable {
   

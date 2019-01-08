@@ -2,11 +2,11 @@ import chai from 'chai';
 
 const time = require('./helpers/time');
 
-const Bridge = artifacts.require('./mocks/BridgeMock.sol');
-const Operator = artifacts.require('./mocks/OperatorMock.sol');
-const Vault = artifacts.require('./mocks/VaultMock.sol');
-const AdminableProxy = artifacts.require('./AdminableProxy.sol');
-const MinGov = artifacts.require('./MinGov.sol');
+const Bridge = artifacts.require('BridgeMock');
+const Operator = artifacts.require('OperatorMock');
+const Vault = artifacts.require('VaultMock');
+const AdminableProxy = artifacts.require('AdminableProxy');
+const MinGov = artifacts.require('MinGov');
 
 chai.use(require('chai-as-promised')).should();
 
