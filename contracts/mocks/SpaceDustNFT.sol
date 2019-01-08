@@ -26,7 +26,6 @@ contract SpaceDustNFT is ERC721Metadata, MinterRole {
     uint8 _color
   ) public onlyMinter {
     require(_size > 0);
-    // solium-disable-next-line security/no-block-members
     uint256 nftId = now << 41 | _size << 9 | _color << 1 | (_isGlowing ? 1 : 0);
     super._mint(_to, nftId);
   }

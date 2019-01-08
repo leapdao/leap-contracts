@@ -38,7 +38,12 @@ contract MinGov is Ownable {
 
   function propose(address _subject, bytes memory _msgData) public onlyOwner() {
     require(size < 5);
-    proposals[first + size] = Proposal(_subject, uint32(now), false, _msgData);
+    proposals[first + size] = Proposal(
+      _subject,
+      uint32(now),
+      false,
+      _msgData
+    );
     emit NewProposal(first + size, _subject, _msgData);
     size++;
   }
@@ -86,4 +91,9 @@ contract MinGov is Ownable {
       }
     }
   }
+
+  function getSig(bytes _msgData) internal pure returns (bytes4) {
+    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
+  }
+
 }

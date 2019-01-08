@@ -63,5 +63,6 @@ contract DepositHandler is Vault {
     );
   }
 
+  // solium-disable-next-line mixedcase
   uint256[50] private ______gap;
 }
