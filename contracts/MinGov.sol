@@ -8,7 +8,8 @@
 
 pragma solidity ^0.4.24;
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./AdminableProxy.sol";
 
 contract MinGov is Ownable {
@@ -47,6 +48,11 @@ contract MinGov is Ownable {
     require(prop.created > 0);
     require(prop.canceled == false);
     prop.canceled = true;
+  }
+
+  function withdrawTax(address _token) public onlyOwner() {
+    IERC20 token = IERC20(_token);
+    token.transfer(owner(), token.balanceOf(this));
   }
 
   function getSig(bytes _msgData) internal pure returns (bytes4) {

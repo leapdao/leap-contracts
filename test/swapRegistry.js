@@ -16,6 +16,7 @@ const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SwapRegistry = artifacts.require('SwapRegistry');
 const MintableToken = artifacts.require('MintableToken');
+const MinGov = artifacts.require('./MinGov.sol');
 
 const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
 const txRoot2 = '0x0202020202020202020202020202020202020202020202020202020202020202';
@@ -162,6 +163,7 @@ contract('SwapRegistry', (accounts) => {
   describe('Simulation', () => {
     let bridge;
     let vault;
+    let gov;
     let swapRegistry;
     let nativeToken;
     let proxy;
@@ -182,6 +184,9 @@ contract('SwapRegistry', (accounts) => {
 
       data = await bridge.contract.setOperator.getData(bob);
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+      gov = await MinGov.new(0);
+      await proxy.changeAdmin(gov.address, {from: accounts[2]});
 
       const vaultCont = await Vault.new();
       data = await vaultCont.contract.initialize.getData(bridge.address);
@@ -248,6 +253,11 @@ contract('SwapRegistry', (accounts) => {
 
       const lastYearTotalSupply = await swapRegistry.lastYearTotalSupply();
       assert.equal(lastYearTotalSupply.toNumber(), initialTotalSupply.div(2).toNumber());
+
+      // withdraw all tax
+      await gov.withdrawTax(nativeToken.address);
+      const bal = await nativeToken.balanceOf(accounts[0]);
+      assert.equal(bal.toNumber(), 1575000000000000);
     });
 
   });
