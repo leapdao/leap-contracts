@@ -25,13 +25,25 @@ contract('FastExitHandler', (accounts) => {
   const bob = accounts[1];
 
   describe('Test', () => {
+    // contracts
     let bridge;
-    let fastExitHandler;
+    let exitHandler;
+    let proxy;
+
+    // ERC20 token stuff
     let nativeToken;
+    const nativeTokenColor = 0;
+    const depositAmount = 100;
+
     const maxReward = 50;
     const parentBlockInterval = 0;
     const exitDuration = 0;
-    const exitStake = 0;
+    const exitStake = 0;    
+
+    const seedTxs = async () => {
+      await nativeToken.approve(exitHandler.address, 1000);
+      await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
+    };
 
     const submitNewPeriod = txs => submitNewPeriodWithTx(txs, bridge, { from: bob });
 
@@ -39,10 +51,9 @@ contract('FastExitHandler', (accounts) => {
       const pqLib = await PriorityQueue.new();
       FastExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await SimpleToken.new();
-
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
-      let proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
       data = await bridge.contract.setOperator.getData(bob);
       await proxy.applyProposal(data, {from: accounts[2]});
@@ -50,38 +61,36 @@ contract('FastExitHandler', (accounts) => {
       const vaultCont = await FastExitHandler.new();
       data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
-      fastExitHandler = FastExitHandler.at(proxy.address);
+      exitHandler = FastExitHandler.at(proxy.address);
 
       // register first token
-      data = await fastExitHandler.contract.registerToken.getData(nativeToken.address, false);
+      data = await exitHandler.contract.registerToken.getData(nativeToken.address, false);
       await proxy.applyProposal(data, {from: accounts[2]});
-      // At this point alice is the owner of bridge and fastExitHandler and has 10000 tokens
-      // Bob is the bridge operator and has 0 tokens
+      // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
+      // Bob is the bridge operator and exitHandler and has 0 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified
+
+      await seedTxs();
     });
 
     it('Can fast exit', async () => {
-      const depositAmount = 100;
-      const nativeTokenColor = 0;
-
-      await nativeToken.approve(fastExitHandler.address, 1000);
-      await fastExitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
 
       // give bob some tokens so he can buy the exit
       await nativeToken.transfer(bob, 100);
-      await nativeToken.approve(fastExitHandler.address, 100, {from: bob});
+      await nativeToken.approve(exitHandler.address, 100, {from: bob});
 
       // alice sends the tokens she want to exit to fastExitHandler and produces proof
       const deposit = Tx.deposit(0, depositAmount, alice);
       let transfer = Tx.transfer(
         [new Input(new Outpoint(deposit.hash(), 0))],
-        [new Output(50, fastExitHandler.address), new Output(50, alice)]
+        [new Output(50, exitHandler.address), new Output(50, alice)]
       );
       transfer = transfer.sign([alicePriv]);
 
       const period = await submitNewPeriod([deposit, transfer]);
 
       const transferProof = period.proof(transfer);
+      const depositProof = period.proof(deposit);
 
       // she then signes over the utxo and some number, basically saying 
       // "I agree to sell these tokens for x to whoever submits the exit"
@@ -98,16 +107,19 @@ contract('FastExitHandler', (accounts) => {
       // and recieveing the exit
       
       const outputIndex = 0;
-      await fastExitHandler.startBoughtExit(transferProof, outputIndex, signedDataBytes32, {from: bob}).should.be.fulfilled;
+      const inputIndex = 0;
+
+      await exitHandler.startBoughtExit(depositProof, transferProof, outputIndex, 
+        inputIndex, signedDataBytes32, {from: bob}).should.be.fulfilled;
 
       const aliceBalance2 = await nativeToken.balanceOf(alice);
       const bobBalance2 = await nativeToken.balanceOf(bob);
-      const exitOwner = (await fastExitHandler.exits(utxoId))[2];
+      const exitOwner = (await exitHandler.exits(utxoId))[2];
       aliceBalance1.plus(40).should.be.bignumber.equal(aliceBalance2);
       bobBalance1.minus(40).should.be.bignumber.equal(bobBalance2);
       exitOwner.should.be.equal(bob);
 
-      await fastExitHandler.finalizeTopExit(0);
+      await exitHandler.finalizeTopExit(0);
 
       const bobBalance3 = await nativeToken.balanceOf(bob);
       bobBalance2.plus(50).should.be.bignumber.equal(bobBalance3);
