@@ -14,7 +14,6 @@ import "./Vault.sol";
 import "./Bridge.sol";
 
 contract POSoperator is Adminable {
-
   using SafeMath for uint256;
 
   event Epoch(uint256 epoch);
@@ -64,10 +63,6 @@ contract POSoperator is Adminable {
     bytes32 newTendermint;
   }
 
-  struct PeriodData {
-    uint8 slot;
-  }
-
   Vault public vault;
   Bridge public bridge;
 
@@ -76,7 +71,6 @@ contract POSoperator is Adminable {
   uint256 public lastEpochBlockHeight;
 
   mapping(uint256 => Slot) public slots;
-  mapping(bytes32 => PeriodData) public periodData;
 
   function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
     vault = _vault;

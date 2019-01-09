@@ -39,7 +39,6 @@ contract BridgeUpgradeTest is Adminable {
   uint256 public parentBlockInterval; // how often epochs can be submitted max
   uint64 public lastParentBlock; // last ethereum block when epoch was submitted
   address public operator; // the operator contract
-  address public exitHandler; // the exit handler contract
 
   mapping(bytes32 => Period) public periods;
 

@@ -263,25 +263,22 @@ contract('SwapRegistry', (accounts) => {
   });
 
   describe('Test', () => {
-    let vault;
     let swapRegistry;
-    let exchangeBlueprint;
     let nativeToken;
-    let proxy;
 
     before(async () => {
       nativeToken = await MintableToken.new();
 
       const vaultCont = await Vault.new();
       let data = await vaultCont.contract.initialize.getData(accounts[0]);
-      proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
-      vault = Vault.at(proxy.address);
+      let proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
+      const vault = Vault.at(proxy.address);
 
       // register first token
       data = await vault.contract.registerToken.getData(nativeToken.address, false);
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
-      exchangeBlueprint = await SwapExchange.new();
+      const exchangeBlueprint = await SwapExchange.new();
       swapRegistry = await SwapRegistry.new();
 
       data = await swapRegistry.contract.initialize.getData(accounts[0], vault.address, 0, 0, 0);
