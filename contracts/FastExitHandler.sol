@@ -65,31 +65,22 @@ contract FastExitHandler is ExitHandler {
     require(out.value > 0, "UTXO has no value");
     require(exits[data.utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exits[data.utxoId].finalized, "The exit for UTXO has already been finalized");
+    require(exitingTx.txType == TxLib.TxType.Transfer, "Can only fast exit transfer tx");
 
     uint256 priority;
-    if (_youngestInputProof.length > 0) {
-      // check youngest input tx inclusion in the root chain block
-      bytes32 inputTxHash;
-      (data.txPos, inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
-      require(
-        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
-        "Input from the proof is not referenced in exiting tx"
-      );
-      
-      if (isNft(out.color)) {
-        priority = (nftExitCounter << 128) | uint128(data.utxoId);
-        nftExitCounter++;
-      } else {      
-        priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
-      }
-    } else {
-      require(exitingTx.txType == TxLib.TxType.Deposit, "Expected deposit tx");
-      if (isNft(out.color)) {
-        priority = (nftExitCounter << 128) | uint128(data.utxoId);
-        nftExitCounter++;
-      } else {      
-        priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
-      }
+    // check youngest input tx inclusion in the root chain block
+    bytes32 inputTxHash;
+    (data.txPos, inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
+    require(
+      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+      "Input from the proof is not referenced in exiting tx"
+    );
+    
+    if (isNft(out.color)) {
+      priority = (nftExitCounter << 128) | uint128(data.utxoId);
+      nftExitCounter++;
+    } else {      
+      priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
     }
 
     emit Debug(signer);
