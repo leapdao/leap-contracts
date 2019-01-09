@@ -7,10 +7,10 @@
  */
 
 import EVMRevert from './helpers/EVMRevert';
+
 require('./helpers/setup');
 
 const Bridge = artifacts.require('Bridge');
-const Vault = artifacts.require('Vault');
 const PoaOperator = artifacts.require('PoaOperator');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
@@ -22,7 +22,6 @@ contract('PoaOperator', (accounts) => {
   describe('Test', () => {
     let bridge;
     let operator;
-    let vault;
     let proxy;
     const parentBlockInterval = 0;
     const epochLength = 3;
@@ -53,13 +52,13 @@ contract('PoaOperator', (accounts) => {
         });
 
         it('should allow to set slot and submit block', async () => {
-          let data = await operator.contract.setSlot.getData(0, alice, alice);
+          const data = await operator.contract.setSlot.getData(0, alice, alice);
           await proxy.applyProposal(data, {from: admin});
           await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
           p[1] = await bridge.tipHash();
         });
         it('should allow to set slot and submit block with reward', async () => {
-          let data = await operator.contract.setSlot.getData(1, bob, bob);
+          const data = await operator.contract.setSlot.getData(1, bob, bob);
           await proxy.applyProposal(data, {from: admin});
           await operator.submitPeriodForReward(1, p[1], '0x02', { from: bob }).should.be.fulfilled;
           p[2] = await bridge.tipHash();

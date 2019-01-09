@@ -95,7 +95,7 @@ contract PoaOperator is Adminable {
       return;
     }
     // emptying slot
-    if(_signerAddr == 0 && _tenderAddr == 0) {
+    if (_signerAddr == 0 && _tenderAddr == 0) {
       slot.activationEpoch = uint32(lastCompleteEpoch + 3);
       slot.eventCounter++;
       emit ValidatorLogout(
