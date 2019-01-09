@@ -83,8 +83,6 @@ contract FastExitHandler is ExitHandler {
       priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
     }
 
-    emit Debug(signer);
-
     tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
 
     tokens[out.color].insert(priority);
@@ -105,8 +103,6 @@ contract FastExitHandler is ExitHandler {
       out.value
     );
   }
-
-  event Debug(address alice);
 
   function unpackSignedData(
     bytes32[] signedData
