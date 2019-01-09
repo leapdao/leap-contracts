@@ -15,6 +15,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SwapRegistry = artifacts.require('SwapRegistry');
+const SwapExchange = artifacts.require('SwapExchange');
 const MintableToken = artifacts.require('MintableToken');
 const MinGov = artifacts.require('./MinGov.sol');
 
@@ -259,7 +260,47 @@ contract('SwapRegistry', (accounts) => {
       const bal = await nativeToken.balanceOf(accounts[0]);
       assert.equal(bal.toNumber(), 1575000000000000);
     });
-
   });
 
+  describe('Test', () => {
+    let vault;
+    let swapRegistry;
+    let exchangeBlueprint;
+    let nativeToken;
+    let proxy;
+
+    before(async () => {
+      nativeToken = await MintableToken.new();
+
+      const vaultCont = await Vault.new();
+      let data = await vaultCont.contract.initialize.getData(accounts[0]);
+      proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
+      vault = Vault.at(proxy.address);
+
+      // register first token
+      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+      exchangeBlueprint = await SwapExchange.new();
+      swapRegistry = await SwapRegistry.new();
+
+      data = await swapRegistry.contract.initialize.getData(accounts[0], vault.address, 0, 0, 0);
+      proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
+      swapRegistry = SwapRegistry.at(proxy.address);
+
+      data = await swapRegistry.contract.setExchangeCodeAddr.getData(exchangeBlueprint.address);
+      await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+    });
+
+    describe('Swap Exchange', async () => {
+      it('should allow to register new swap market', async () => {
+        const token = await MintableToken.new();
+        await swapRegistry.createExchange(token.address);
+        const exchangeAddr = await swapRegistry.getExchange(token.address);
+        const exchange = SwapExchange.at(exchangeAddr);
+        const decimals = await exchange.decimals();
+        assert.equal(decimals.toNumber(), 18);
+      });
+    });
+  });
 });

@@ -130,17 +130,27 @@ contract SwapRegistry is Adminable {
   event NewExchange(address indexed token, address indexed exchange);
   mapping(address => address) tokenToExchange;
   mapping(address => address) exchangeToToken;
+  address exchangeCodeAddr;
 
   function createExchange(address _token) public returns (address) {
     require(_token != 0, "invalid token address");
+    address nativeToken = vault.getTokenAddr(0);
+    require(_token != nativeToken, "token can not be nativeToken");
     require(tokenToExchange[_token] == 0, "exchange already created");
-    // todo: deploy exchange
-    address exchange = address(new SwapExchange());
-    // Exchange(exchange).setup(token)
+    address exchange = createClone(exchangeCodeAddr);
+    SwapExchange(exchange).setup(nativeToken, _token);
     tokenToExchange[_token] = exchange;
     exchangeToToken[exchange] = _token;
     emit NewExchange(_token, exchange);
     return exchange;
+  }
+
+  function getExchangeCodeAddr() public view returns(address) {
+    return exchangeCodeAddr;
+  }
+
+  function setExchangeCodeAddr(address _exchangeCodeAddr) public ifAdmin {
+    exchangeCodeAddr = _exchangeCodeAddr;
   }
 
   function getExchange(address _token) public view returns(address) {
@@ -149,6 +159,17 @@ contract SwapRegistry is Adminable {
 
   function getToken(address _exchange) public view returns(address) {
     return exchangeToToken[_exchange];
+  }
+
+  function createClone(address target) internal returns (address result) {
+    bytes20 targetBytes = bytes20(target);
+    assembly {
+      let clone := mload(0x40)
+      mstore(clone, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
+      mstore(add(clone, 0x14), targetBytes)
+      mstore(add(clone, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
+      result := create(0, clone, 0x37)
+    }
   }
 
 }
