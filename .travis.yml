@@ -1,7 +1,23 @@
 language: node_js
-cache: yarn
+cache:
+  - npm
+  - yarn
 node_js:
   - '8.11'
-script:
-  - yarn run lint
-  - yarn run test-ci
+jobs:
+  include:
+    - stage: tests
+      name: "Linter"
+      script: yarn run lint
+
+    - stage: tests
+      name: "Unit tests"
+      script: yarn run test-ci
+
+    - stage: tests
+      name: "Solidity Coverage"
+      script:
+        - npm install codecov
+        - npm install solidity-coverage
+        - npm run coverage
+        - ./node_modules/.bin/codecov -f coverage/lcov.info

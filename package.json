@@ -11,7 +11,8 @@
     "lint": "yarn run lint:contracts && yarn run lint:js",
     "lint:contracts": "solium -d contracts/ --fix",
     "lint:js": "eslint test/ --fix",
-    "postinstall": "cp -n .env.template .env || true"
+    "postinstall": "cp -n .env.template .env || true",
+    "coverage": "scripts/coverage.sh"
   },
   "husky": {
     "hooks": {
