@@ -52,4 +52,18 @@ contract('Bridge', (accounts) => {
     });
   });
 
+  describe('Governance', () => {
+    let bridge;
+    let proxy;
+    const parentBlockInterval = 0;
+
+    it('can set blockInterval', async() => {
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = Bridge.at(proxy.address);
+      data = await bridge.contract.setParentBlockInterval.getData(10);
+      await proxy.applyProposal(data, {from: accounts[2]});
+    });
+  });
 });
