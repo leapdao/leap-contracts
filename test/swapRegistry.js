@@ -21,9 +21,6 @@ const MinGov = artifacts.require('./MinGov.sol');
 
 const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
 const txRoot2 = '0x0202020202020202020202020202020202020202020202020202020202020202';
-const txRoot3 = '0x0303030303030303030303030303030303030303030303030303030303030303';
-const txRoot4 = '0x0404040404040404040404040404040404040404040404040404040404040404';
-const txRoot5 = '0x0505050505050505050505050505050505050505050505050505050505050505';
 
 const merkelize = (hash1, hash2) => {
   const buffer = Buffer.alloc(64, 0);
@@ -35,8 +32,6 @@ const merkelize = (hash1, hash2) => {
 contract('SwapRegistry', (accounts) => {
   const bob = accounts[1];
 
-  const inflationCap = 0.5;
-
   describe('Test', () => {
     let bridge;
     let vault;
@@ -44,8 +39,8 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
     let proxy;
     const parentBlockInterval = 0;
-    const initialTotalSupply = new web3.BigNumber(10).pow(12); // 10 * 10^4 * 10^8
-    const periodsPerYear = 262800; // 30 * 24 * 365
+    const initialTotalSupply = new web3.BigNumber(10).pow(18).mul(7000000); // 7kk
+    const inflationRate = 2637549827;  // ~ 100% in 262800 periods
     const taxRate = 0.5; // 50%
 
     beforeEach(async () => {
@@ -70,12 +65,16 @@ contract('SwapRegistry', (accounts) => {
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
-      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, taxRate * 1000, periodsPerYear, initialTotalSupply);
+      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, 0);
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
       swapRegistry = SwapRegistry.at(proxy.address);
 
-      await nativeToken.addMinter(swapRegistry.address);
+      // set tax to 50%
+      data = await swapRegistry.contract.setTaxRate.getData(500);
+      await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
+      // make swapRegistry a minter
+      await nativeToken.addMinter(swapRegistry.address);
     });
 
     describe('Period claim', async () => {
@@ -93,18 +92,16 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        const reward = initialTotalSupply.mul(inflationCap).div(periodsPerYear).toNumber();
+        const reward = initialTotalSupply.mul(inflationRate).div(new web3.BigNumber(10).pow(15));
 
-        assert.equal(taxBalBefore.add(Math.floor(reward * taxRate)).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(Math.round(reward - (reward * taxRate))).toNumber(), bobBalAfter.toNumber());
+        assert.equal(taxBalBefore.add(reward.mul(taxRate)).toNumber(), taxBalAfter.toNumber());
+        assert.equal(bobBalBefore.add(reward.sub(reward.mul(taxRate))).toNumber(), bobBalAfter.toNumber());
 
         await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.rejectedWith(EVMRevert);
-
-        assert.equal(reward * periodsPerYear, initialTotalSupply.mul(inflationCap).toNumber());
       });
 
       it('should receive no reward if all staked', async () => {
-        await nativeToken.transfer(bob, 1000000000000);
+        await nativeToken.transfer(bob, initialTotalSupply);
 
         const prevPeriodHash = await bridge.tipHash();
         const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
@@ -124,7 +121,7 @@ contract('SwapRegistry', (accounts) => {
       });
 
       it('should receive less than inflation cap if more than 50% staked', async () => {
-        await nativeToken.transfer(bob, 750000000000);
+        await nativeToken.transfer(bob, initialTotalSupply.div(4).mul(3));
 
         const prevPeriodHash = await bridge.tipHash();
         const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
@@ -139,10 +136,11 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        const reward = initialTotalSupply.sub(staked).mul(staked).mul(4).mul(inflationCap).div(initialTotalSupply).div(periodsPerYear).toNumber();
+        let reward = initialTotalSupply.mul(inflationRate).div(new web3.BigNumber(10).pow(15));
+        reward = reward.mul(initialTotalSupply.sub(staked)).mul(staked).mul(4).div(initialTotalSupply);
 
-        assert.equal(taxBalBefore.add(Math.round(reward * taxRate)).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(Math.round(reward - (reward * taxRate))).toNumber(), bobBalAfter.toNumber());
+        assert.equal(taxBalBefore.add(reward.mul(taxRate)).toNumber(), taxBalAfter.toNumber());
+        assert.equal(bobBalBefore.add(reward.sub(reward.mul(taxRate))).toNumber(), bobBalAfter.toNumber());
       });
 
       it('should allow to claim multiple at once', async () => {
@@ -169,11 +167,7 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
     let proxy;
     const parentBlockInterval = 0;
-    // we want to mint 7M in the first half year at an inflation rate of 50%
-    // so virtualSupply is set to 28M
-    const initialTotalSupply = new web3.BigNumber(10).pow(14).mul(28); // 10 * 10^4 * 10^8
-    const periodsPerYear = 4;
-    const taxRate = 1; // 100%    
+    const poaReward = new web3.BigNumber(10).pow(24).mul(3.5);
 
     before(async () => {
       nativeToken = await MintableToken.new();
@@ -200,7 +194,7 @@ contract('SwapRegistry', (accounts) => {
 
       swapRegistry = await SwapRegistry.new();
 
-      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, taxRate * 1000, periodsPerYear, initialTotalSupply);
+      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, poaReward);
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
       swapRegistry = SwapRegistry.at(proxy.address);
 
@@ -226,39 +220,12 @@ contract('SwapRegistry', (accounts) => {
       await swapRegistry.claim(3, [txRoot1, oracleRoot1, txRoot2, oracleRoot2], {from: bob}).should.be.fulfilled;
 
       const total = await nativeToken.totalSupply();
-      assert.equal(total.toNumber(), initialTotalSupply.div(4).toNumber());
-    });
-    it('at 1 year', async () => {
-      const periodHash0 = await bridge.tipHash();
-      const oracleRoot1 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-      const periodHash1 = merkelize(txRoot3, oracleRoot1);
-      const oracleRoot2 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-      const periodHash2 = merkelize(txRoot4, oracleRoot2);
-
-      await bridge.submitPeriod(periodHash0, periodHash1, {from: bob}).should.be.fulfilled;
-      await bridge.submitPeriod(periodHash1, periodHash2, {from: bob}).should.be.fulfilled;
-
-      await swapRegistry.claim(3, [txRoot3, oracleRoot1, txRoot4, oracleRoot2], {from: bob}).should.be.fulfilled;
-
-      const total = await nativeToken.totalSupply();
-      assert.equal(total.toNumber(), initialTotalSupply.div(2).toNumber());
-    });
-
-    it('after 1 year', async () => {
-      const prevPeriodHash = await bridge.tipHash();
-      const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
-      const newPeriodHash = merkelize(txRoot5, oracleRoot);
-      await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: bob}).should.be.fulfilled;
-
-      await swapRegistry.claim(3, [txRoot5, oracleRoot], {from: bob}).should.be.fulfilled;
-
-      const lastYearTotalSupply = await swapRegistry.lastYearTotalSupply();
-      assert.equal(lastYearTotalSupply.toNumber(), initialTotalSupply.div(2).toNumber());
+      assert.equal(total.toNumber(), new web3.BigNumber(10).pow(24).mul(7).toNumber());
 
       // withdraw all tax
       await gov.withdrawTax(nativeToken.address);
       const bal = await nativeToken.balanceOf(accounts[0]);
-      assert.equal(bal.toNumber(), 1575000000000000);
+      assert.equal(bal.toNumber(), new web3.BigNumber(10).pow(24).mul(7).toNumber());
     });
   });
 
@@ -281,7 +248,7 @@ contract('SwapRegistry', (accounts) => {
       const exchangeBlueprint = await SwapExchange.new();
       swapRegistry = await SwapRegistry.new();
 
-      data = await swapRegistry.contract.initialize.getData(accounts[0], vault.address, 0, 0, 0);
+      data = await swapRegistry.contract.initialize.getData(accounts[0], vault.address, 0);
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
       swapRegistry = SwapRegistry.at(proxy.address);
 

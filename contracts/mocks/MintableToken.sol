@@ -13,6 +13,6 @@ contract MintableToken is ERC20Mintable {
 
   string public constant name = "SimpleToken";
   string public constant symbol = "SIM";
-  uint8 public constant decimals = 8;
+  uint8 public constant decimals = 18;
 
 }

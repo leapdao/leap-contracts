@@ -21,32 +21,28 @@ contract SwapRegistry is Adminable {
   // Claim Related
   Bridge bridge;
   Vault vault;
-  uint256 constant maxTax = 1000;
+  uint256 constant maxTax = 1000; // 100%
   uint256 taxRate; // as perMil (1000 == 100%, 1 == 0.1%)
-  uint256 public lastYearTotalSupply;
-  uint256 periodsClaimed; // a counter between 0 and periodsPerYear
-  uint256 periodsPerYear;
-  uint256 inflationCap; // as totalSupply / x (2 = 50%, 10 = 10%)
+  uint256 constant inflationFactor = 10 ** 15;
+  uint256 constant maxInflation = 2637549827; // the x from (1 + x*10^-18)^(30 * 24 * 363) = 2  
+  uint256 inflationRate; // between 0 and maxInflation/inflationFactor
+  uint256 constant poaSupplyTarget = 7000000 * 10 ** 18;
+  uint256 poaReward;
   mapping(uint256 => uint256) slotToHeight;
 
   function initialize(
     address _bridge,
     address _vault,
-    uint32 _taxRate,
-    uint32 _periodsPerYear,
-    uint256 _initialTotalSupply
+    uint256 _poaReward
   ) public initializer {
     require(_bridge != 0, "invalid bridge address");
     bridge = Bridge(_bridge);
     require(_bridge != 0, "invalid vault address");
     vault = Vault(_vault);
     // todo: check that this contract is admin of token;
-    require(_taxRate <= maxTax, "tax rate can not be more than 100%");
-    taxRate = _taxRate;
-    periodsPerYear = _periodsPerYear;
-    inflationCap = 2;
-    periodsClaimed = 0;
-    lastYearTotalSupply = _initialTotalSupply;
+    taxRate = maxTax;
+    inflationRate = maxInflation;
+    poaReward = _poaReward;
   }
 
   function claim(uint256 _slotId, bytes32[] memory _roots) public {
@@ -66,29 +62,14 @@ contract SwapRegistry is Adminable {
     uint256 total = token.totalSupply();
     uint256 staked = token.balanceOf(bridge.operator());
     
-    // update lastYearTotalSupply if year passed
-    periodsClaimed = claimCount + periodsClaimed;
-    if (periodsClaimed > periodsPerYear) {
-      periodsClaimed = periodsClaimed % periodsPerYear;
-      lastYearTotalSupply = total;
-    }
     // calculate reward according to:
     // https://ethresear.ch/t/riss-reflexive-inflation-through-staked-supply/3633
-    uint256 reward;
-    if (staked <= total.div(2)) {
-      //             total
-      //  --------------------------
-      //  inflation * periodsPerYear
-      reward = lastYearTotalSupply.div(inflationCap).div(periodsPerYear);
-    } else {
-      if (lastYearTotalSupply < total) {
-        // adjust stake proportial to last years supply
-        staked = staked.mul(lastYearTotalSupply).div(total);
-      }
-      //    4 * staked * (total - staked)
-      //  ----------------------------------
-      //  total * inflation * periodsPerYear
-      reward = lastYearTotalSupply.sub(staked).mul(staked).mul(4).div(lastYearTotalSupply).div(inflationCap).div(periodsPerYear);
+    uint256 reward = total.mul(inflationRate).div(inflationFactor);
+    if (staked > total.div(2)) {
+      reward = reward.mul(total.sub(staked).mul(staked).mul(4)).div(total);
+    }
+    if (total < poaSupplyTarget) {
+      reward = poaReward;
     }
     reward = reward.mul(claimCount);
     uint256 tax = reward.mul(taxRate).div(maxTax);  // taxRate perMil (1000 == 100%, 1 == 0.1%)
@@ -99,14 +80,6 @@ contract SwapRegistry is Adminable {
 
   // Governance Params
 
-  function getPeriodsPerYear() public view returns(uint256) {
-    return periodsPerYear;
-  }
-
-  function setPeriodsPerYear(uint256 _periodsPerYear) public ifAdmin {
-    periodsPerYear = _periodsPerYear;
-  }
-
   function getTaxRate() public view returns(uint256) {
     return taxRate;
   }
@@ -116,13 +89,13 @@ contract SwapRegistry is Adminable {
     taxRate = _taxRate;
   }
 
-  function getInflationCap() public view returns(uint256) {
-    return inflationCap;
+  function getInflationRate() public view returns(uint256) {
+    return inflationRate;
   }
 
-  function setInflationCap(uint256 _inflationCap) public ifAdmin {
-    require(_inflationCap > 0, "inflation cap can not be 0");
-    inflationCap = _inflationCap;
+  function setInflationRate(uint256 _inflationRate) public ifAdmin {
+    require(_inflationRate < maxInflation, "inflation too high");
+    inflationRate = _inflationRate;
   }
 
   // Swap Exchanges
