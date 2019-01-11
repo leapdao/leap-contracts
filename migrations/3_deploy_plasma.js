@@ -5,7 +5,7 @@ const truffleConfig = require('../truffle-config.js');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const LeapToken = artifacts.require('LeapToken');
-const POSoperator = artifacts.require('POSoperator');
+const PoaOperator = artifacts.require('PoaOperator');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const BridgeProxy = artifacts.require('BridgeProxy');
@@ -63,7 +63,7 @@ module.exports = (deployer, network, accounts) => {
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
-    const operatorCont = await deployer.deploy(POSoperator);
+    const operatorCont = await deployer.deploy(PoaOperator);
     data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
@@ -83,7 +83,7 @@ module.exports = (deployer, network, accounts) => {
 
     writeAbi('bridgeAbi', Bridge.abi);
     writeAbi('exitHandler', ExitHandler.abi);
-    writeAbi('operator', POSoperator.abi);
+    writeAbi('operator', PoaOperator.abi);
 
     writeConfig(bridgeProxy.address, operatorProxy.address, exitHandlerProxy.address, network);
 
