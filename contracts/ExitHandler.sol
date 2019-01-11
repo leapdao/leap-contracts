@@ -38,8 +38,8 @@ contract ExitHandler is DepositHandler {
     uint256 stake;
   }
 
-  uint256 exitDuration;
-  uint256 exitStake;
+  uint256 public exitDuration;
+  uint256 public exitStake;
   uint256 public nftExitCounter;
 
   /**
@@ -173,16 +173,8 @@ contract ExitHandler is DepositHandler {
     exitStake = _exitStake;
   }
 
-  function getExitStake() public view returns (uint256) {
-    return exitStake;
-  }
-
   function setExitStake(uint256 _exitStake) public ifAdmin {
     exitStake = _exitStake;
-  }
-
-  function getExitDuration() public view returns (uint256) {
-    return exitDuration;
   }
 
   function setExitDuration(uint256 _exitDuration) public ifAdmin {

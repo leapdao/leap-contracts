@@ -523,12 +523,12 @@ contract('ExitHandler', (accounts) => {
       // set exit duration
       data = await exitHandler.contract.setExitDuration.getData(100);
       await proxy.applyProposal(data, {from: accounts[2]});
-      assert.equal(await exitHandler.getExitDuration(), 100);
+      assert.equal(await exitHandler.exitDuration(), 100);
 
       // set exit stake
       data = await exitHandler.contract.setExitStake.getData(200);
       await proxy.applyProposal(data, {from: accounts[2]});
-      assert.equal(await exitHandler.getExitStake(), 200);
+      assert.equal(await exitHandler.exitStake(), 200);
     });
   });
 
