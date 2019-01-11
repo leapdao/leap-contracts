@@ -25,6 +25,11 @@ contract('MinGov', (accounts) => {
     await bridgeProxy.changeAdmin(gov.address);
   });
 
+  it('should allow to read admin as not-admin', async () => {
+    const admin = await bridgeProxy.admin({from: accounts[1]});
+    assert.equal(admin, gov.address);
+  });
+
   it('should allow to propose and finalize one operation', async () => {
     // check value before
     let operator = await bridge.operator();
