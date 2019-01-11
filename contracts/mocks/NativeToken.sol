@@ -1,14 +1,14 @@
+/**
+ * Copyright (c) 2018-present, Leap DAO (leapdao.org)
+ *
+ * This source code is licensed under the Mozilla Public License, version 2,
+ * found in the LICENSE file in the root directory of this source tree.
+ */
+
 pragma solidity 0.4.24;
 
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
-
-/**
- * @title SimpleToken
- * @dev Very simple ERC20 Token example, where all tokens are pre-assigned to the creator.
- * Note they can later distribute these tokens as they wish using `transfer` and other
- * `StandardToken` functions.
- */
 
 contract NativeToken is ERC20Mintable, ERC20Burnable {
 
