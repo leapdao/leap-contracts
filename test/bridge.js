@@ -64,6 +64,8 @@ contract('Bridge', (accounts) => {
       bridge = Bridge.at(proxy.address);
       data = await bridge.contract.setParentBlockInterval.getData(10);
       await proxy.applyProposal(data, {from: accounts[2]});
+      const newInterval = await bridge.getParentBlockInterval();
+      assert.equal(newInterval.toNumber(), 10);
     });
   });
 });
