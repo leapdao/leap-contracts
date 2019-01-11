@@ -39,7 +39,6 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
 
-  const maxReward = 50;
   const parentBlockInterval = 0;
   const epochLength = 5;
   const exitDuration = 0;
@@ -51,7 +50,7 @@ module.exports = (deployer, network, accounts) => {
     const nativeToken = await deployer.deploy(SimpleToken);
 
     const bridgeCont = await deployer.deploy(Bridge);
-    data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+    data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
     const bridgeProxy = await deployer.deploy(AdminableProxy, bridgeCont.address, data, {from: admin});
 
     const pqLib = await deployer.deploy(PriorityQueue);

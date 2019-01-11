@@ -8,13 +8,10 @@
 
 pragma solidity 0.4.24;
 
-import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
-import "./Vault.sol";
 import "./Bridge.sol";
 
-contract POSoperator is Adminable {
-  using SafeMath for uint256;
+contract PoaOperator is Adminable {
 
   event Epoch(uint256 epoch);
   event EpochLength(uint256 epochLength);
@@ -52,18 +49,13 @@ contract POSoperator is Adminable {
 
   struct Slot {
     uint32 eventCounter;
-    address owner;
-    uint64 stake;
     address signer;
     bytes32 tendermint;
     uint32 activationEpoch;
-    address newOwner;
-    uint64 newStake;
     address newSigner;
     bytes32 newTendermint;
   }
 
-  Vault public vault;
   Bridge public bridge;
 
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -72,8 +64,7 @@ contract POSoperator is Adminable {
 
   mapping(uint256 => Slot) public slots;
 
-  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
-    vault = _vault;
+  function initialize(Bridge _bridge, uint256 _epochLength) public initializer {
     bridge = _bridge;
     epochLength = _epochLength;
     emit EpochLength(epochLength);
@@ -84,20 +75,28 @@ contract POSoperator is Adminable {
     emit EpochLength(epochLength);
   }
 
-  // solium-disable security/no-tx-origin
-  // TODO: consider not to use tx.origin
-  function bet(
-    uint256 _slotId,
-    uint256 _value,
-    address _signerAddr,
-    bytes32 _tenderAddr
-  ) public {
+  function setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) public ifAdmin {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
-    // take care of logout
-    if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
-      require(slot.owner == tx.origin);
-      slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
+
+    // taking empty slot
+    if (slot.signer == 0) {
+      slot.signer = _signerAddr;
+      slot.tendermint = _tenderAddr;
+      slot.activationEpoch = 0;
+      slot.eventCounter++;
+      emit ValidatorJoin(
+        slot.signer,
+        _slotId,
+        _tenderAddr,
+        slot.eventCounter,
+        lastCompleteEpoch + 1
+      );
+      return;
+    }
+    // emptying slot
+    if (_signerAddr == 0 && _tenderAddr == 0) {
+      slot.activationEpoch = uint32(lastCompleteEpoch + 3);
       slot.eventCounter++;
       emit ValidatorLogout(
         slot.signer,
@@ -109,69 +108,13 @@ contract POSoperator is Adminable {
       );
       return;
     }
-    // check min stake
-    uint required = slot.stake;
-    if (slot.newStake > required) {
-      required = slot.newStake;
-    }
-    required = required.mul(105).div(100);
-    require(required < _value);
-
-    // new purchase or update
-    if (slot.stake == 0 || (slot.owner == tx.origin && slot.newStake == 0)) {
-      uint64 stake = slot.stake;
-      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value - slot.stake);
-      slot.owner = tx.origin;
-      slot.signer = _signerAddr;
-      slot.tendermint = _tenderAddr;
-      slot.stake = uint64(_value);
-      slot.activationEpoch = 0;
-      slot.eventCounter++;
-      if (stake == 0) {
-        emit ValidatorJoin(
-          slot.signer,
-          _slotId,
-          _tenderAddr,
-          slot.eventCounter,
-          lastCompleteEpoch + 1
-        );
-      } else {
-        emit ValidatorUpdate(
-          slot.signer,
-          _slotId,
-          _tenderAddr,
-          slot.eventCounter
-        );
-      }
-    } else { // auction
-      if (slot.newStake > 0) {
-        ERC20(vault.getTokenAddr(0)).transfer(slot.newOwner, slot.newStake);
-      }
-      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value);
-      slot.newOwner = tx.origin;
-      slot.newSigner = _signerAddr;
-      slot.newTendermint = _tenderAddr;
-      slot.newStake = uint64(_value);
-      slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
-      slot.eventCounter++;
-      emit ValidatorLogout(
-        slot.signer,
-        _slotId,
-        _tenderAddr,
-        _signerAddr,
-        slot.eventCounter,
-        lastCompleteEpoch + 3
-      );
-    }
   }
-  // solium-enable security/no-tx-origin
 
   function activate(uint256 _slotId) public {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
-    if (slot.stake > 0) {
-      ERC20(vault.getTokenAddr(0)).transfer(slot.owner, slot.stake);
+    if (slot.signer > 0) {
       emit ValidatorLeave(
         slot.signer,
         _slotId,
@@ -179,17 +122,13 @@ contract POSoperator is Adminable {
         lastCompleteEpoch + 1
       );
     }
-    slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
     slot.tendermint = slot.newTendermint;
-    slot.stake = slot.newStake;
     slot.activationEpoch = 0;
-    slot.newOwner = 0;
     slot.newSigner = 0;
     slot.newTendermint = 0x0;
-    slot.newStake = 0;
     slot.eventCounter++;
-    if (slot.stake > 0) {
+    if (slot.signer > 0) {
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -207,12 +146,31 @@ contract POSoperator is Adminable {
     // This is here so that I can submit in the same epoch I auction/logout but not after
     if (slot.activationEpoch > 0) {
       // if slot not active, prevent submission
-      require(lastCompleteEpoch.add(2) < slot.activationEpoch);
+      require(lastCompleteEpoch + 2 < slot.activationEpoch);
     }
 
     uint256 newHeight = bridge.submitPeriod(_prevHash, _root);
     // check if epoch completed
-    if (newHeight >= lastEpochBlockHeight.add(epochLength)) {
+    if (newHeight >= lastEpochBlockHeight + epochLength) {
+      lastCompleteEpoch++;
+      lastEpochBlockHeight = newHeight;
+      emit Epoch(lastCompleteEpoch);
+    }
+  }
+
+  function submitPeriodForReward(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
+    require(_slotId < epochLength, "Incorrect slotId");
+    Slot storage slot = slots[_slotId];
+    require(slot.signer == msg.sender);
+    // This is here so that I can submit in the same epoch I auction/logout but not after
+    if (slot.activationEpoch > 0) {
+      // if slot not active, prevent submission
+      require(lastCompleteEpoch + 2 < slot.activationEpoch);
+    }
+    bytes32 periodRood = keccak256(_blocksRoot, _slotId << 160 | uint160(msg.sender));
+    uint256 newHeight = bridge.submitPeriod(_prevHash, periodRood);
+    // check if epoch completed
+    if (newHeight >= lastEpochBlockHeight + epochLength) {
       lastCompleteEpoch++;
       lastEpochBlockHeight = newHeight;
       emit Epoch(lastCompleteEpoch);

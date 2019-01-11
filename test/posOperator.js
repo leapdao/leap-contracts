@@ -24,14 +24,13 @@ contract('PosOperator', (accounts) => {
     let nativeToken;
     let operator;
     let vault;
-    const maxReward = 50;
     const parentBlockInterval = 0;
     const epochLength = 3;
 
     before(async () => {
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});
       bridge = Bridge.at(proxyBridge.address);
 

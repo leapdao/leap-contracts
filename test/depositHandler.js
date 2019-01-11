@@ -26,13 +26,12 @@ contract('DepositHandler', (accounts) => {
     let depositHandler;
     let proxy;
     let nativeToken;
-    const maxReward = 50;
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
       data = await bridge.contract.setOperator.getData(bob);

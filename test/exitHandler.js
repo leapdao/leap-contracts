@@ -55,7 +55,6 @@ contract('ExitHandler', (accounts) => {
     let nftDepositTx;
     let nftTransferTx;
 
-    const maxReward = 50;
     const parentBlockInterval = 0;
     const exitDuration = 5;
     const exitStake = 0;    
@@ -103,7 +102,7 @@ contract('ExitHandler', (accounts) => {
       ExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval, maxReward);
+      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
       bridge = Bridge.at(proxy.address);
       data = await bridge.contract.setOperator.getData(bob);
