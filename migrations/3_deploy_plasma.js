@@ -41,8 +41,8 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
 
-  const parentBlockInterval = 0;
-  const epochLength = 5;
+  const parentBlockInterval = 32;
+  const epochLength = 32;
   const exitDuration = 0;
   const exitStake = 0;
 
