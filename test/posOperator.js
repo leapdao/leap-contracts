@@ -10,7 +10,7 @@ import EVMRevert from './helpers/EVMRevert';
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
-const SimpleToken = artifacts.require('SimpleToken');
+const NativeToken = artifacts.require('NativeToken');
 const POSoperator = artifacts.require('POSoperator');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
@@ -18,6 +18,7 @@ contract('PosOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const charlie = accounts[2];
+  const supply = new web3.BigNumber(10).pow(18).mul(10000); // 10k
 
   describe('Test', () => {
     let bridge;
@@ -28,7 +29,8 @@ contract('PosOperator', (accounts) => {
     const epochLength = 3;
 
     before(async () => {
-      nativeToken = await SimpleToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+      await nativeToken.mint(accounts[0], supply);
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: accounts[3]});

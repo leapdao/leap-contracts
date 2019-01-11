@@ -4,7 +4,7 @@ const truffleConfig = require('../truffle.js');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
-const SimpleToken = artifacts.require('SimpleToken');
+const NativeToken = artifacts.require('NativeToken');
 const POSoperator = artifacts.require('POSoperator');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -47,7 +47,7 @@ module.exports = (deployer, network, accounts) => {
   let data;
 
   deployer.then(async () => {
-    const nativeToken = await deployer.deploy(SimpleToken);
+    const nativeToken = await deployer.deploy(NativeToken, '0x53696d706c6520546f6b656e', '0x534d54', 18);
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = await bridgeCont.contract.initialize.getData(parentBlockInterval);

@@ -15,7 +15,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
-const SimpleToken = artifacts.require('SimpleToken');
+const NativeToken = artifacts.require('NativeToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
@@ -32,6 +32,7 @@ contract('ExitHandler', (accounts) => {
   const bob = accounts[1];
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
+  const supply = new web3.BigNumber(10).pow(18).mul(10000); // 10k
 
   describe('Test', () => {
     // contracts
@@ -100,7 +101,8 @@ contract('ExitHandler', (accounts) => {
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
       ExitHandler.link('PriorityQueue', pqLib.address);
-      nativeToken = await SimpleToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+      await nativeToken.mint(accounts[0], supply);
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});

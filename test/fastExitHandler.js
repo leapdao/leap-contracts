@@ -16,13 +16,14 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const FastExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
-const SimpleToken = artifacts.require('SimpleToken');
+const NativeToken = artifacts.require('NativeToken');
 
 contract('FastExitHandler', (accounts) => {
   const alice = accounts[0];
   // This is from ganache GUI version
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
+  const supply = new web3.BigNumber(10).pow(18).mul(10000); // 10k
 
   describe('Test', () => {
     // contracts
@@ -49,7 +50,8 @@ contract('FastExitHandler', (accounts) => {
     beforeEach(async () => {
       const pqLib = await PriorityQueue.new();
       FastExitHandler.link('PriorityQueue', pqLib.address);
-      nativeToken = await SimpleToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+      await nativeToken.mint(accounts[0], supply);
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});

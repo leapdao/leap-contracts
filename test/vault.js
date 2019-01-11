@@ -11,11 +11,12 @@ import EVMRevert from './helpers/EVMRevert';
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
-const SimpleToken = artifacts.require('SimpleToken');
+const NativeToken = artifacts.require('NativeToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 
 contract('Vault', (accounts) => {
   const bob = accounts[1];
+  const supply = new web3.BigNumber(10).pow(18).mul(10000); // 10k
 
   describe('Test', () => {
     let bridge;
@@ -25,7 +26,8 @@ contract('Vault', (accounts) => {
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
-      nativeToken = await SimpleToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+      await nativeToken.mint(accounts[0], supply);
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
@@ -51,7 +53,8 @@ contract('Vault', (accounts) => {
     describe('Register Token', async () => {
 
       it('Owner can register ERC20 token', async () => {
-        const newToken = await SimpleToken.new();
+        const newToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+        await newToken.mint(accounts[0], supply);
 
         const data = await vault.contract.registerToken.getData(newToken.address, false);
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
@@ -73,7 +76,8 @@ contract('Vault', (accounts) => {
       });
 
       it('Non-owner can not register token', async () => {
-        const newToken = await SimpleToken.new();
+        const newToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
+        await newToken.mint(accounts[0], supply);
         await vault.registerToken(newToken.address, false, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
     });

@@ -16,7 +16,7 @@ const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SwapRegistry = artifacts.require('SwapRegistry');
 const SwapExchange = artifacts.require('SwapExchange');
-const MintableToken = artifacts.require('MintableToken');
+const NativeToken = artifacts.require('NativeToken');
 const MinGov = artifacts.require('./MinGov.sol');
 
 const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
@@ -44,7 +44,7 @@ contract('SwapRegistry', (accounts) => {
     const taxRate = 0.5; // 50%
 
     beforeEach(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
       await nativeToken.mint(accounts[0], initialTotalSupply);
 
       const bridgeCont = await Bridge.new();
@@ -170,7 +170,7 @@ contract('SwapRegistry', (accounts) => {
     const poaReward = new web3.BigNumber(10).pow(24).mul(3.5);
 
     before(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
@@ -234,7 +234,7 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
 
     before(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
 
       const vaultCont = await Vault.new();
       let data = await vaultCont.contract.initialize.getData(accounts[0]);
@@ -258,7 +258,7 @@ contract('SwapRegistry', (accounts) => {
 
     describe('Swap Exchange', async () => {
       it('should allow to register new swap market', async () => {
-        const token = await MintableToken.new();
+        const token = await NativeToken.new('0x53696d706c6520546f6b656e', '0x534d54', 18);
         await swapRegistry.createExchange(token.address);
         const exchangeAddr = await swapRegistry.getExchange(token.address);
         const exchange = SwapExchange.at(exchangeAddr);
