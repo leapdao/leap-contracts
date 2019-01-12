@@ -1,6 +1,7 @@
 pragma solidity 0.4.24;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
 
 /**
  * @title LeapToken
@@ -9,7 +10,7 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintabl
  * `StandardToken` functions.
  */
 
-contract LeapToken is ERC20Mintable {
+contract LeapToken is ERC20Mintable, ERC20Burnable {
 
   string public constant name = "LeapToken";
   string public constant symbol = "LEAP";
