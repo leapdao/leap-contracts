@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 const fs = require('fs');
 const truffleConfig = require('../truffle-config.js');
+const { durationToString, duration } = require('../test/helpers/duration');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -38,13 +39,16 @@ function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
   fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), logError);
 }
 
+const DEFAULT_EXIT_DURATION = duration.days(14);
+const DEFAULT_EXIT_STAKE = 0;
+const DEFAULT_EPOCH_LENGTH = 32;
+const DEFAULT_PARENT_BLOCK_INTERVAL = 0;
+
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
 
-  const parentBlockInterval = 32;
-  const epochLength = 32;
-  const exitDuration = 0;
-  const exitStake = 0;
+  const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
+  const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
 
   let data;
 
@@ -53,18 +57,21 @@ module.exports = (deployer, network, accounts) => {
     console.log('  ♻️  Reusing existing Leap Token:', leapToken.address);
 
     const bridgeCont = await deployer.deploy(Bridge);
-    data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
+    data = bridgeCont.contract.methods.initialize(DEFAULT_PARENT_BLOCK_INTERVAL).encodeABI();
     const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin });
 
     const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
+
+    console.log('  🕐 Exit duration:', durationToString(exitDuration));
+    console.log('  💰 Exit stake:', exitStake);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(PoaOperator);
-    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
+    data = await operatorCont.contract.methods.initialize(ridgeProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);
