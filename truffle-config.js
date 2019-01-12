@@ -41,12 +41,7 @@ module.exports = {
       ),
       gasPrice: 10000000000, // 10 gwei
       gas: 5500000,
-      network_id: 4
-    },
-    ganache: {
-      host: 'localhost',
-      port: 7545,
-      network_id: 5777
+      network_id: '4'
     },
     coverage: {
       host: 'localhost',

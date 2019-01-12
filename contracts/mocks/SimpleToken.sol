@@ -9,12 +9,12 @@ import "../NativeToken.sol";
  */
 contract SimpleToken is NativeToken {
 
-  uint256 public constant INITIAL_SUPPLY = 10000000000000000000000; // 10000 * 10^18
+  uint256 public constant INITIAL_SUPPLY = 1000000000000; // 10000 * 10^8
 
   /**
    * @dev Constructor that gives msg.sender all of existing tokens.
    */
-  constructor() public NativeToken("SimpleToken", "SIM", 18) {
+  constructor() public NativeToken("SimpleToken", "SIM", 8) {
     _mint(msg.sender, INITIAL_SUPPLY);
   }
 

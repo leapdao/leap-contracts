@@ -6,20 +6,20 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./AdminableProxy.sol";
 import "../POSoperator.sol";
 
 /**
  * @title OperatorProxy
- * @dev Proxy for POSoperator contract upgradeability. Should be used to 
- * communicate with POSoperator contract
+ * @dev Proxy for POSoperator/PoaOperator contract upgradeability. Should be used to 
+ * communicate with POSoperator/PoaOperator contract
  */
 contract OperatorProxy is AdminableProxy {
 
-  constructor(POSoperator _implementation, bytes _data) 
-    AdminableProxy(_implementation, _data) public payable {
+  constructor(POSoperator _implementation, bytes memory _data) 
+    AdminableProxy(address(_implementation), _data) public payable {
   }
 
 }

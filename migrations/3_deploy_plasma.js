@@ -75,10 +75,10 @@ module.exports = (deployer, network, accounts) => {
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);
-    data = await bridgeCont.contract.methods.setOperator(operatorProxy.address).encodeABI();
+    data = await bridge.contract.methods.setOperator(operatorProxy.address).encodeABI();
     await bridgeProxy.applyProposal(data, {from: admin});
 
-    const vault = Vault.at(exitHandlerProxy.address);
+    const vault = await Vault.at(exitHandlerProxy.address);
     data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
     await exitHandlerProxy.applyProposal(data, { from: admin });
 
