@@ -5,9 +5,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-/* eslint-disable no-console */
-
 const { durationToString, duration } = require('../test/helpers/duration');
+const { log } = require('../test/helpers/');
 
 const MinGov = artifacts.require('MinGov');
 const BridgeProxy = artifacts.require('BridgeProxy');
@@ -22,19 +21,19 @@ module.exports = (deployer, network, accounts) => {
   deployer.then(async () => {
     const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
 
-    console.log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
+    log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
     const governance = await deployer.deploy(MinGov, proposalTime);
     
     const bridgeProxy = await BridgeProxy.deployed();
-    console.log('  🔄 Transferring ownership for Bridge:', bridgeProxy.address);
+    log('  🔄 Transferring ownership for Bridge:', bridgeProxy.address);
     await bridgeProxy.changeAdmin(governance.address, { from: admin });
 
     const operatorProxy = await OperatorProxy.deployed();
-    console.log('  🔄 Transferring ownership for Operator:', operatorProxy.address);
+    log('  🔄 Transferring ownership for Operator:', operatorProxy.address);
     await operatorProxy.changeAdmin(governance.address, { from: admin });
     
     const exitHandlerProxy = await ExitHandlerProxy.deployed();
-    console.log('  🔄 Transferring ownership for ExitHandler:', exitHandlerProxy.address);
+    log('  🔄 Transferring ownership for ExitHandler:', exitHandlerProxy.address);
     await exitHandlerProxy.changeAdmin(governance.address, { from: admin });
   });
 };

@@ -5,13 +5,13 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-/* eslint-disable no-console */
+const { log } = require('../test/helpers/');
 
 const LeapToken = artifacts.require('LeapToken');
 
 module.exports = (deployer) => {
   deployer.then(async () => {
     const leapToken = await deployer.deploy(LeapToken);
-    console.log('Deployed LEAP Token at', leapToken.address);
+    log('Deployed LEAP Token at', leapToken.address);
   });
 };

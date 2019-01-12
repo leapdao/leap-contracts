@@ -1,7 +1,7 @@
-/* eslint-disable no-console */
 const fs = require('fs');
 const truffleConfig = require('../truffle-config.js');
 const { durationToString, duration } = require('../test/helpers/duration');
+const { log } = require('../test/helpers/');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -13,7 +13,7 @@ const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
-const logError = err => { if (err) { console.log(err); } }
+const logError = err => { if (err) { log(err); } }
 
 function abiFileString(abi) {
   return `module.exports = ${JSON.stringify(abi)}`;
@@ -54,7 +54,7 @@ module.exports = (deployer, network, accounts) => {
 
   deployer.then(async () => {
     const leapToken = await LeapToken.deployed();
-    console.log('  ♻️  Reusing existing Leap Token:', leapToken.address);
+    log('  ♻️  Reusing existing Leap Token:', leapToken.address);
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(DEFAULT_PARENT_BLOCK_INTERVAL).encodeABI();
@@ -63,15 +63,15 @@ module.exports = (deployer, network, accounts) => {
     const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
 
-    console.log('  🕐 Exit duration:', durationToString(exitDuration));
-    console.log('  💰 Exit stake:', exitStake);
+    log('  🕐 Exit duration:', durationToString(exitDuration));
+    log('  💰 Exit stake:', exitStake);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(PoaOperator);
-    data = await operatorCont.contract.methods.initialize(ridgeProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
+    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);
@@ -94,6 +94,6 @@ module.exports = (deployer, network, accounts) => {
 
     writeConfig(bridgeProxy.address, operatorProxy.address, exitHandlerProxy.address, network);
 
-    console.log("Generated node files in /build/nodeFiles");
- })
+    log("Generated node files in /build/nodeFiles");
+  })
 }
