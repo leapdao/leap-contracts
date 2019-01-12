@@ -12,7 +12,7 @@ contract Proxy {
    * @dev Fallback function.
    * Implemented entirely in `_fallback`.
    */
-  function () payable external {
+  function () external payable {
     _fallback();
   }
 

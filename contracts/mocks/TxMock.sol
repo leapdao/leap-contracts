@@ -19,7 +19,8 @@ contract TxMock {
   using TxLib for TxLib.Tx;
   using TxLib for TxLib.TxType;
 
-  function parse(bytes32[] memory _proof) public pure returns (uint256 txType, bytes32[] memory rsp, bytes memory msgData) {
+  function parse(bytes32[] memory _proof)
+    public pure returns (uint256 txType, bytes32[] memory rsp, bytes memory msgData) {
     bytes memory txData;
     (, , txData) = TxLib.validateProof(0, _proof);
 
@@ -42,7 +43,8 @@ contract TxMock {
     }
   }
 
-  function validateProof(bytes32[] memory _proof) public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
+  function validateProof(bytes32[] memory _proof)
+    public pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
     (txPos, txHash, txData) = TxLib.validateProof(0, _proof);
   }
 

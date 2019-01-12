@@ -11,7 +11,7 @@ import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 const time = require('./helpers/time');
 require('./helpers/setup');
 
-const BN = web3.utils.BN;
+const { BN } = web3.utils;
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
