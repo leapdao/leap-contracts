@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 //Copied from zos-lib due to import fix needed in UpgradeabilityProxy.sol
 
@@ -49,7 +49,7 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
    * https://solidity.readthedocs.io/en/v0.4.24/abi-spec.html#function-selector-and-argument-encoding.
    * This parameter is optional, if no data is given the initialization call to proxied contract will be skipped.
    */
-  constructor(address _implementation, bytes _data) UpgradeabilityProxy(_implementation, _data) public payable {
+  constructor(address _implementation, bytes memory _data) UpgradeabilityProxy(_implementation, _data) public payable {
     assert(ADMIN_SLOT == keccak256("org.zeppelinos.proxy.admin"));
 
     _setAdmin(msg.sender);
@@ -58,14 +58,14 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
   /**
    * @return The address of the proxy admin.
    */
-  function admin() external view ifAdmin returns (address) {
+  function admin() external ifAdmin returns (address) {
     return _admin();
   }
 
   /**
    * @return The address of the implementation.
    */
-  function implementation() external view ifAdmin returns (address) {
+  function implementation() external ifAdmin returns (address) {
     return _implementation();
   }
 
@@ -98,9 +98,11 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
    * It should include the signature and the parameters of the function to be called, as described in
    * https://solidity.readthedocs.io/en/v0.4.24/abi-spec.html#function-selector-and-argument-encoding.
    */
-  function upgradeToAndCall(address newImplementation, bytes data) external payable ifAdmin {
+  function upgradeToAndCall(address newImplementation, bytes calldata data) external payable ifAdmin {
     _upgradeTo(newImplementation);
-    require(newImplementation.delegatecall(data));
+    bool rv;
+    (rv,) = newImplementation.delegatecall(data);
+    require(rv);
   }
 
   /**

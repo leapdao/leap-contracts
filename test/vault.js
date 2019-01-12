@@ -28,20 +28,20 @@ contract('Vault', (accounts) => {
       nativeToken = await SimpleToken.new();
 
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
+      bridge = await Bridge.at(proxy.address);
 
-      data = await bridge.contract.setOperator.getData(bob);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       const vaultCont = await Vault.new();
-      data = await vaultCont.contract.initialize.getData(bridge.address);
+      data = await vaultCont.contract.methods.initialize(bridge.address).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
-      vault = Vault.at(proxy.address);
+      vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
       // At this point alice is the owner of bridge and vault and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -53,7 +53,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC20 token', async () => {
         const newToken = await SimpleToken.new();
 
-        const data = await vault.contract.registerToken.getData(newToken.address, false);
+        const data = await vault.contract.methods.registerToken(newToken.address, false).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         const tokenOneAddr = (await vault.tokens(1))[0];
@@ -63,7 +63,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC721 token', async () => {
         const newNFTtoken = await SpaceDustNFT.new();
 
-        const data = await vault.contract.registerToken.getData(newNFTtoken.address, true);
+        const data = await vault.contract.methods.registerToken(newNFTtoken.address, true).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         // NFTs have their own space

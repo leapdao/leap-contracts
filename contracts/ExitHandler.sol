@@ -8,7 +8,7 @@
 
 /* solium-disable security/no-block-members */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/Math.sol";
 
@@ -79,7 +79,7 @@ contract ExitHandler is DepositHandler {
    * to be used in an exit challenge. We use this verification process to scrutinize 
    * the validity of complex transactions (consolidate and spending conditions).
    */
-  function startVerification(bytes32[] _proof, uint8 _outputIndex) public payable {
+  function startVerification(bytes32[] memory _proof, uint8 _outputIndex) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
     bytes32 parent;
     (parent,,,) = bridge.periods(_proof[0]);
@@ -90,7 +90,7 @@ contract ExitHandler is DepositHandler {
     bytes memory txData;
     (, utxoId, txData) = TxLib.validateProof(32, _proof);
     if (_outputIndex > 0) {
-      utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(utxoId));
+      utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(uint256(utxoId)));
     }
     require(verifications[utxoId].stake == 0, "Transaction already registered");
 
@@ -107,7 +107,7 @@ contract ExitHandler is DepositHandler {
       for (uint i = 0; i < txn.ins.length; i++) {
         bytes32 prevUtxoId = txn.ins[i].outpoint.hash;
         if (txn.ins[i].outpoint.pos > 0) {
-          prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(txn.ins[i].outpoint.hash));
+          prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(uint256(txn.ins[i].outpoint.hash)));
         }
         Verification memory prevVerification = verifications[prevUtxoId];
         require(prevVerification.startTime > 0, "Input not found");
@@ -128,7 +128,7 @@ contract ExitHandler is DepositHandler {
    * and the consolidate transaction should not be usable in a challenge.
    */
   function challengeConsolidateDoublespent(
-    bytes32[] _doublespendProof, bytes32[] _consolidateProof,
+    bytes32[] memory _doublespendProof, bytes32[] memory _consolidateProof,
     uint8 _inputIndex, uint8 _consolidateInputIndex) public {
     // output owner of consolidate proof different then owner of some input
     bytes32 parent;
@@ -178,7 +178,7 @@ contract ExitHandler is DepositHandler {
   }
 
   function startExit(
-    bytes32[] _youngestInputProof, bytes32[] _proof,
+    bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
@@ -202,7 +202,7 @@ contract ExitHandler is DepositHandler {
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
-    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
     require(out.owner == msg.sender, "Only UTXO owner can start exit");
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
@@ -219,7 +219,7 @@ contract ExitHandler is DepositHandler {
       );
       
       if (isNft(out.color)) {
-        priority = (nftExitCounter << 128) | uint128(utxoId);
+        priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
         nftExitCounter++;
       } else {      
         priority = getERC20ExitPriority(timestamp, utxoId, txPos);
@@ -227,7 +227,7 @@ contract ExitHandler is DepositHandler {
     } else {
       require(exitingTx.txType == TxLib.TxType.Deposit, "Expected deposit tx");
       if (isNft(out.color)) {
-        priority = (nftExitCounter << 128) | uint128(utxoId);
+        priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
         nftExitCounter++;
       } else {      
         priority = getERC20ExitPriority(timestamp, utxoId, txPos);
@@ -300,7 +300,7 @@ contract ExitHandler is DepositHandler {
 
     Exit memory currentExit = exits[utxoId];
 
-    if (currentExit.owner != 0 || currentExit.amount != 0) { // exit was removed
+    if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was removed
       // Note: for NFTs, the amount is actually the NFT id (both uint256)
       if (isNft(currentExit.color)) {
         tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
@@ -309,7 +309,7 @@ contract ExitHandler is DepositHandler {
         tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
       }
       // Pay exit stake
-      currentExit.owner.transfer(currentExit.stake);
+      address(uint160(currentExit.owner)).transfer(currentExit.stake);
     }
 
     tokens[currentExit.color].delMin();
@@ -317,8 +317,8 @@ contract ExitHandler is DepositHandler {
   }
 
   function challengeExit(
-    bytes32[] _proof, 
-    bytes32[] _prevProof, 
+    bytes32[] memory _proof, 
+    bytes32[] memory _prevProof, 
     uint8 _outputIndex,
     uint8 _inputIndex
   ) public {
@@ -327,7 +327,7 @@ contract ExitHandler is DepositHandler {
     bytes32 txHash1;
     bytes memory txData;
     (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
-    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash1));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash1)));
     
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
@@ -370,7 +370,7 @@ contract ExitHandler is DepositHandler {
       if (txn.txType == TxLib.TxType.Deposit) {
         // check that deposit was included correctly
         // only then it should be usable for challenge
-        Deposit memory deposit = deposits[uint32(utxoId)];
+        Deposit memory deposit = deposits[uint32(uint256(utxoId))];
         require(deposit.amount == txn.outs[0].value, "value mismatch");
         require(deposit.owner == txn.outs[0].owner, "owner mismatch");
         require(deposit.color == txn.outs[0].color, "color mismatch");
@@ -391,8 +391,8 @@ contract ExitHandler is DepositHandler {
   }
 
   function challengeYoungestInput(
-    bytes32[] _youngerInputProof,
-    bytes32[] _exitingTxProof, 
+    bytes32[] memory _youngerInputProof,
+    bytes32[] memory _exitingTxProof, 
     uint8 _outputIndex, 
     uint8 _inputIndex
   ) public {
@@ -400,7 +400,7 @@ contract ExitHandler is DepositHandler {
     bytes32 txHash;
     bytes memory txData;
     (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
-    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(txHash));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
 
     // check the exit exists
     require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
@@ -428,7 +428,7 @@ contract ExitHandler is DepositHandler {
 
   function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {
     uint256 priority = tokens[_color].getMin();
-    utxoId = bytes32(uint128(priority));
+    utxoId = bytes32(uint256(uint128(priority)));
     exitableAt = priority >> 192;
   }
 
@@ -440,7 +440,7 @@ contract ExitHandler is DepositHandler {
     uint32 timestamp, bytes32 utxoId, uint64 txPos
   ) internal view returns (uint256 priority) {
     uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
-    return (exitableAt << 192) | uint256(txPos) << 128 | uint128(utxoId);
+    return (exitableAt << 192) | uint256(txPos) << 128 | uint128(uint256(utxoId));
   }
 
   // Use this to find calldata offset - you are looking for the number:

@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./Vault.sol";
 import "./Bridge.sol";
@@ -40,8 +40,9 @@ contract DepositHandler is Vault {
    * @param _color Color of the token to deposit
    */
   function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
-    require(tokens[_color].addr != address(0), "Token color not registered");
-    tokens[_color].addr.transferFrom(_owner, this, _amountOrTokenId);
+    TransferrableToken token = tokens[_color].addr;
+    require(address(token) != address(0), "Token color not registered");
+    token.transferFrom(_owner, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
     uint256 timestamp;

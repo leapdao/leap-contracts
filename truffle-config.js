@@ -7,11 +7,19 @@ require('dotenv').config();
 const HDWalletProvider = require('truffle-hdwallet-provider');
 
 module.exports = {
-  solc: {
-    optimizer: {
-      enabled: true,
-      runs: 500
-    }
+  // Configure your compilers
+  compilers: {
+    solc: {
+      version: '0.5.2',
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 2,
+        },
+        // TODO: the code is supposed to work on constantinople EVM but fails if this is switched on
+        evmVersion: 'byzantium',
+      },
+    },
   },
   // See <http://truffleframework.com/docs/advanced/configuration>
   // to customize your Truffle configuration!

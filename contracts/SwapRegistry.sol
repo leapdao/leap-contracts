@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./Bridge.sol";
 import "./Vault.sol";
@@ -35,9 +35,9 @@ contract SwapRegistry is Adminable {
     address _vault,
     uint256 _poaReward
   ) public initializer {
-    require(_bridge != 0, "invalid bridge address");
+    require(_bridge != address(0), "invalid bridge address");
     bridge = Bridge(_bridge);
-    require(_bridge != 0, "invalid vault address");
+    require(_bridge != address(0), "invalid vault address");
     vault = Vault(_vault);
     // todo: check that this contract is admin of token;
     taxRate = maxTax;
@@ -50,9 +50,9 @@ contract SwapRegistry is Adminable {
     uint32 claimCount = 0;
     for (uint256 i = 0; i < _roots.length; i += 2) {
       require(_slotId == uint256(_roots[i+1] >> 160), "unexpected slotId");
-      require(msg.sender == address(_roots[i+1]), "unexpected claimant");
+      require(msg.sender == address(uint160(uint256(_roots[i+1]))), "unexpected claimant");
       uint256 height;
-      (,height ,,) = bridge.periods(keccak256(_roots[i], _roots[i + 1]));
+      (,height ,,) = bridge.periods(keccak256(abi.encodePacked(_roots[i], _roots[i + 1])));
       require(height > maxHeight, "unorderly claim");
       maxHeight = height;
       claimCount += 1;
@@ -106,10 +106,10 @@ contract SwapRegistry is Adminable {
   address exchangeCodeAddr;
 
   function createExchange(address _token) public returns (address) {
-    require(_token != 0, "invalid token address");
+    require(_token != address(0), "invalid token address");
     address nativeToken = vault.getTokenAddr(0);
     require(_token != nativeToken, "token can not be nativeToken");
-    require(tokenToExchange[_token] == 0, "exchange already created");
+    require(tokenToExchange[_token] == address(0), "exchange already created");
     address exchange = createClone(exchangeCodeAddr);
     SwapExchange(exchange).setup(nativeToken, _token);
     tokenToExchange[_token] = exchange;

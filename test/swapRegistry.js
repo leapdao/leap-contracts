@@ -11,6 +11,7 @@ import EVMRevert from './helpers/EVMRevert';
 
 require('./helpers/setup');
 
+const BN = web3.utils.BN;
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -39,8 +40,8 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
     let proxy;
     const parentBlockInterval = 0;
-    const initialTotalSupply = new web3.BigNumber(10).pow(18).mul(7000000); // 7kk
-    const inflationRate = 2637549827;  // ~ 100% in 262800 periods
+    const initialTotalSupply = new BN(web3.utils.toWei('7000000', 'ether')); // 7kk
+    const inflationRate = new BN(2637549827);  // ~ 100% in 262800 periods
     const taxRate = 0.5; // 50%
 
     beforeEach(async () => {
@@ -48,29 +49,29 @@ contract('SwapRegistry', (accounts) => {
       await nativeToken.mint(accounts[0], initialTotalSupply);
 
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
+      bridge = await Bridge.at(proxy.address);
 
-      data = await bridge.contract.setOperator.getData(bob);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       const vaultCont = await Vault.new();
-      data = await vaultCont.contract.initialize.getData(bridge.address);
+      data = await vaultCont.contract.methods.initialize(bridge.address).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
-      vault = Vault.at(proxy.address);
+      vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
-      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, 0);
+      data = await swapRegistry.contract.methods.initialize(bridge.address, vault.address, 0).encodeABI();
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
-      swapRegistry = SwapRegistry.at(proxy.address);
+      swapRegistry = await SwapRegistry.at(proxy.address);
 
       // set tax to 50%
-      data = await swapRegistry.contract.setTaxRate.getData(500);
+      data = await swapRegistry.contract.methods.setTaxRate(500).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       // make swapRegistry a minter
@@ -92,10 +93,10 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        const reward = initialTotalSupply.mul(inflationRate).div(new web3.BigNumber(10).pow(15));
+        const reward = initialTotalSupply.mul(inflationRate).div(new BN(web3.utils.toWei('0.001', 'ether')));
 
-        assert.equal(taxBalBefore.add(reward.mul(taxRate)).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(reward.sub(reward.mul(taxRate))).toNumber(), bobBalAfter.toNumber());
+        assert(taxBalBefore.add(reward.div(new BN(1 / taxRate))).eq(taxBalAfter));
+        assert(bobBalAfter.eq(bobBalBefore.add(reward.sub(reward.div(new BN(1 / taxRate))))));
 
         await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.rejectedWith(EVMRevert);
       });
@@ -116,12 +117,13 @@ contract('SwapRegistry', (accounts) => {
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
 
-        assert.equal(taxBalBefore.toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.toNumber(), bobBalAfter.toNumber());
+        assert(taxBalBefore.eq(taxBalAfter));
+        assert(bobBalBefore.eq(bobBalAfter));
       });
 
       it('should receive less than inflation cap if more than 50% staked', async () => {
-        await nativeToken.transfer(bob, initialTotalSupply.div(4).mul(3));
+        const val = initialTotalSupply.div(new BN(4)).mul(new BN(3));
+        await nativeToken.transfer(bob, val);
 
         const prevPeriodHash = await bridge.tipHash();
         const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
@@ -130,17 +132,17 @@ contract('SwapRegistry', (accounts) => {
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
-        const staked = bobBalBefore.toNumber();
+        const staked = bobBalBefore;
 
         await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
-        let reward = initialTotalSupply.mul(inflationRate).div(new web3.BigNumber(10).pow(15));
-        reward = reward.mul(initialTotalSupply.sub(staked)).mul(staked).mul(4).div(initialTotalSupply);
+        let reward = initialTotalSupply.mul(inflationRate).div(new BN(web3.utils.toWei('0.001', 'ether')));
+        reward = reward.mul(initialTotalSupply.sub(staked)).mul(staked).mul(new BN(4)).div(initialTotalSupply);
 
-        assert.equal(taxBalBefore.add(reward.mul(taxRate)).toNumber(), taxBalAfter.toNumber());
-        assert.equal(bobBalBefore.add(reward.sub(reward.mul(taxRate))).toNumber(), bobBalAfter.toNumber());
+        assert(taxBalBefore.add(reward.div(new BN(1 / taxRate))).eq(taxBalAfter));
+        assert(bobBalBefore.add(reward.sub(reward.div(new BN(1 / taxRate)))).eq(bobBalAfter));
       });
 
       it('should allow to claim multiple at once', async () => {
@@ -167,36 +169,36 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
     let proxy;
     const parentBlockInterval = 0;
-    const poaReward = new web3.BigNumber(10).pow(24).mul(3.5);
+    const poaReward = web3.utils.toWei('3500000', 'ether');
 
     before(async () => {
       nativeToken = await MintableToken.new();
 
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
+      bridge = await Bridge.at(proxy.address);
 
-      data = await bridge.contract.setOperator.getData(bob);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       gov = await MinGov.new(0);
       await proxy.changeAdmin(gov.address, {from: accounts[2]});
 
       const vaultCont = await Vault.new();
-      data = await vaultCont.contract.initialize.getData(bridge.address);
+      data = await vaultCont.contract.methods.initialize(bridge.address).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
-      vault = Vault.at(proxy.address);
+      vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
 
-      data = await swapRegistry.contract.initialize.getData(bridge.address, vault.address, poaReward);
+      data = await swapRegistry.contract.methods.initialize(bridge.address, vault.address, poaReward).encodeABI();
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
-      swapRegistry = SwapRegistry.at(proxy.address);
+      swapRegistry = await SwapRegistry.at(proxy.address);
 
       await nativeToken.addMinter(swapRegistry.address);
 
@@ -220,12 +222,12 @@ contract('SwapRegistry', (accounts) => {
       await swapRegistry.claim(3, [txRoot1, oracleRoot1, txRoot2, oracleRoot2], {from: bob}).should.be.fulfilled;
 
       const total = await nativeToken.totalSupply();
-      assert.equal(total.toNumber(), new web3.BigNumber(10).pow(24).mul(7).toNumber());
+      assert.equal(total, web3.utils.toWei('7000000', 'ether'));
 
       // withdraw all tax
       await gov.withdrawTax(nativeToken.address);
       const bal = await nativeToken.balanceOf(accounts[0]);
-      assert.equal(bal.toNumber(), new web3.BigNumber(10).pow(24).mul(7).toNumber());
+      assert.equal(bal, web3.utils.toWei('7000000', 'ether'));
     });
   });
 
@@ -237,22 +239,22 @@ contract('SwapRegistry', (accounts) => {
       nativeToken = await MintableToken.new();
 
       const vaultCont = await Vault.new();
-      let data = await vaultCont.contract.initialize.getData(accounts[0]);
+      let data = await vaultCont.contract.methods.initialize(accounts[0]).encodeABI();
       let proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
-      const vault = Vault.at(proxy.address);
+      const vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.registerToken.getData(nativeToken.address, false);
+      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       const exchangeBlueprint = await SwapExchange.new();
       swapRegistry = await SwapRegistry.new();
 
-      data = await swapRegistry.contract.initialize.getData(accounts[0], vault.address, 0);
+      data = await swapRegistry.contract.methods.initialize(accounts[0], vault.address, 0).encodeABI();
       proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
-      swapRegistry = SwapRegistry.at(proxy.address);
+      swapRegistry = await SwapRegistry.at(proxy.address);
 
-      data = await swapRegistry.contract.setExchangeCodeAddr.getData(exchangeBlueprint.address);
+      data = await swapRegistry.contract.methods.setExchangeCodeAddr(exchangeBlueprint.address).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
     });
 
@@ -261,7 +263,7 @@ contract('SwapRegistry', (accounts) => {
         const token = await MintableToken.new();
         await swapRegistry.createExchange(token.address);
         const exchangeAddr = await swapRegistry.getExchange(token.address);
-        const exchange = SwapExchange.at(exchangeAddr);
+        const exchange = await SwapExchange.at(exchangeAddr);
         const decimals = await exchange.decimals();
         assert.equal(decimals.toNumber(), 18);
       });

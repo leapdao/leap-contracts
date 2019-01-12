@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const fs = require('fs');
-const truffleConfig = require('../truffle.js');
+const truffleConfig = require('../truffle-config.js');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -50,26 +50,26 @@ module.exports = (deployer, network, accounts) => {
     const nativeToken = await deployer.deploy(SimpleToken);
 
     const bridgeCont = await deployer.deploy(Bridge);
-    data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+    data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
     const bridgeProxy = await deployer.deploy(AdminableProxy, bridgeCont.address, data, {from: admin});
 
     const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     const exitHandlerCont = await deployer.deploy(ExitHandler);
-    data = await exitHandlerCont.contract.initializeWithExit.getData(bridgeProxy.address, exitDuration, exitStake);
+    data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
     const exitHandlerProxy = await deployer.deploy(AdminableProxy, exitHandlerCont.address, data, {from: admin});
 
     const operatorCont = await deployer.deploy(POSoperator);
-    data = await operatorCont.contract.initialize.getData(bridgeProxy.address, exitHandlerProxy.address, epochLength);
+    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
     const operatorProxy = await deployer.deploy(AdminableProxy, operatorCont.address, data, {from: admin});
 
-    const bridge = Bridge.at(bridgeProxy.address);
-    data = await bridge.contract.setOperator.getData(operatorProxy.address);
+    const bridge = await Bridge.at(bridgeProxy.address);
+    data = await bridgeCont.contract.methods.setOperator(operatorProxy.address).encodeABI();
     await bridgeProxy.applyProposal(data, {from: admin});
 
-    const vault = Vault.at(exitHandlerProxy.address);
-    data = await vault.contract.registerToken.getData(nativeToken.address, false);
+    const vault = await Vault.at(exitHandlerProxy.address);
+    data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
     await exitHandlerProxy.applyProposal(data, {from: admin});
 
     try {
@@ -85,5 +85,5 @@ module.exports = (deployer, network, accounts) => {
     writeConfig(bridgeProxy.address, operatorProxy.address, exitHandlerProxy.address, network);
 
     console.log("Generated node files in /build/nodeFiles");
-  })
+ })
 }

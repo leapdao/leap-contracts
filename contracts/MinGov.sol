@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity ^0.4.24;
+pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
@@ -52,10 +52,10 @@ contract MinGov is Ownable {
 
   function withdrawTax(address _token) public onlyOwner() {
     IERC20 token = IERC20(_token);
-    token.transfer(owner(), token.balanceOf(this));
+    token.transfer(owner(), token.balanceOf(address(this)));
   }
 
-  function getSig(bytes _msgData) internal pure returns (bytes4) {
+  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
     return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
   }
   
@@ -69,12 +69,12 @@ contract MinGov is Ownable {
             getSig(prop.msgData) == 0x3659cfe6 // upgradeTo(address)
           ) {
             // this changes proxy parameters 
-            rv = prop.subject.call(prop.msgData);
+            (rv, ) = prop.subject.call(prop.msgData);
             // use this for 0.5
             // (rv, ) = prop.subject.call(prop.msgData);
           } else {
             // this changes governance parameters to the implementation
-            rv = AdminableProxy(prop.subject).applyProposal(prop.msgData);
+            rv = AdminableProxy(address(uint160(prop.subject))).applyProposal(prop.msgData);
           }
           if (rv) {
             emit Execution(i, prop.subject, prop.msgData);

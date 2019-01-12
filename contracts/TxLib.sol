@@ -5,8 +5,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
-
+pragma solidity 0.5.2;
 
 library TxLib {
 
@@ -47,7 +46,7 @@ library TxLib {
   }
 
   function parseInput(
-    TxType _type, bytes _txData, uint256 _pos, uint256 offset, Input[] _ins
+    TxType _type, bytes memory _txData, uint256 _pos, uint256 offset, Input[] memory _ins
   ) internal pure returns (uint256 newOffset) {
     bytes32 inputData;
     uint8 index;
@@ -56,7 +55,7 @@ library TxLib {
         // load the depositId (4 bytes) starting from byte 2 of tx
         inputData := mload(add(add(offset, 4), _txData))
       }
-      inputData = bytes32(uint32(inputData));
+      inputData = bytes32(uint256(uint32(uint256(inputData))));
       index = 0;
       newOffset = offset + 4;
     } else {
@@ -110,7 +109,7 @@ library TxLib {
   }
 
   function parseOutput(
-    TxType _type, bytes _txData, uint256 _pos, uint256 offset, Output[] _outs
+    TxType _type, bytes memory _txData, uint256 _pos, uint256 offset, Output[] memory _outs
   ) internal pure returns (uint256 newOffset) {
     uint256 value;
     uint16 color;
@@ -153,7 +152,7 @@ library TxLib {
     }
   }
 
-  function parseTx(bytes _txData) internal pure returns (Tx memory txn) {
+  function parseTx(bytes memory _txData) internal pure returns (Tx memory txn) {
     // read type
     TxType txType;
     uint256 a;
@@ -192,13 +191,13 @@ library TxLib {
     if (txType == TxType.Consolidate && ins.length <= outs.length) {
       revert("invalid consolidate");
     }
-    for (i = 0; i < outs.length; i++) {
+    for (uint256 i = 0; i < outs.length; i++) {
       offset = parseOutput(txType, _txData, i, offset, outs); // solium-disable-line arg-overflow
     }
     txn = Tx(txType, ins, outs);
   }
 
-  function getSigHash(bytes _txData) internal pure returns (bytes32 sigHash) {
+  function getSigHash(bytes memory _txData) internal pure returns (bytes32 sigHash) {
     uint256 a;
     assembly {
       a := mload(add(0x20, _txData))
@@ -241,7 +240,7 @@ library TxLib {
 
   // solium-disable-next-line security/no-assign-params
   function getMerkleRoot(
-    bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] _proof
+    bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] memory _proof
   ) internal pure returns (bytes32) {
     bytes32 temp;
     for (uint256 i = _offset; i < _proof.length; i++) {
@@ -266,28 +265,28 @@ library TxLib {
 
   //validate that transaction is included to the period (merkle proof)
   function validateProof(
-    uint256 _cdOffset, bytes32[] _proof
+    uint256 _cdOffset, bytes32[] memory _proof
   ) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
-    uint256 offset = uint8(_proof[1] >> 248);
-    uint256 txLength = uint16(_proof[1] >> 224);
+    uint256 offset = uint8(uint256(_proof[1] >> 248));
+    uint256 txLength = uint16(uint256(_proof[1] >> 224));
 
     txData = new bytes(txLength);
     assembly {
       calldatacopy(add(txData, 0x20), add(68, add(offset, _cdOffset)), txLength)
     }
     txHash = keccak256(txData);
-    txPos = uint64(_proof[1] >> 160);
+    txPos = uint64(uint256(_proof[1] >> 160));
     bytes32 root = getMerkleRoot(
       txHash, 
       txPos, 
-      uint8(_proof[1] >> 240), 
+      uint8(uint256(_proof[1] >> 240)),
       _proof
     ); 
     require(root == _proof[0]);
   }
 
-  function recoverTxSigner(uint256 offset, bytes32[] _proof) internal pure returns (address dest) {
-    uint16 txLength = uint16(_proof[1] >> 224);
+  function recoverTxSigner(uint256 offset, bytes32[] memory _proof) internal pure returns (address dest) {
+    uint16 txLength = uint16(uint256(_proof[1] >> 224));
     bytes memory txData = new bytes(txLength);
     bytes32 r;
     bytes32 s;
@@ -304,19 +303,21 @@ library TxLib {
 
   // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
   // solium-disable-next-line security/no-assign-params
-  function uint2str(uint i) private pure returns (string) {
-    if (i == 0) return "0";
-    uint j = i;
-    uint length;
+  function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+    if (_i == 0) {
+      return "0";
+    }
+    uint j = _i;
+    uint len;
     while (j != 0) {
-      length++;
+      len++;
       j /= 10;
     }
-    bytes memory bstr = new bytes(length);
-    uint k = length - 1;
-    while (i != 0) {
-      bstr[k--] = byte(48 + i % 10);
-      i /= 10;
+    bytes memory bstr = new bytes(len);
+    uint k = len - 1;
+    while (_i != 0) {
+      bstr[k--] = byte(uint8(48 + _i % 10));
+      _i /= 10;
     }
     return string(bstr);
   }

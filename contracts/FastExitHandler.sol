@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./ExitHandler.sol";
 import "./Bridge.sol";
@@ -23,8 +23,8 @@ contract FastExitHandler is ExitHandler {
   }
 
   function startBoughtExit(
-    bytes32[] _youngestInputProof, bytes32[] _proof,
-    uint8 _outputIndex, uint8 _inputIndex, bytes32[] signedData
+    bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
+    uint8 _outputIndex, uint8 _inputIndex, bytes32[] memory signedData
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     Data memory data;
@@ -42,7 +42,7 @@ contract FastExitHandler is ExitHandler {
     // parse exiting tx and check if it is exitable
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
-    data.utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(data.txHash));
+    data.utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(data.txHash)));
 
     (uint256 buyPrice, bytes32 utxoIdSigned, address signer) = unpackSignedData(signedData);
 
@@ -53,7 +53,7 @@ contract FastExitHandler is ExitHandler {
         TxLib.getSigHash(txData), 
         exitingTx.ins[0].v, exitingTx.ins[0].r, exitingTx.ins[0].s
       ) == signer,
-      "Signer was not the previous owenr of UTXO"
+      "Signer was not the previous owner of UTXO"
     );
     require(
       data.utxoId == utxoIdSigned, 
@@ -75,7 +75,7 @@ contract FastExitHandler is ExitHandler {
     );
     
     if (isNft(out.color)) {
-      priority = (nftExitCounter << 128) | uint128(data.utxoId);
+      priority = (nftExitCounter << 128) | uint128(uint256(data.utxoId));
       nftExitCounter++;
     } else {      
       priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
@@ -103,19 +103,21 @@ contract FastExitHandler is ExitHandler {
   }
 
   function unpackSignedData(
-    bytes32[] signedData
+    bytes32[] memory signedData
   ) internal pure returns (
     uint256 buyPrice, bytes32 utxoId, address signer
   ) {
-    bytes32[] memory sigBuff = new bytes32[](2);
     utxoId = signedData[0];
     buyPrice = uint256(signedData[1]);
     bytes32 r = signedData[2];
     bytes32 s = signedData[3];
-    uint8 v = uint8(signedData[4]);
-    sigBuff[0] = utxoId;
-    sigBuff[1] = signedData[1];
-    bytes32 sigHash = keccak256(sigBuff);
+    uint8 v = uint8(uint256(signedData[4]));
+    bytes32 sigHash = signedData[1];
+    assembly {
+      mstore(0, utxoId)
+      mstore(0x20, sigHash)
+      sigHash := keccak256(0, 0x40)
+    }
     signer = ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow
   }
 }

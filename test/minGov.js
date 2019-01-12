@@ -20,13 +20,13 @@ contract('MinGov', (accounts) => {
     gov = await MinGov.new(0);
     // bridge
     const bridgeLogic = await Bridge.new();
-    bridgeProxy = await AdminableProxy.new(bridgeLogic.address, 0);
-    bridge = Bridge.at(bridgeProxy.address);
+    bridgeProxy = await AdminableProxy.new(bridgeLogic.address, '0x');
+    bridge = await Bridge.at(bridgeProxy.address);
     await bridgeProxy.changeAdmin(gov.address);
   });
 
   it('should allow to read admin as not-admin', async () => {
-    const admin = await bridgeProxy.admin({from: accounts[1]});
+    const admin = await bridgeProxy.admin.call({ from: accounts[1] });
     assert.equal(admin, gov.address);
   });
 
@@ -35,7 +35,7 @@ contract('MinGov', (accounts) => {
     let operator = await bridge.operator();
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
     // propose and finalize value change
-    const data = await bridge.contract.setOperator.getData(accounts[1]);
+    const data = await bridge.contract.methods.setOperator(accounts[1]).encodeABI();
     await gov.propose(bridge.address, data);
     await gov.finalize();
 
@@ -47,15 +47,15 @@ contract('MinGov', (accounts) => {
   it('should allow to propose and finalize multiple operations', async () => {
     // operator
     const operatorLogic = await Operator.new();
-    const proxyOp = await AdminableProxy.new(operatorLogic.address, 0);
+    const proxyOp = await AdminableProxy.new(operatorLogic.address, '0x');
     // await proxyOp.initialize(operatorLogic.address);
-    const operator = Operator.at(proxyOp.address);
+    const operator = await Operator.at(proxyOp.address);
     await proxyOp.changeAdmin(gov.address);
 
     // propose and finalize value changes
-    const data1 = await operator.contract.setMinGasPrice.getData(200);
+    const data1 = await operator.contract.methods.setMinGasPrice(200).encodeABI();
     await gov.propose(operator.address, data1);
-    const data2 = await operator.contract.setEpochLength.getData(32);
+    const data2 = await operator.contract.methods.setEpochLength(32).encodeABI();
     await gov.propose(operator.address, data2);
     let size = await gov.size();
     let first = await gov.first();
@@ -69,7 +69,7 @@ contract('MinGov', (accounts) => {
     assert.equal(epochLength.toNumber(), 32);
 
     // propose and finalize value changes
-    const data3 = await operator.contract.setParentBlockInterval.getData(300);
+    const data3 = await operator.contract.methods.setParentBlockInterval(300).encodeABI();
     await gov.propose(operator.address, data3);
     first = await gov.first();
     // position 1 and 2 have been used in first finalize
@@ -93,13 +93,13 @@ contract('MinGov', (accounts) => {
   it('should allow to finalize same operation multiple times', async () => {
     // vault
     const vaultLogic = await Vault.new();
-    const proxyVa = await AdminableProxy.new(vaultLogic.address, 0);
+    const proxyVa = await AdminableProxy.new(vaultLogic.address, '0x');
     // await proxyVa.initialize(vaultLogic.address);
-    const vault = Vault.at(proxyVa.address);
+    const vault = await Vault.at(proxyVa.address);
     await proxyVa.changeAdmin(gov.address);
 
     // propose and finalize value change
-    const data = await vault.contract.registerToken.getData(accounts[1]);
+    const data = await vault.contract.methods.registerToken(accounts[1]).encodeABI();
     await gov.propose(vault.address, data);
     await gov.finalize();
 
@@ -108,7 +108,7 @@ contract('MinGov', (accounts) => {
     assert.equal(count, 1);
 
     // propose and finalize value change
-    const data2 = await vault.contract.registerToken.getData(accounts[2]);
+    const data2 = await vault.contract.methods.registerToken(accounts[2]).encodeABI();
     await gov.propose(vault.address, data2);
     await gov.finalize();
 
@@ -126,24 +126,24 @@ contract('MinGov', (accounts) => {
 
   it('should allow to upgrade bridge', async () => {
     // deploy new contract
-    const proxy = AdminableProxy.at(bridge.address);
+    const proxy = await AdminableProxy.at(bridge.address);
     const newBridgeLogic = await Bridge.new();
 
     // propose and finalize upgrade
-    const data = await proxy.contract.upgradeTo.getData(newBridgeLogic.address);
+    const data = await proxy.contract.methods.upgradeTo(newBridgeLogic.address).encodeABI();
     await gov.propose(bridge.address, data);
     await gov.finalize();
 
     // check value after
     const imp = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3';
     const logicAddr = await web3.eth.getStorageAt(proxy.address, imp);
-    assert.equal(logicAddr, newBridgeLogic.address);
+    assert.equal(logicAddr.toLowerCase(), newBridgeLogic.address.toLowerCase());
   });
 
   it('should allow to transfer into new governance', async () => {
 
     // propose and finalize upgrade
-    const data = await bridgeProxy.contract.changeAdmin.getData(accounts[1]);
+    const data = await bridgeProxy.contract.methods.changeAdmin(accounts[1]).encodeABI();
     await gov.propose(bridge.address, data);
     await gov.finalize();
 
@@ -162,16 +162,16 @@ contract('MinGov', (accounts) => {
     gov = await MinGov.new(time.duration.weeks(2));
     // bridge
     const bridgeLogic = await Bridge.new();
-    const proxy = await AdminableProxy.new(bridgeLogic.address, 0);
+    const proxy = await AdminableProxy.new(bridgeLogic.address, '0x');
     // await proxy.initialize(bridgeLogic.address);
-    bridge = Bridge.at(proxy.address);
+    bridge = await Bridge.at(proxy.address);
     await proxy.changeAdmin(gov.address);
 
     // check value before
     let operator = await bridge.operator();
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
     // propose and finalize value change
-    const data = await bridge.contract.setOperator.getData(accounts[1]);
+    const data = await bridge.contract.methods.setOperator(accounts[1]).encodeABI();
     await gov.propose(bridge.address, data);
 
     // try before time passed
@@ -193,7 +193,7 @@ contract('MinGov', (accounts) => {
     let operator = await bridge.operator();
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
     // propose and finalize value change
-    const data = await bridge.contract.setOperator.getData(accounts[1]);
+    const data = await bridge.contract.methods.setOperator(accounts[1]).encodeABI();
     await gov.propose(bridge.address, data);
     await gov.cancel(1);
     await gov.finalize();

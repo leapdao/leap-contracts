@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./Adminable.sol";
 import "./Bridge.sol";
@@ -80,7 +80,7 @@ contract PoaOperator is Adminable {
     Slot storage slot = slots[_slotId];
 
     // taking empty slot
-    if (slot.signer == 0) {
+    if (slot.signer == address(0)) {
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
       slot.activationEpoch = 0;
@@ -95,14 +95,14 @@ contract PoaOperator is Adminable {
       return;
     }
     // emptying slot
-    if (_signerAddr == 0 && _tenderAddr == 0) {
+    if (_signerAddr == address(0) && _tenderAddr == 0) {
       slot.activationEpoch = uint32(lastCompleteEpoch + 3);
       slot.eventCounter++;
       emit ValidatorLogout(
         slot.signer,
         _slotId,
         _tenderAddr,
-        0x0,
+        address(0),
         slot.eventCounter,
         lastCompleteEpoch + 3
       );
@@ -114,7 +114,7 @@ contract PoaOperator is Adminable {
     require(_slotId < epochLength);
     Slot storage slot = slots[_slotId];
     require(lastCompleteEpoch + 1 >= slot.activationEpoch);
-    if (slot.signer > 0) {
+    if (slot.signer != address(0)) {
       emit ValidatorLeave(
         slot.signer,
         _slotId,
@@ -125,10 +125,10 @@ contract PoaOperator is Adminable {
     slot.signer = slot.newSigner;
     slot.tendermint = slot.newTendermint;
     slot.activationEpoch = 0;
-    slot.newSigner = 0;
+    slot.newSigner = address(0);
     slot.newTendermint = 0x0;
     slot.eventCounter++;
-    if (slot.signer > 0) {
+    if (slot.signer != address(0)) {
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -167,7 +167,12 @@ contract PoaOperator is Adminable {
       // if slot not active, prevent submission
       require(lastCompleteEpoch + 2 < slot.activationEpoch);
     }
-    bytes32 periodRood = keccak256(_blocksRoot, _slotId << 160 | uint160(msg.sender));
+    bytes32 periodRood = bytes32(_slotId << 160 | uint160(msg.sender));
+    assembly {
+      mstore(0, _blocksRoot)
+      mstore(0x20, periodRood)
+      periodRood := keccak256(0, 0x40)
+    }
     uint256 newHeight = bridge.submitPeriod(_prevHash, periodRood);
     // check if epoch completed
     if (newHeight >= lastEpochBlockHeight + epochLength) {

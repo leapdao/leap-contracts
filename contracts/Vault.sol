@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "./Bridge.sol";
 import "./Adminable.sol";
@@ -30,16 +30,16 @@ contract Vault is Adminable {
   } 
 
   function getTokenAddr(uint16 _color) public view returns (address) {
-    return tokens[_color].addr;
+    return address(tokens[_color].addr);
   }
 
-  function registerToken(TransferrableToken _token, bool _isERC721) public ifAdmin {
+  function registerToken(address _token, bool _isERC721) public ifAdmin {
     // make sure token is not 0x0 and that it has not been registered yet
     require(_token != address(0), "Tried to register 0x0 address");
     require(!tokenColors[_token], "Token already registered");
     uint16 color;
     if (_isERC721) {
-      require(_token.supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
+      require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
       color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
@@ -50,7 +50,7 @@ contract Vault is Adminable {
     uint256[] memory arr = new uint256[](1);
     tokenColors[_token] = true;
     tokens[color] = PriorityQueue.Token({
-      addr: _token,
+      addr: TransferrableToken(_token),
       heapList: arr,
       currentSize: 0
     });
