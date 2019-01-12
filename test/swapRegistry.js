@@ -17,7 +17,7 @@ const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SwapRegistry = artifacts.require('SwapRegistry');
 const SwapExchange = artifacts.require('SwapExchange');
-const MintableToken = artifacts.require('MintableToken');
+const NativeToken = artifacts.require('NativeToken');
 const MinGov = artifacts.require('./MinGov.sol');
 
 const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
@@ -33,6 +33,8 @@ const merkelize = (hash1, hash2) => {
 contract('SwapRegistry', (accounts) => {
   const bob = accounts[1];
 
+  const deployToken = async () => NativeToken.new("Token", "TOK", 18);
+
   describe('Test', () => {
     let bridge;
     let vault;
@@ -45,7 +47,7 @@ contract('SwapRegistry', (accounts) => {
     const taxRate = 0.5; // 50%
 
     beforeEach(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await deployToken();
       await nativeToken.mint(accounts[0], initialTotalSupply);
 
       const bridgeCont = await Bridge.new();
@@ -172,7 +174,7 @@ contract('SwapRegistry', (accounts) => {
     const poaReward = web3.utils.toWei('3500000', 'ether');
 
     before(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await deployToken();
 
       const bridgeCont = await Bridge.new();
       let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
@@ -236,7 +238,7 @@ contract('SwapRegistry', (accounts) => {
     let nativeToken;
 
     before(async () => {
-      nativeToken = await MintableToken.new();
+      nativeToken = await deployToken();
 
       const vaultCont = await Vault.new();
       let data = await vaultCont.contract.methods.initialize(accounts[0]).encodeABI();
@@ -260,7 +262,7 @@ contract('SwapRegistry', (accounts) => {
 
     describe('Swap Exchange', async () => {
       it('should allow to register new swap market', async () => {
-        const token = await MintableToken.new();
+        const token = await deployToken();
         await swapRegistry.createExchange(token.address);
         const exchangeAddr = await swapRegistry.getExchange(token.address);
         const exchange = await SwapExchange.at(exchangeAddr);
