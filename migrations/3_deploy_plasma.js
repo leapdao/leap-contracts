@@ -5,7 +5,7 @@ const { log } = require('../test/helpers/');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
-const LeapToken = artifacts.require('LeapToken');
+const NativeToken = artifacts.require('NativeToken');
 const PoaOperator = artifacts.require('PoaOperator');
 const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
@@ -53,8 +53,8 @@ module.exports = (deployer, network, accounts) => {
   let data;
 
   deployer.then(async () => {
-    const leapToken = await LeapToken.deployed();
-    log('  ♻️  Reusing existing Leap Token:', leapToken.address);
+    const nativeToken = await NativeToken.deployed();
+    log('  ♻️  Reusing existing Native Token:', nativeToken.address);
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(DEFAULT_PARENT_BLOCK_INTERVAL).encodeABI();
@@ -78,9 +78,9 @@ module.exports = (deployer, network, accounts) => {
     data = await bridgeCont.contract.methods.setOperator(operatorProxy.address).encodeABI();
     await bridgeProxy.applyProposal(data, {from: admin});
 
-    const vault = await Vault.at(exitHandlerProxy.address);
-    data = await vault.contract.methods.registerToken(leapToken.address, false).encodeABI();
-    await exitHandlerProxy.applyProposal(data, {from: admin});
+    const vault = Vault.at(exitHandlerProxy.address);
+    data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+    await exitHandlerProxy.applyProposal(data, { from: admin });
 
     try {
       fs.mkdirSync('./build/nodeFiles');

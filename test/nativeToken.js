@@ -5,12 +5,12 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-const LeapToken = artifacts.require('LeapToken');
+const NativeToken = artifacts.require('NativeToken');
 
-contract('LeapToken', (accounts) => {
+contract('NativeToken', (accounts) => {
 
   it('is mintable', async () => {
-    const token = await LeapToken.deployed();
+    const token = await NativeToken.deployed();
     assert.equal(await token.balanceOf(accounts[0]), 0);
     
     await token.mint(accounts[0], 200);
@@ -19,7 +19,7 @@ contract('LeapToken', (accounts) => {
   });
 
   it('is burnable', async () => {
-    const token = await LeapToken.deployed();
+    const token = await NativeToken.deployed();
     const balance = await token.balanceOf(accounts[0]);
 
     await token.burn(100);

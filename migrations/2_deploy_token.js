@@ -7,11 +7,11 @@
 
 const { log } = require('../test/helpers/');
 
-const LeapToken = artifacts.require('LeapToken');
+const NativeToken = artifacts.require('NativeToken');
 
 module.exports = (deployer) => {
   deployer.then(async () => {
-    const leapToken = await deployer.deploy(LeapToken);
-    log('Deployed LEAP Token at', leapToken.address);
+    const nativeToken = await deployer.deploy(NativeToken, "LeapToken", "LEAP", 18);
+    log('Deployed LEAP Token at', nativeToken.address);
   });
 };

@@ -4,19 +4,22 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintabl
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
 
 /**
- * @title LeapToken
+ * @title NativeToken
  * @dev Simple mintable ERC20 Token, where all tokens are pre-assigned to the creator.
  * Note they can later distribute these tokens as they wish using `transfer` and other
  * `StandardToken` functions.
  */
 
-contract LeapToken is ERC20Mintable, ERC20Burnable {
+contract NativeToken is ERC20Mintable, ERC20Burnable {
 
-  string public constant name = "LeapToken";
-  string public constant symbol = "LEAP";
-  uint8 public constant decimals = 18;
+  bytes32 public name;
+  bytes32 public symbol;
+  uint256 public decimals;
 
-  constructor() public {    
+  constructor(bytes32 _name, bytes32 _symbol, uint256 _decimals) public {
+    name = _name;
+    symbol = _symbol;
+    decimals = _decimals;
   }
 
 }
