@@ -1,5 +1,6 @@
 pragma solidity 0.4.24;
 
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
 
@@ -10,16 +11,10 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnabl
  * `StandardToken` functions.
  */
 
-contract NativeToken is ERC20Mintable, ERC20Burnable {
+contract NativeToken is ERC20Detailed, ERC20Mintable, ERC20Burnable {
 
-  bytes32 public name;
-  bytes32 public symbol;
-  uint256 public decimals;
-
-  constructor(bytes32 _name, bytes32 _symbol, uint256 _decimals) public {
-    name = _name;
-    symbol = _symbol;
-    decimals = _decimals;
+  constructor(string _name, string _symbol, uint8 _decimals) 
+    public ERC20Detailed(_name, _symbol, _decimals) {
   }
 
 }
