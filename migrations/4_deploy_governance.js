@@ -7,31 +7,14 @@
 
 /* eslint-disable no-console */
 
+const { durationToString, duration } = require('../test/helpers/duration');
+
 const MinGov = artifacts.require('MinGov');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
-const MINUTE = 60;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-const DEFAULT_PROPOSAL_TIME = 14 * DAY;
-
-const formatTime = (durationSec) => {
-  const days = Math.trunc(durationSec / DAY); 
-  const hours = Math.trunc((durationSec - days * DAY) / HOUR); 
-  const minutes = Math.trunc((durationSec - days * DAY - hours * HOUR) / MINUTE); 
-  const seconds = Math.trunc(durationSec - days * DAY - hours * HOUR - minutes * MINUTE); 
-  
-  const duration = [];
-  if (days) duration.push(`${days} days`);
-  if (hours) duration.push(`${hours} hours`);
-  if (minutes) duration.push(`${minutes} minutes`);
-  if (seconds) duration.push(`${seconds} seconds`);
-
-  return duration.join(', ');
-};
+const DEFAULT_PROPOSAL_TIME = duration.days(14);
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
@@ -39,7 +22,7 @@ module.exports = (deployer, network, accounts) => {
   deployer.then(async () => {
     const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
 
-    console.log('  🕐 Deploying Governance with proposal time:', formatTime(proposalTime));
+    console.log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
     const governance = await deployer.deploy(MinGov, proposalTime);
     
     const bridgeProxy = await BridgeProxy.deployed();

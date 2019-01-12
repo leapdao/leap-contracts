@@ -1,5 +1,6 @@
 const { promisify } = require('util');
 const { ethGetBlock } = require('./web3');
+const { duration } = require('./duration');
 
 function advanceBlock () {
   return promisify(web3.currentProvider.send)({
@@ -15,13 +16,13 @@ async function latest () {
 }
 
 // Increases ganache time by the passed duration in seconds
-async function increase (duration) {
-  if (duration < 0) throw Error(`Cannot increase time by a negative amount (${duration})`);
+async function increase (durationSec) {
+  if (durationSec < 0) throw Error(`Cannot increase time by a negative amount (${durationSec})`);
 
   await promisify(web3.currentProvider.send)({
     jsonrpc: '2.0',
     method: 'evm_increaseTime',
-    params: [duration],
+    params: [durationSec],
   });
 
   await advanceBlock();
@@ -41,15 +42,6 @@ async function increaseTo (target) {
   const diff = target - now;
   return increase(diff);
 }
-
-const duration = {
-  seconds (val) { return val; },
-  minutes (val) { return val * this.seconds(60); },
-  hours (val) { return val * this.minutes(60); },
-  days (val) { return val * this.hours(24); },
-  weeks (val) { return val * this.days(7); },
-  years (val) { return val * this.days(365); },
-};
 
 module.exports = {
   advanceBlock,
