@@ -60,10 +60,6 @@ contract MinGov is Ownable {
     token.transfer(owner(), token.balanceOf(address(this)));
   }
 
-  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
-    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
-  }
-  
   function finalize() public {
     for (uint256 i = first; i < first + size; i++) {
       Proposal memory prop = proposals[i];
@@ -92,7 +88,7 @@ contract MinGov is Ownable {
     }
   }
 
-  function getSig(bytes _msgData) internal pure returns (bytes4) {
+  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
     return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
   }
 
