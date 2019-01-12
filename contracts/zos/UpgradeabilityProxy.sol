@@ -1,9 +1,9 @@
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 //copied from zos-lib due to import fix needed: 
 //import "openzeppelin-solidity/contracts/AddressUtils.sol" -> import "openzeppelin-solidity/contracts/utils/Address.sol"
 
-import "../../node_modules/zos-lib/contracts/upgradeability/Proxy.sol";
+import "./Proxy.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/utils/Address.sol";
 
 /**
@@ -38,7 +38,9 @@ contract UpgradeabilityProxy is Proxy {
     assert(IMPLEMENTATION_SLOT == keccak256("org.zeppelinos.proxy.implementation"));
     _setImplementation(_implementation);
     if (_data.length > 0) {
-      require(_implementation.delegatecall(_data));
+      bool rv;
+      (rv,) = _implementation.delegatecall(_data);
+      require(rv);
     }
   }
 

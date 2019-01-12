@@ -2,7 +2,7 @@ const { promisify } = require('util');
 const { ethGetBlock } = require('./web3');
 
 function advanceBlock () {
-  return promisify(web3.currentProvider.sendAsync)({
+  return promisify(web3.currentProvider.send)({
     jsonrpc: '2.0',
     method: 'evm_mine',
   });
@@ -18,7 +18,7 @@ async function latest () {
 async function increase (duration) {
   if (duration < 0) throw Error(`Cannot increase time by a negative amount (${duration})`);
 
-  await promisify(web3.currentProvider.sendAsync)({
+  await promisify(web3.currentProvider.send)({
     jsonrpc: '2.0',
     method: 'evm_increaseTime',
     params: [duration],

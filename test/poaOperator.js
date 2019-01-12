@@ -28,16 +28,16 @@ contract('PoaOperator', (accounts) => {
 
     before(async () => {
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: admin});
-      bridge = Bridge.at(proxyBridge.address);
+      bridge = await Bridge.at(proxyBridge.address);
 
       const opCont = await PoaOperator.new();
-      data = await opCont.contract.initialize.getData(bridge.address, epochLength);
+      data = await opCont.contract.methods.initialize(bridge.address, epochLength).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data,  {from: admin});
-      operator = PoaOperator.at(proxy.address);
+      operator = await PoaOperator.at(proxy.address);
 
-      data = await bridge.contract.setOperator.getData(operator.address);
+      data = await bridge.contract.methods.setOperator(operator.address).encodeABI();
       await proxyBridge.applyProposal(data, {from: admin});
     });
 
@@ -52,13 +52,13 @@ contract('PoaOperator', (accounts) => {
         });
 
         it('should allow to set slot and submit block', async () => {
-          const data = await operator.contract.setSlot.getData(0, alice, alice);
+          const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
           await proxy.applyProposal(data, {from: admin});
           await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
           p[1] = await bridge.tipHash();
         });
         it('should allow to set slot and submit block with reward', async () => {
-          const data = await operator.contract.setSlot.getData(1, bob, bob);
+          const data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
           await proxy.applyProposal(data, {from: admin});
           await operator.submitPeriodForReward(1, p[1], '0x02', { from: bob }).should.be.fulfilled;
           p[2] = await bridge.tipHash();

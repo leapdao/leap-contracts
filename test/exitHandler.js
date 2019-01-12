@@ -11,6 +11,7 @@ import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 const time = require('./helpers/time');
 require('./helpers/setup');
 
+const { BN } = web3.utils;
 const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const ExitHandler = artifacts.require('ExitHandler');
@@ -44,7 +45,7 @@ contract('ExitHandler', (accounts) => {
     const nativeTokenColor = 0;
     let depositTx;
     let transferTx;
-    const depositAmount = 100;
+    const depositAmount = new BN(100);
     const depositId = 1;
 
     // ERC721 token stuff
@@ -63,7 +64,7 @@ contract('ExitHandler', (accounts) => {
       await nativeToken.approve(exitHandler.address, 1000);
       await exitHandler.deposit(alice, depositAmount, nativeTokenColor).should.be.fulfilled;
 
-      depositTx = Tx.deposit(depositId, depositAmount, alice);
+      depositTx = Tx.deposit(depositId, depositAmount.toNumber(), alice);
       transferTx = Tx.transfer(
         [new Input(new Outpoint(depositTx.hash(), 0))],
         [new Output(50, bob), new Output(50, alice)]
@@ -78,9 +79,9 @@ contract('ExitHandler', (accounts) => {
       nftTokenId = receipt.logs[0].args.tokenId;
       nftTokenIdStr = nftTokenId.toString(10);
 
-      const data = await exitHandler.contract.registerToken.getData(nftToken.address, true);
+      const data = await exitHandler.contract.methods.registerToken(nftToken.address, true).encodeABI();
       receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
-      nftColor = Buffer.from(receipt.receipt.logs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
+      nftColor = Buffer.from(receipt.receipt.rawLogs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
       
       // deposit
       await nftToken.approve(exitHandler.address, nftTokenId);
@@ -102,19 +103,19 @@ contract('ExitHandler', (accounts) => {
       ExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
-      data = await bridge.contract.setOperator.getData(bob);
+      bridge = await Bridge.at(proxy.address);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await ExitHandler.new();
-      data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
+      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, exitDuration, exitStake).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
-      exitHandler = ExitHandler.at(proxy.address);
+      exitHandler = await ExitHandler.at(proxy.address);
 
       // register first token
-      data = await exitHandler.contract.registerToken.getData(nativeToken.address, false);
+      data = await exitHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -126,7 +127,6 @@ contract('ExitHandler', (accounts) => {
 
     describe('Start exit', async () => {
       it('Should allow to exit valid utxo', async () => {
-        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx, transferTx]);
 
         const transferProof = period.proof(transferTx);
@@ -144,11 +144,10 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
-        aliceBalanceBefore.plus(50).should.be.bignumber.equal(aliceBalanceAfter);
+        assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
       });
 
       it('Should allow to exit deposit utxo', async () => {
-        await time.advanceBlock();
         const period = await submitNewPeriod([depositTx]);
 
         const proof = period.proof(depositTx);
@@ -165,11 +164,10 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
-        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+        assert(aliceBalanceBefore.add(depositAmount).eq(aliceBalanceAfter));
       });
 
       it('Should allow to exit consolidate utxo', async () => {
-        await time.advanceBlock();
         transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]
@@ -200,11 +198,10 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
-        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+        assert(aliceBalanceBefore.add(depositAmount).eq(aliceBalanceAfter));
       });
 
       it('Should allow to exit deposit', async () => {
-        await time.advanceBlock();
         await exitHandler.startDepositExit(1);
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
@@ -216,7 +213,7 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
-        aliceBalanceBefore.plus(depositAmount).should.be.bignumber.equal(aliceBalanceAfter);
+        assert(aliceBalanceBefore.add(depositAmount).eq(aliceBalanceAfter));
       });
 
 
@@ -265,7 +262,6 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit', async () => {
-        await time.advanceBlock();
         // utxo that will have spend exit utxo
         const spendTx = Tx.transfer(
           [new Input(new Outpoint(transferTx.hash(), 0))],
@@ -308,7 +304,6 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to challenge exit by verified tx', async () => {
-        await time.advanceBlock();
         transferTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
           [new Output(50, alice), new Output(50, alice)]

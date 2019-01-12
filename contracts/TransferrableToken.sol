@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/introspection/ERC165.sol";
 

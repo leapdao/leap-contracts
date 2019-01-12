@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
+pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./Adminable.sol";
@@ -103,7 +103,7 @@ contract POSoperator is Adminable {
         slot.signer,
         _slotId,
         _tenderAddr,
-        0x0,
+        address(0),
         slot.eventCounter,
         lastCompleteEpoch + 3
       );
@@ -120,7 +120,7 @@ contract POSoperator is Adminable {
     // new purchase or update
     if (slot.stake == 0 || (slot.owner == tx.origin && slot.newStake == 0)) {
       uint64 stake = slot.stake;
-      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value - slot.stake);
+      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, address(this), _value - slot.stake);
       slot.owner = tx.origin;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
@@ -147,7 +147,7 @@ contract POSoperator is Adminable {
       if (slot.newStake > 0) {
         ERC20(vault.getTokenAddr(0)).transfer(slot.newOwner, slot.newStake);
       }
-      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, this, _value);
+      ERC20(vault.getTokenAddr(0)).transferFrom(tx.origin, address(this), _value);
       slot.newOwner = tx.origin;
       slot.newSigner = _signerAddr;
       slot.newTendermint = _tenderAddr;
@@ -184,8 +184,8 @@ contract POSoperator is Adminable {
     slot.tendermint = slot.newTendermint;
     slot.stake = slot.newStake;
     slot.activationEpoch = 0;
-    slot.newOwner = 0;
-    slot.newSigner = 0;
+    slot.newOwner = address(0);
+    slot.newSigner = address(0);
     slot.newTendermint = 0x0;
     slot.newStake = 0;
     slot.eventCounter++;

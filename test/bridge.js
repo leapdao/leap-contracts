@@ -20,10 +20,10 @@ contract('Bridge', (accounts) => {
 
     beforeEach(async () => {
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
-      data = await bridge.contract.setOperator.getData(accounts[0]);
+      bridge = await Bridge.at(proxy.address);
+      data = await bridgeCont.contract.methods.setOperator(accounts[0]).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
     });
 
@@ -39,7 +39,7 @@ contract('Bridge', (accounts) => {
       });
 
       it('Operator can be set', async() => {
-        const data = await bridge.contract.setOperator.getData(accounts[1]);
+        const data = await bridge.contract.methods.setOperator(accounts[1]).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]});
         const prevPeriodHash = await bridge.tipHash();
         const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';

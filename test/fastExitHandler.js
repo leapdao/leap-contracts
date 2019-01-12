@@ -51,19 +51,19 @@ contract('FastExitHandler', (accounts) => {
       FastExitHandler.link('PriorityQueue', pqLib.address);
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
-      data = await bridge.contract.setOperator.getData(bob);
+      bridge = await Bridge.at(proxy.address);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await FastExitHandler.new();
-      data = await vaultCont.contract.initializeWithExit.getData(bridge.address, exitDuration, exitStake);
+      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, exitDuration, exitStake).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
-      exitHandler = FastExitHandler.at(proxy.address);
+      exitHandler = await FastExitHandler.at(proxy.address);
 
       // register first token
-      data = await exitHandler.contract.registerToken.getData(nativeToken.address, false);
+      data = await exitHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -114,14 +114,14 @@ contract('FastExitHandler', (accounts) => {
       const aliceBalance2 = await nativeToken.balanceOf(alice);
       const bobBalance2 = await nativeToken.balanceOf(bob);
       const exitOwner = (await exitHandler.exits(utxoId))[2];
-      aliceBalance1.plus(40).should.be.bignumber.equal(aliceBalance2);
-      bobBalance1.minus(40).should.be.bignumber.equal(bobBalance2);
+      assert.equal(aliceBalance1.toNumber() + 40, aliceBalance2.toNumber());
+      assert.equal(bobBalance1.toNumber() - 40, bobBalance2.toNumber());
       exitOwner.should.be.equal(bob);
 
       await exitHandler.finalizeTopExit(0);
 
       const bobBalance3 = await nativeToken.balanceOf(bob);
-      bobBalance2.plus(50).should.be.bignumber.equal(bobBalance3);
+      assert.equal(bobBalance2.toNumber() + 50, bobBalance3.toNumber());
     });
   });
 

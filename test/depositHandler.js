@@ -31,19 +31,19 @@ contract('DepositHandler', (accounts) => {
     beforeEach(async () => {
       nativeToken = await SimpleToken.new();
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
-      data = await bridge.contract.setOperator.getData(bob);
+      bridge = await Bridge.at(proxy.address);
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await DepositHandler.new();
-      data = await vaultCont.contract.initialize.getData(bridge.address);
+      data = await vaultCont.contract.methods.initialize(bridge.address).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
-      depositHandler = DepositHandler.at(proxy.address);
+      depositHandler = await DepositHandler.at(proxy.address);
 
       // register first token
-      data = await depositHandler.contract.registerToken.getData(nativeToken.address, false);
+      data = await depositHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
 
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
@@ -63,9 +63,9 @@ contract('DepositHandler', (accounts) => {
         await depositHandler.deposit(alice, amount, color).should.be.fulfilled;
 
         const depositHandlerBalanceAfter = await nativeToken.balanceOf(depositHandler.address);
-        const depositHandlerBalanceDiff = depositHandlerBalanceAfter.minus(depositHandlerBalanceBefore);
+        const depositHandlerBalanceDiff = depositHandlerBalanceAfter.sub(depositHandlerBalanceBefore);
 
-        depositHandlerBalanceDiff.should.be.bignumber.equal(amount);
+        assert.equal(depositHandlerBalanceDiff, amount);
       });
 
       it('Can deposit ERC721 and depositHandler becomes owner', async () => {
@@ -74,7 +74,7 @@ contract('DepositHandler', (accounts) => {
         const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
-        const data = await depositHandler.contract.registerToken.getData(nftToken.address, true);
+        const data = await depositHandler.contract.methods.registerToken(nftToken.address, true).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});

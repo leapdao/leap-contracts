@@ -6,8 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.4.24;
-
+pragma solidity 0.5.2;
 
 contract SwapExchange {
 
@@ -19,9 +18,9 @@ contract SwapExchange {
   uint256 public decimals;
 
   function setup(address _nativeToken, address _tokenAddr) public {
-    require(factory == 0 && token == 0, "setup can only be executed once");
-    require(_nativeToken != 0, "tokenAddr not valid");
-    require(_tokenAddr != 0, "tokenAddr not valid");
+    require(factory == address(0) && token == address(0), "setup can only be executed once");
+    require(_nativeToken != address(0), "tokenAddr not valid");
+    require(_tokenAddr != address(0), "tokenAddr not valid");
     factory = msg.sender;
     token = _tokenAddr;
     nativeToken = _nativeToken;
