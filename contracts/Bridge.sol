@@ -33,6 +33,7 @@ contract Bridge is Adminable {
   bytes32 constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
 
   bytes32 public tipHash; // hash of first period that has extended chain to some height
+  uint256 public genesisBlockNumber;
   uint256 parentBlockInterval; // how often epochs can be submitted max
   uint256 public lastParentBlock; // last ethereum block when epoch was submitted
   address public operator; // the operator contract
@@ -50,7 +51,7 @@ contract Bridge is Adminable {
     });
     tipHash = GENESIS;
     periods[tipHash] = genesisPeriod;
-
+    genesisBlockNumber = block.number;
     parentBlockInterval = _parentBlockInterval;
     operator = msg.sender;
   }
