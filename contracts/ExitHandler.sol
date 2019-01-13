@@ -177,6 +177,10 @@ contract ExitHandler is DepositHandler {
     exitStake = _exitStake;
   }
 
+  function setExitDuration(uint256 _exitDuration) public ifAdmin {
+    exitDuration = _exitDuration;
+  }
+
   function startExit(
     bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex

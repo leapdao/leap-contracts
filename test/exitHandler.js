@@ -502,4 +502,28 @@ contract('ExitHandler', (accounts) => {
 
   });
 
+  describe('Governance', () => {
+    let proxy;
+    let exitHandler;
+    const exitDuration = 5;
+    const exitStake = 0;    
+
+    it('should allow to change exit params', async () => {
+      const vaultCont = await ExitHandler.new();
+      let data = await vaultCont.contract.initializeWithExit.getData(accounts[0], exitDuration, exitStake);
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
+      exitHandler = ExitHandler.at(proxy.address);
+
+      // set exit duration
+      data = await exitHandler.contract.setExitDuration.getData(100);
+      await proxy.applyProposal(data, {from: accounts[2]});
+      assert.equal(await exitHandler.exitDuration(), 100);
+
+      // set exit stake
+      data = await exitHandler.contract.setExitStake.getData(200);
+      await proxy.applyProposal(data, {from: accounts[2]});
+      assert.equal(await exitHandler.exitStake(), 200);
+    });
+  });
+
 });
