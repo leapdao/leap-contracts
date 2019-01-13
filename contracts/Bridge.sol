@@ -30,12 +30,12 @@ contract Bridge is Adminable {
     bytes32[] children; // unordered list of children below this node
   }
 
-  bytes32 public constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
+  bytes32 constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
 
-  uint256 public genesisBlockNumber; 
   bytes32 public tipHash; // hash of first period that has extended chain to some height
-  uint256 public parentBlockInterval; // how often epochs can be submitted max
-  uint64 public lastParentBlock; // last ethereum block when epoch was submitted
+  uint256 public genesisBlockNumber;
+  uint256 parentBlockInterval; // how often epochs can be submitted max
+  uint256 public lastParentBlock; // last ethereum block when epoch was submitted
   address public operator; // the operator contract
 
   mapping(bytes32 => Period) public periods;
@@ -52,9 +52,7 @@ contract Bridge is Adminable {
     tipHash = GENESIS;
     periods[tipHash] = genesisPeriod;
     genesisBlockNumber = block.number;
-
     parentBlockInterval = _parentBlockInterval;
-    lastParentBlock = uint64(block.number);
     operator = msg.sender;
   }
 
@@ -63,10 +61,18 @@ contract Bridge is Adminable {
     emit NewOperator(_operator);
   }
 
+  function getParentBlockInterval() public view returns (uint256) {
+    return parentBlockInterval;
+  }
+
+  function setParentBlockInterval(uint256 _parentBlockInterval) public ifAdmin {
+    parentBlockInterval = _parentBlockInterval;
+  }
+
   function submitPeriod(
     bytes32 _prevHash, 
     bytes32 _root) 
-  public onlyOperator returns (uint256 newHeight){
+  public onlyOperator returns (uint256 newHeight) {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
     require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
@@ -81,7 +87,7 @@ contract Bridge is Adminable {
         "Tried to submit new period too soon"
       );
       tipHash = _root;
-      lastParentBlock = uint64(block.number);
+      lastParentBlock = block.number;
       emit NewHeight(newHeight, _root);
     }
     // store the period

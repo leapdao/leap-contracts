@@ -53,8 +53,8 @@ contract('Bridge', (accounts) => {
         const prevPeriodHash = await bridge.tipHash();
         const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
 
-        const receipt = await bridge.submitPeriod(prevPeriodHash, newPeriodHash);
-        const logMsg = receipt.logs[1].event;
+        const receipt = await bridge.submitPeriod2(prevPeriodHash, newPeriodHash);
+        const logMsg = receipt.logs[0].event;
         assert.equal(logMsg, "LogMessage"); // Check if new line of code emitting log event is working
 
         const newTip = await bridge.tipHash();
