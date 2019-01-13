@@ -59,10 +59,10 @@ contract('Bridge', (accounts) => {
 
     it('can set blockInterval', async() => {
       const bridgeCont = await Bridge.new();
-      let data = await bridgeCont.contract.initialize.getData(parentBlockInterval);
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
       proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
-      bridge = Bridge.at(proxy.address);
-      data = await bridge.contract.setParentBlockInterval.getData(10);
+      bridge = await Bridge.at(proxy.address);
+      data = await bridge.contract.methods.setParentBlockInterval(10).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       const newInterval = await bridge.getParentBlockInterval();
       assert.equal(newInterval.toNumber(), 10);

@@ -510,17 +510,17 @@ contract('ExitHandler', (accounts) => {
 
     it('should allow to change exit params', async () => {
       const vaultCont = await ExitHandler.new();
-      let data = await vaultCont.contract.initializeWithExit.getData(accounts[0], exitDuration, exitStake);
+      let data = await vaultCont.contract.methods.initializeWithExit(accounts[0], exitDuration, exitStake).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
-      exitHandler = ExitHandler.at(proxy.address);
+      exitHandler = await ExitHandler.at(proxy.address);
 
       // set exit duration
-      data = await exitHandler.contract.setExitDuration.getData(100);
+      data = await exitHandler.contract.methods.setExitDuration(100).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       assert.equal(await exitHandler.exitDuration(), 100);
 
       // set exit stake
-      data = await exitHandler.contract.setExitStake.getData(200);
+      data = await exitHandler.contract.methods.setExitStake(200).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       assert.equal(await exitHandler.exitStake(), 200);
     });
