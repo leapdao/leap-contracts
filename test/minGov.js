@@ -203,4 +203,18 @@ contract('MinGov', (accounts) => {
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
   })
 
+  it('should allow to proxy SetSlot without goverance delay', async () => {
+
+    const operatorLogic = await Operator.new();
+    const proxyOp = await AdminableProxy.new(operatorLogic.address, '0x');
+    const operator = await Operator.at(proxyOp.address);
+    await proxyOp.changeAdmin(gov.address);
+
+    const overloadedSlot = `${proxyOp.address  }0000000000000000000000fe`;
+    await gov.setSlot(overloadedSlot, accounts[0], accounts[1]);
+
+    const slotId = await operator.slotId();
+    assert.equal(slotId.toNumber(), 254);
+  })
+
 });
