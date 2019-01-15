@@ -86,10 +86,6 @@ contract MinGov is Ownable {
     }
   }
 
-  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
-    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
-  }
-
   // proxy function to manage validator slots without governance delay
   function setSlot(uint256 _slotId, address, bytes32) public onlyOwner {
     // extract subject
@@ -102,6 +98,10 @@ contract MinGov is Ownable {
     }
     // call subject
     require(AdminableProxy(subject).applyProposal(msgData), "setSlot call failed");
+  }
+
+  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
+    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
   }
 
 }
