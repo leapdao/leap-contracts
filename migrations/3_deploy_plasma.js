@@ -1,7 +1,6 @@
-const fs = require('fs');
-const truffleConfig = require('../truffle-config.js');
 const { durationToString, duration } = require('../test/helpers/duration');
-const { log } = require('../test/helpers/');
+const log = require('./utils/log');
+const writeConfig = require('./utils/writeConfig');
 
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
@@ -13,31 +12,6 @@ const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
-const logError = err => { if (err) { log(err); } }
-
-function abiFileString(abi) {
-  return `module.exports = ${JSON.stringify(abi)}`;
-}
-
-function writeAbi(name, abi) {
-  fs.writeFile(`./build/nodeFiles/${name}.js`, abiFileString(abi), logError);
-}
-
-function writeConfig(bridgeAddr, operatorAddr, exitHandlerAddr, network) {
-  const networkData = truffleConfig.networks[network];
-  const rootNetwork = `http://${networkData.host}:${networkData.port}`;
-  const networkId = Math.floor(Math.random() * Math.floor(1000000000));
-  const config = {
-    "bridgeAddr": bridgeAddr,
-    "operatorAddr": operatorAddr,
-    "exitHandlerAddr": exitHandlerAddr,
-    "rootNetwork": rootNetwork,
-    "network": network,
-    "networkId": networkId,
-    "peers": []
-  }
-  fs.writeFile("./build/nodeFiles/generatedConfig.json", JSON.stringify(config), logError);
-}
 
 const DEFAULT_EXIT_DURATION = duration.days(14);
 const DEFAULT_EXIT_STAKE = 0;
@@ -82,18 +56,14 @@ module.exports = (deployer, network, accounts) => {
     data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
     await exitHandlerProxy.applyProposal(data, { from: admin });
 
-    try {
-      fs.mkdirSync('./build/nodeFiles');
-    } catch(error) {
-      // we don;t care
-    }
+    writeConfig({
+      bridgeProxy,
+      operatorProxy,
+      exitHandlerProxy,
+      bridge: Bridge,
+      operator: PoaOperator,
+      exitHandler: ExitHandler,
+    }, network);
 
-    writeAbi('bridgeAbi', Bridge.abi);
-    writeAbi('exitHandler', ExitHandler.abi);
-    writeAbi('operator', PoaOperator.abi);
-
-    writeConfig(bridgeProxy.address, operatorProxy.address, exitHandlerProxy.address, network);
-
-    log("Generated node files in /build/nodeFiles");
   })
 }

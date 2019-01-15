@@ -6,7 +6,7 @@
  */
 
 const { durationToString, duration } = require('../test/helpers/duration');
-const { log } = require('../test/helpers/');
+const log = require('./utils/log');
 
 const MinGov = artifacts.require('MinGov');
 const BridgeProxy = artifacts.require('BridgeProxy');

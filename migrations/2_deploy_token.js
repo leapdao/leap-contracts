@@ -5,7 +5,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-const { log } = require('../test/helpers/');
+const log = require('./utils/log');
 
 const NativeToken = artifacts.require('NativeToken');
 
