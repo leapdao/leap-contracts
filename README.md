@@ -2,10 +2,42 @@
 [![Build Status](https://travis-ci.org/leapdao/leap-contracts.svg?branch=master)](https://travis-ci.org/leapdao/leap-contracts)
 # Development
 
+## Getting started
+
 ```
 yarn
 yarn test 
 ```
+
+## Deploying contracts
+
+> All the commands support any truffle options like `--network` or `--reset`.
+
+
+Contract may be customized via ENV variables:
+
+| ENV variable | Description | Default value |
+| ------- | ----------- | ------------- |
+| PROPOSAL_TIME | Governance proposal cool-off time (in seconds) | `1209600` (14 days) |
+|EXIT_STAKE| Exit stake (in LEAP cents) |0|
+|EXIT_DURATION| Exit duration (in seconds) |`1209600` (14 days)|
+
+E.g. `PROPOSAL_TIME=600 EXIT_DURATION=180 yarn deploy` deploys plasma contract with 3 minutes exit duration governed by MinGov with 10 minutes proposal time.
+
+### Deploy everything
+
+```
+yarn deploy
+```
+
+This will deploy deploy token, plasma and governance contracts.
+
+### Deploy only plasma and governance contracts (reusing token)
+
+```
+yarn deploy:plasma
+```
+
 # Contracts
 
 In this repository are the solidity smart contracts implementing LeapDAO's plasma leap. 

@@ -463,5 +463,6 @@ contract ExitHandler is DepositHandler {
     emit Debug(callData);
   }
 
+  // solium-disable-next-line mixedcase
   uint256[50] private ______gap;
 }

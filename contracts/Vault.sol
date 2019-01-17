@@ -57,6 +57,7 @@ contract Vault is Adminable {
     emit NewToken(_token, color);
   }
 
+  // solium-disable-next-line mixedcase
   uint256[50] private ______gap;
 
 }

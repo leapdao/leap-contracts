@@ -76,7 +76,7 @@ contract PoaOperator is Adminable {
   }
 
   function setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) public ifAdmin {
-    require(_slotId < epochLength);
+    require(_slotId < epochLength, "out of range slotId");
     Slot storage slot = slots[_slotId];
 
     // taking empty slot
@@ -111,9 +111,9 @@ contract PoaOperator is Adminable {
   }
 
   function activate(uint256 _slotId) public {
-    require(_slotId < epochLength);
+    require(_slotId < epochLength, "out of range slotId");
     Slot storage slot = slots[_slotId];
-    require(lastCompleteEpoch + 1 >= slot.activationEpoch);
+    require(lastCompleteEpoch + 1 >= slot.activationEpoch, "activation epoch not reached yet");
     if (slot.signer != address(0)) {
       emit ValidatorLeave(
         slot.signer,
@@ -142,11 +142,11 @@ contract PoaOperator is Adminable {
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
-    require(slot.signer == msg.sender);
+    require(slot.signer == msg.sender, "not submitted by signerAddr");
     // This is here so that I can submit in the same epoch I auction/logout but not after
     if (slot.activationEpoch > 0) {
       // if slot not active, prevent submission
-      require(lastCompleteEpoch + 2 < slot.activationEpoch);
+      require(lastCompleteEpoch + 2 < slot.activationEpoch, "slot not active");
     }
 
     uint256 newHeight = bridge.submitPeriod(_prevHash, _root);
@@ -161,11 +161,11 @@ contract PoaOperator is Adminable {
   function submitPeriodForReward(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
-    require(slot.signer == msg.sender);
+    require(slot.signer == msg.sender, "not submitted by signerAddr");
     // This is here so that I can submit in the same epoch I auction/logout but not after
     if (slot.activationEpoch > 0) {
       // if slot not active, prevent submission
-      require(lastCompleteEpoch + 2 < slot.activationEpoch);
+      require(lastCompleteEpoch + 2 < slot.activationEpoch, "slot not active");
     }
     bytes32 periodRood = bytes32(_slotId << 160 | uint160(msg.sender));
     assembly {

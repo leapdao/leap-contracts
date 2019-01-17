@@ -2,11 +2,11 @@ import chai from 'chai';
 
 const time = require('./helpers/time');
 
-const Bridge = artifacts.require('./mocks/BridgeMock.sol');
-const Operator = artifacts.require('./mocks/OperatorMock.sol');
-const Vault = artifacts.require('./mocks/VaultMock.sol');
-const AdminableProxy = artifacts.require('./AdminableProxy.sol');
-const MinGov = artifacts.require('./MinGov.sol');
+const Bridge = artifacts.require('BridgeMock');
+const Operator = artifacts.require('OperatorMock');
+const Vault = artifacts.require('VaultMock');
+const AdminableProxy = artifacts.require('AdminableProxy');
+const MinGov = artifacts.require('MinGov');
 
 chai.use(require('chai-as-promised')).should();
 
@@ -201,6 +201,20 @@ contract('MinGov', (accounts) => {
     // check value after
     operator = await bridge.operator();
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
+  })
+
+  it('should allow to proxy SetSlot without goverance delay', async () => {
+
+    const operatorLogic = await Operator.new();
+    const proxyOp = await AdminableProxy.new(operatorLogic.address, '0x');
+    const operator = await Operator.at(proxyOp.address);
+    await proxyOp.changeAdmin(gov.address);
+
+    const overloadedSlot = `${proxyOp.address  }0000000000000000000000fe`;
+    await gov.setSlot(overloadedSlot, accounts[0], accounts[1]);
+
+    const slotId = await operator.slotId();
+    assert.equal(slotId.toNumber(), 254);
   })
 
 });

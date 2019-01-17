@@ -1,6 +1,5 @@
 language: node_js
 cache:
-  - npm
   - yarn
 node_js:
   - '8.11'
@@ -17,7 +16,6 @@ jobs:
     - stage: tests
       name: "Solidity Coverage"
       script:
-        - npm install codecov
-        - npm install solidity-coverage
-        - npm run coverage
-        - ./node_modules/.bin/codecov -f coverage/lcov.info
+        - yarn add codecov solidity-coverage
+        - yarn coverage
+        - codecov -f coverage/lcov.info

@@ -10,7 +10,7 @@ pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import "./AdminableProxy.sol";
+import "./proxies/AdminableProxy.sol";
 
 contract MinGov is Ownable {
   
@@ -36,9 +36,14 @@ contract MinGov is Ownable {
     size = 0;
   }
 
-  function propose(address _subject, bytes memory _msgData) public onlyOwner() {
+  function propose(address _subject, bytes memory _msgData) public onlyOwner {
     require(size < 5);
-    proposals[first + size] = Proposal(_subject, uint32(now), false, _msgData);
+    proposals[first + size] = Proposal(
+      _subject,
+      uint32(now),
+      false,
+      _msgData
+    );
     emit NewProposal(first + size, _subject, _msgData);
     size++;
   }
@@ -50,15 +55,11 @@ contract MinGov is Ownable {
     prop.canceled = true;
   }
 
-  function withdrawTax(address _token) public onlyOwner() {
+  function withdrawTax(address _token) public onlyOwner {
     IERC20 token = IERC20(_token);
     token.transfer(owner(), token.balanceOf(address(this)));
   }
 
-  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
-    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
-  }
-  
   function finalize() public {
     for (uint256 i = first; i < first + size; i++) {
       Proposal memory prop = proposals[i];
@@ -70,8 +71,6 @@ contract MinGov is Ownable {
           ) {
             // this changes proxy parameters 
             (rv, ) = prop.subject.call(prop.msgData);
-            // use this for 0.5
-            // (rv, ) = prop.subject.call(prop.msgData);
           } else {
             // this changes governance parameters to the implementation
             rv = AdminableProxy(address(uint160(prop.subject))).applyProposal(prop.msgData);
@@ -86,4 +85,23 @@ contract MinGov is Ownable {
       }
     }
   }
+
+  // proxy function to manage validator slots without governance delay
+  function setSlot(uint256 _slotId, address, bytes32) public onlyOwner {
+    // extract subject
+    address payable subject = address(uint160(_slotId >> 96));
+    // strip out subject from data
+    bytes memory msgData = new bytes(100);
+    assembly {
+      calldatacopy(add(msgData, 32), 0, 4)
+      calldatacopy(add(msgData, 56), 24, 76)
+    }
+    // call subject
+    require(AdminableProxy(subject).applyProposal(msgData), "setSlot call failed");
+  }
+
+  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
+    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
+  }
+
 }
