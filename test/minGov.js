@@ -125,6 +125,9 @@ contract('MinGov', (accounts) => {
   });
 
   it('should allow to upgrade bridge', async () => {
+    const someVal = 1234;
+    // set storage befor upgrade
+    await bridge.setValue(someVal);
     // deploy new contract
     const proxy = await AdminableProxy.at(bridge.address);
     const newBridgeLogic = await Bridge.new();
@@ -133,11 +136,15 @@ contract('MinGov', (accounts) => {
     const data = await proxy.contract.methods.upgradeTo(newBridgeLogic.address).encodeABI();
     await gov.propose(bridge.address, data);
     await gov.finalize();
+    const newBridge = await Bridge.at(proxy.address);
 
     // check value after
     const imp = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3';
     const logicAddr = await web3.eth.getStorageAt(proxy.address, imp);
     assert.equal(logicAddr.toLowerCase(), newBridgeLogic.address.toLowerCase());
+    // check storage still matches
+    const val = await newBridge.value();
+    assert.equal(someVal, val.toNumber());
   });
 
   it('should allow to transfer into new governance', async () => {

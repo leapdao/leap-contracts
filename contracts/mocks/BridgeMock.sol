@@ -12,8 +12,13 @@ import "../Adminable.sol";
 
 contract BridgeMock is Adminable {
   address public operator;
+  uint256 public value;
 
   function setOperator(address _operator) public ifAdmin {
     operator = _operator;
+  }
+
+  function setValue(uint256 _value) public {
+    value = _value;
   }
 }
