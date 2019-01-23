@@ -60,7 +60,7 @@ contract('PoaOperator', (accounts) => {
         it('should allow to set slot and submit block with reward', async () => {
           const data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
           await proxy.applyProposal(data, {from: admin});
-          await operator.submitPeriodForReward(1, p[1], '0x02', { from: bob }).should.be.fulfilled;
+          await operator.submitPeriod(1, p[1], '0x02', { from: bob }).should.be.fulfilled;
           p[2] = await bridge.tipHash();
         });
       });

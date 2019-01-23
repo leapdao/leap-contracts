@@ -83,6 +83,7 @@ contract('TxLib', (accounts) => {
   const color = 1337;
   const nftTokenId = '3378025004445879814397';
   const nftColor = 32769;
+  const slotId = 4;
 
   describe('Parser', () => {
     let txLib;
@@ -98,6 +99,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(deposit);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(deposit);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -109,6 +111,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(deposit);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(deposit);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -128,6 +131,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(transfer);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -146,6 +150,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(transfer);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -164,6 +169,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(transfer);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -179,6 +185,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(transfer);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(transfer);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -198,6 +205,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(consolidate);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(consolidate);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
@@ -213,6 +221,7 @@ contract('TxLib', (accounts) => {
         const block = new Block(32);
         block.addTx(consolidate);
         const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
         const proof = period.proof(consolidate);
         await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
       });
@@ -233,6 +242,7 @@ contract('TxLib', (accounts) => {
         blocks.push(block);
       }
       const period = new Period(alicePriv, blocks);
+      period.setValidatorData(slotId, alice);
       const proof = period.proof(Tx.deposit(12, value, bob, color));
       await txLib.validateProof(proof).should.be.fulfilled;
     });
@@ -245,6 +255,7 @@ contract('TxLib', (accounts) => {
         blocks.push(block);
       }
       const period = new Period(alicePriv, blocks);
+      period.setValidatorData(slotId, alice);
       const proof = period.proof(Tx.deposit(12, value, bob, color));
       await txLib.validateProof(proof).should.be.fulfilled;
     });
