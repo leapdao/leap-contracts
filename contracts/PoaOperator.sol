@@ -139,7 +139,7 @@ contract PoaOperator is Adminable {
     }
   }
 
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
+  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender, "not submitted by signerAddr");
@@ -149,31 +149,36 @@ contract PoaOperator is Adminable {
       require(lastCompleteEpoch + 2 < slot.activationEpoch, "slot not active");
     }
 
-    uint256 newHeight = bridge.submitPeriod(_prevHash, _root);
-    // check if epoch completed
-    if (newHeight >= lastEpochBlockHeight + epochLength) {
-      lastCompleteEpoch++;
-      lastEpochBlockHeight = newHeight;
-      emit Epoch(lastCompleteEpoch);
+    // validator root
+    bytes32 hashRoot = bytes32(_slotId << 160 | uint160(msg.sender));
+    assembly {
+      mstore(0, hashRoot)
+      mstore(0x20, 0x0000000000000000000000000000000000000000)
+      hashRoot := keccak256(0, 0x40)
     }
-  }
+    // cas root
+    assembly {
+      mstore(0, 0x0000000000000000000000000000000000000000)
+      mstore(0x20, hashRoot)
+      hashRoot := keccak256(0, 0x40)
+    }
 
-  function submitPeriodForReward(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
-    require(_slotId < epochLength, "Incorrect slotId");
-    Slot storage slot = slots[_slotId];
-    require(slot.signer == msg.sender, "not submitted by signerAddr");
-    // This is here so that I can submit in the same epoch I auction/logout but not after
-    if (slot.activationEpoch > 0) {
-      // if slot not active, prevent submission
-      require(lastCompleteEpoch + 2 < slot.activationEpoch, "slot not active");
-    }
-    bytes32 periodRood = bytes32(_slotId << 160 | uint160(msg.sender));
+    // consensus root
+    bytes32 consensusRoot;
     assembly {
       mstore(0, _blocksRoot)
-      mstore(0x20, periodRood)
-      periodRood := keccak256(0, 0x40)
+      mstore(0x20, 0x0000000000000000000000000000000000000000)
+      consensusRoot := keccak256(0, 0x40)
     }
-    uint256 newHeight = bridge.submitPeriod(_prevHash, periodRood);
+
+    // period root
+    assembly {
+      mstore(0, consensusRoot)
+      mstore(0x20, hashRoot)
+      hashRoot := keccak256(0, 0x40)
+    }
+
+    uint256 newHeight = bridge.submitPeriod(_prevHash, hashRoot);
     // check if epoch completed
     if (newHeight >= lastEpochBlockHeight + epochLength) {
       lastCompleteEpoch++;
