@@ -44,7 +44,7 @@
     "ethereumjs-util": "^6.0.0",
     "ganache-cli": "^6.2.3",
     "husky": "^1.2.0",
-    "leap-core": "^0.19.4",
+    "leap-core": "^0.20.5",
     "solium": "^1.1.8",
     "truffle": "^5.0.0"
   },

@@ -112,6 +112,7 @@ contract FastExitHandler is ExitHandler {
     bytes32 r = signedData[2];
     bytes32 s = signedData[3];
     uint8 v = uint8(uint256(signedData[4]));
+    // solium-disable-next-line
     bytes32 sigHash = keccak256(abi.encodePacked(
       "\x19Ethereum Signed Message:\n", 
       uint2str(64),
