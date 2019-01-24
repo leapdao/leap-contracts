@@ -13,8 +13,8 @@ export default async (txs, bridge, opts) => {
 
   let { slotId } = opts;
   let { signerAddr } = opts;
-  slotId = (slotId) ? slotId : 0;
-  signerAddr = (signerAddr) ? signerAddr : '0x0000000000000000000000000000000000000000';
+  slotId = (slotId) || 0;
+  signerAddr = (signerAddr) || '0x0000000000000000000000000000000000000000';
   period.setValidatorData(slotId, signerAddr);
   const newPeriodRoot = period.proof(txs[0])[0];
 
