@@ -7,7 +7,8 @@
  */
 
 import ethUtil from 'ethereumjs-util';
-import EVMRevert from './helpers/EVMRevert';
+import { Tx } from 'leap-core';
+import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 
 require('./helpers/setup');
 
@@ -20,8 +21,7 @@ const SwapExchange = artifacts.require('SwapExchange');
 const NativeToken = artifacts.require('NativeToken');
 const MinGov = artifacts.require('./MinGov.sol');
 
-const txRoot1 = '0x0101010101010101010101010101010101010101010101010101010101010101';
-const txRoot2 = '0x0202020202020202020202020202020202020202020202020202020202020202';
+const empty   = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 const merkelize = (hash1, hash2) => {
   const buffer = Buffer.alloc(64, 0);
@@ -31,7 +31,9 @@ const merkelize = (hash1, hash2) => {
 };
 
 contract('SwapRegistry', (accounts) => {
+  const alice = accounts[0];
   const bob = accounts[1];
+  const depositTx = Tx.deposit(1, 34567890, alice);
 
   const deployToken = async () => NativeToken.new("Token", "TOK", 18);
 
@@ -80,18 +82,21 @@ contract('SwapRegistry', (accounts) => {
       await nativeToken.addMinter(swapRegistry.address);
     });
 
+    const submitNewPeriod = (txs, slotId, signerAddr) => submitNewPeriodWithTx(txs, bridge, {
+      from: bob, slotId, signerAddr
+    });
+
     describe('Period claim', async () => {
 
       it('should receive inflation cap if less than 50% staked', async () => {
-        const prevPeriodHash = await bridge.tipHash();
-        const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
-        const newPeriodHash = merkelize(txRoot1, oracleRoot);
-        await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: bob}).should.be.fulfilled;
+        const period = await submitNewPeriod([depositTx], 3, bob);
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
 
-        await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.fulfilled;
+        const consensusRoot = merkelize(period.merkleRoot(), empty);
+        const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        await swapRegistry.claim(3, [consensusRoot], [empty], [validatorData], [empty], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
@@ -100,21 +105,20 @@ contract('SwapRegistry', (accounts) => {
         assert(taxBalBefore.add(reward.div(new BN(1 / taxRate))).eq(taxBalAfter));
         assert(bobBalAfter.eq(bobBalBefore.add(reward.sub(reward.div(new BN(1 / taxRate))))));
 
-        await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.rejectedWith(EVMRevert);
+        await swapRegistry.claim(3, [consensusRoot], [empty], [validatorData], [empty], {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('should receive no reward if all staked', async () => {
         await nativeToken.transfer(bob, initialTotalSupply);
 
-        const prevPeriodHash = await bridge.tipHash();
-        const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
-        const newPeriodHash = merkelize(txRoot1, oracleRoot);
-        await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: bob}).should.be.fulfilled;
+        const period = await submitNewPeriod([depositTx], 3, bob);
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
 
-        await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.fulfilled;
+        const consensusRoot = merkelize(period.merkleRoot(), empty);
+        const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        await swapRegistry.claim(3, [consensusRoot], [empty], [validatorData], [empty], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
@@ -127,16 +131,15 @@ contract('SwapRegistry', (accounts) => {
         const val = initialTotalSupply.div(new BN(4)).mul(new BN(3));
         await nativeToken.transfer(bob, val);
 
-        const prevPeriodHash = await bridge.tipHash();
-        const oracleRoot = `0x000000000000000000000003${bob.replace('0x', '')}`;
-        const newPeriodHash = merkelize(txRoot1, oracleRoot);
-        await bridge.submitPeriod(prevPeriodHash, newPeriodHash, {from: bob}).should.be.fulfilled;
+        const period = await submitNewPeriod([depositTx], 3, bob);
 
         const bobBalBefore = await nativeToken.balanceOf(bob);
         const taxBalBefore = await nativeToken.balanceOf(accounts[2]);
         const staked = bobBalBefore;
 
-        await swapRegistry.claim(3, [txRoot1, oracleRoot], {from: bob}).should.be.fulfilled;
+        const consensusRoot = merkelize(period.merkleRoot(), empty);
+        const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        await swapRegistry.claim(3, [consensusRoot], [empty], [validatorData], [empty], {from: bob}).should.be.fulfilled;
 
         const bobBalAfter = await nativeToken.balanceOf(bob);
         const taxBalAfter = await nativeToken.balanceOf(accounts[2]);
@@ -148,16 +151,14 @@ contract('SwapRegistry', (accounts) => {
       });
 
       it('should allow to claim multiple at once', async () => {
-        const periodHash0 = await bridge.tipHash();
-        const oracleRoot1 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-        const periodHash1 = merkelize(txRoot1, oracleRoot1);
-        const oracleRoot2 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-        const periodHash2 = merkelize(txRoot2, oracleRoot2);
+        const period1 = await submitNewPeriod([depositTx], 3, bob);
+        const depositTx2 = Tx.deposit(2, 34567890, alice);
+        const period2 = await submitNewPeriod([depositTx2], 3, bob);
 
-        await bridge.submitPeriod(periodHash0, periodHash1, {from: bob}).should.be.fulfilled;
-        await bridge.submitPeriod(periodHash1, periodHash2, {from: bob}).should.be.fulfilled;
-
-        await swapRegistry.claim(3, [txRoot1, oracleRoot1, txRoot2, oracleRoot2], {from: bob}).should.be.fulfilled;
+        const consensusRoot1 = merkelize(period1.merkleRoot(), empty);
+        const consensusRoot2 = merkelize(period2.merkleRoot(), empty);
+        const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+        await swapRegistry.claim(3, [consensusRoot1, consensusRoot2], [empty, empty], [validatorData, validatorData], [empty, empty], {from: bob}).should.be.fulfilled;
       });
     });
 
@@ -206,22 +207,24 @@ contract('SwapRegistry', (accounts) => {
 
     });
 
-    it('at start', async () => {
+    const submitNewPeriod = (txs, slotId, signerAddr) => submitNewPeriodWithTx(txs, bridge, {
+      from: bob, slotId, signerAddr
+    });
+
+    it('at start totalSupply should be 0', async () => {
       const total = await nativeToken.totalSupply();
       assert.equal(total.toNumber(), 0);
     });
 
-    it('after 6 month', async () => {
-      const periodHash0 = await bridge.tipHash();
-      const oracleRoot1 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-      const periodHash1 = merkelize(txRoot1, oracleRoot1);
-      const oracleRoot2 = `0x000000000000000000000003${bob.replace('0x', '')}`;
-      const periodHash2 = merkelize(txRoot2, oracleRoot2);
+    it('after 6 month total supply should be half of target and tax withdrawable', async () => {
+      const period1 = await submitNewPeriod([depositTx], 3, bob);
+      const depositTx2 = Tx.deposit(2, 34567890, alice);
+      const period2 = await submitNewPeriod([depositTx2], 3, bob);
 
-      await bridge.submitPeriod(periodHash0, periodHash1, {from: bob}).should.be.fulfilled;
-      await bridge.submitPeriod(periodHash1, periodHash2, {from: bob}).should.be.fulfilled;
-
-      await swapRegistry.claim(3, [txRoot1, oracleRoot1, txRoot2, oracleRoot2], {from: bob}).should.be.fulfilled;
+      const consensusRoot1 = merkelize(period1.merkleRoot(), empty);
+      const consensusRoot2 = merkelize(period2.merkleRoot(), empty);
+      const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+      await swapRegistry.claim(3, [consensusRoot1, consensusRoot2], [empty, empty], [validatorData, validatorData], [empty, empty], {from: bob}).should.be.fulfilled;
 
       const total = await nativeToken.totalSupply();
       assert.equal(total, web3.utils.toWei('7000000', 'ether'));

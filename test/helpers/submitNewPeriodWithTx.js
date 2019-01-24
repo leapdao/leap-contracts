@@ -10,7 +10,15 @@ export default async (txs, bridge, opts) => {
   // create new period
   const prevPeriodRoot = await bridge.tipHash();
   const period = new Period(prevPeriodRoot, [block]);
-  period.setValidatorData(0, '0x0000000000000000000000000000000000000000');
+  let slotId = 0;
+  let signerAddr = '0x0000000000000000000000000000000000000000';
+  if (opts.slotId) {
+    { slotId } = opts;
+  }
+  if (opts.signerAddr) {
+    { signerAddr } = opts;
+  }
+  period.setValidatorData(slotId, signerAddr);
   const newPeriodRoot = period.proof(txs[0])[0];
 
   await bridge.submitPeriod(prevPeriodRoot, newPeriodRoot, opts).should.be.fulfilled;
