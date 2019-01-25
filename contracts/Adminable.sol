@@ -8,7 +8,7 @@
 
 pragma solidity 0.5.2;
 
-import "../node_modules/zos-lib/contracts/Initializable.sol";
+import "./zos/Initializable.sol";
 
 /**
  * @title Adminable

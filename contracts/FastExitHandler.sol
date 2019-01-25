@@ -112,12 +112,34 @@ contract FastExitHandler is ExitHandler {
     bytes32 r = signedData[2];
     bytes32 s = signedData[3];
     uint8 v = uint8(uint256(signedData[4]));
-    bytes32 sigHash = signedData[1];
-    assembly {
-      mstore(0, utxoId)
-      mstore(0x20, sigHash)
-      sigHash := keccak256(0, 0x40)
-    }
+    // solium-disable-next-line
+    bytes32 sigHash = keccak256(abi.encodePacked(
+      "\x19Ethereum Signed Message:\n", 
+      uint2str(64),
+      utxoId, 
+      buyPrice
+    ));
     signer = ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow
+  }
+
+  // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
+  // solium-disable-next-line security/no-assign-params
+  function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+    if (_i == 0) {
+      return "0";
+    }
+    uint j = _i;
+    uint len;
+    while (j != 0) {
+      len++;
+      j /= 10;
+    }
+    bytes memory bstr = new bytes(len);
+    uint k = len - 1;
+    while (_i != 0) {
+      bstr[k--] = byte(uint8(48 + _i % 10));
+      _i /= 10;
+    }
+    return string(bstr);
   }
 }

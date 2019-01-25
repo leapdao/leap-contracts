@@ -44,7 +44,7 @@
     "ethereumjs-util": "^6.0.0",
     "ganache-cli": "^6.2.3",
     "husky": "^1.2.0",
-    "leap-core": "^0.19.4",
+    "leap-core": "^0.21.1",
     "solium": "^1.1.8",
     "truffle": "^5.0.0"
   },
@@ -54,7 +54,6 @@
     "openzeppelin-solidity": "=2.1.1",
     "pify": "^4.0.1",
     "scrypt": "^6.0.3",
-    "truffle-hdwallet-provider": "1.0.2",
-    "zos-lib": "^2.1.0"
+    "truffle-hdwallet-provider": "1.0.2"
   }
 }
