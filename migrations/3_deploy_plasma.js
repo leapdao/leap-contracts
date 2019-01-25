@@ -6,7 +6,7 @@ const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const NativeToken = artifacts.require('NativeToken');
 const PoaOperator = artifacts.require('PoaOperator');
-const ExitHandler = artifacts.require('ExitHandler');
+const ExitHandler = artifacts.require('FastExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
@@ -23,11 +23,18 @@ module.exports = (deployer, network, accounts) => {
 
   const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
+  const deployedToken = process.env.DEPLOYED_TOKEN;
 
   let data;
 
   deployer.then(async () => {
-    const nativeToken = await NativeToken.deployed();
+    let nativeToken;
+    if(deployedToken) {
+      nativeToken = await NativeToken.at(deployedToken);
+      log('  ♻️♻️  found token in environment');
+    } else {
+      nativeToken = await NativeToken.deployed();  
+    }
     log('  ♻️  Reusing existing Native Token:', nativeToken.address);
 
     const bridgeCont = await deployer.deploy(Bridge);
