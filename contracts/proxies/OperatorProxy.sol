@@ -9,16 +9,16 @@
 pragma solidity 0.5.2;
 
 import "./AdminableProxy.sol";
-import "../POSoperator.sol";
+import "../PosOperator.sol";
 
 /**
  * @title OperatorProxy
- * @dev Proxy for POSoperator/PoaOperator contract upgradeability. Should be used to 
- * communicate with POSoperator/PoaOperator contract
+ * @dev Proxy for PosOperator/PoaOperator contract upgradeability. Should be used to 
+ * communicate with PosOperator/PoaOperator contract
  */
 contract OperatorProxy is AdminableProxy {
 
-  constructor(POSoperator _implementation, bytes memory _data) 
+  constructor(PosOperator _implementation, bytes memory _data) 
     AdminableProxy(address(_implementation), _data) public payable {
   }
 

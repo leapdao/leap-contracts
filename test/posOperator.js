@@ -11,7 +11,7 @@ import EVMRevert from './helpers/EVMRevert';
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SimpleToken = artifacts.require('SimpleToken');
-const POSoperator = artifacts.require('POSoperator');
+const PosOperator = artifacts.require('PosOperator');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('PosOperator', (accounts) => {
@@ -39,10 +39,10 @@ contract('PosOperator', (accounts) => {
       const proxyVault = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[3]});
       vault = await Vault.at(proxyVault.address);
 
-      const opCont = await POSoperator.new();
+      const opCont = await PosOperator.new();
       data = await opCont.contract.methods.initialize(bridge.address, vault.address, epochLength).encodeABI();
       const proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
-      operator = await POSoperator.at(proxyPos.address);
+      operator = await PosOperator.at(proxyPos.address);
 
       data = await bridge.contract.methods.setOperator(operator.address).encodeABI();
       await proxyBridge.applyProposal(data, {from: accounts[3]});

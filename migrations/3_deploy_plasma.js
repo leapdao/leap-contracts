@@ -45,7 +45,7 @@ module.exports = (deployer, network, accounts) => {
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(PoaOperator);
-    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
+    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);

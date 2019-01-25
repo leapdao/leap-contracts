@@ -9,6 +9,7 @@
 pragma solidity 0.5.2;
 
 import "./Adminable.sol";
+import "./Vault.sol";
 import "./Bridge.sol";
 
 contract PoaOperator is Adminable {
@@ -49,13 +50,18 @@ contract PoaOperator is Adminable {
 
   struct Slot {
     uint32 eventCounter;
+    address owner;
+    uint64 stake;
     address signer;
     bytes32 tendermint;
     uint32 activationEpoch;
+    address newOwner;
+    uint64 newStake;
     address newSigner;
     bytes32 newTendermint;
   }
 
+  Vault public vault;
   Bridge public bridge;
 
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -64,7 +70,9 @@ contract PoaOperator is Adminable {
 
   mapping(uint256 => Slot) public slots;
 
-  function initialize(Bridge _bridge, uint256 _epochLength) public initializer {
+
+  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
+    vault = _vault;
     bridge = _bridge;
     epochLength = _epochLength;
     emit EpochLength(epochLength);
@@ -81,6 +89,7 @@ contract PoaOperator is Adminable {
 
     // taking empty slot
     if (slot.signer == address(0)) {
+      slot.owner = _signerAddr;
       slot.signer = _signerAddr;
       slot.tendermint = _tenderAddr;
       slot.activationEpoch = 0;
@@ -122,6 +131,7 @@ contract PoaOperator is Adminable {
         lastCompleteEpoch + 1
       );
     }
+    slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
     slot.tendermint = slot.newTendermint;
     slot.activationEpoch = 0;
@@ -150,7 +160,7 @@ contract PoaOperator is Adminable {
     }
 
     // validator root
-    bytes32 hashRoot = bytes32(_slotId << 160 | uint160(msg.sender));
+    bytes32 hashRoot = bytes32(_slotId << 160 | uint160(slot.owner));
     assembly {
       mstore(0, hashRoot)
       mstore(0x20, 0x0000000000000000000000000000000000000000)

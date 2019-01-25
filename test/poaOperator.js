@@ -35,7 +35,7 @@ contract('PoaOperator', (accounts) => {
       bridge = await Bridge.at(proxyBridge.address);
 
       const opCont = await PoaOperator.new();
-      data = await opCont.contract.methods.initialize(bridge.address, epochLength).encodeABI();
+      data = await opCont.contract.methods.initialize(bridge.address, bridge.address, epochLength).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data,  {from: admin});
       operator = await PoaOperator.at(proxy.address);
 
