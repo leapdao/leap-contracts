@@ -8,6 +8,7 @@
 
 import utils from "ethereumjs-util";
 import BN from 'bn.js';
+import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
 import EVMRevert from './helpers/EVMRevert';
@@ -18,8 +19,9 @@ const EMPTY =  '0x00000000000000000000000000000000000000000000000000000000000000
 chai.use(require('chai-as-promised')).should();
 
 function toInt(str) {
-  const buf = Buffer.from(str.replace('0x', ''), 'hex');
-  return new BN(buf);
+  // const buf = Buffer.from(str.replace('0x', ''), 'hex');
+  // return new BN(buf);
+  return BigInt(str);
 }
 
 function toAddr(str) {
@@ -56,7 +58,7 @@ function checkParse(rsp, txn) {
   }
   // outputs
   for (let i = 0; i < txn.outputs.length; i++) {
-    assert.equal(toInt(rsp[1][2 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].value);
+    assert(equal(toInt(rsp[1][2 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].value));
     assert.equal(toInt(rsp[1][3 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].color);
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
     if (txn.type === Type.COMP_RSP && i === 0) {
