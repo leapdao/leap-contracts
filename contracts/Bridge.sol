@@ -75,7 +75,7 @@ contract Bridge is Adminable {
   public onlyOperator returns (uint256 newHeight) {
 
     require(periods[_prevHash].parent > 0, "Parent node should exist");
-    require(periods[_root].height == 0, "Given root shouldn't be submitted yet");
+    require(periods[_root].height == 0, "Trying to submit the same root twice");
 
     // calculate height
     newHeight = periods[_prevHash].height + 1;

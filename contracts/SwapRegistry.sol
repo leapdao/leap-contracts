@@ -45,14 +45,39 @@ contract SwapRegistry is Adminable {
     poaReward = _poaReward;
   }
 
-  function claim(uint256 _slotId, bytes32[] memory _roots) public {
+  function claim(
+    uint256 _slotId,
+    bytes32[] memory _consensusRoots,
+    bytes32[] memory _cas,
+    bytes32[] memory _validatorData,
+    bytes32[] memory _rest
+  ) public {
     uint256 maxHeight = slotToHeight[_slotId];
     uint32 claimCount = 0;
-    for (uint256 i = 0; i < _roots.length; i += 2) {
-      require(_slotId == uint256(_roots[i+1] >> 160), "unexpected slotId");
-      require(msg.sender == address(uint160(uint256(_roots[i+1]))), "unexpected claimant");
+    for (uint256 i = 0; i < _consensusRoots.length; i += 1) {
+      require(_slotId == uint256(_validatorData[i] >> 160), "unexpected slotId");
+      require(msg.sender == address(uint160(uint256(_validatorData[i]))), "unexpected claimant");
       uint256 height;
-      (,height ,,) = bridge.periods(keccak256(abi.encodePacked(_roots[i], _roots[i + 1])));
+      bytes32 left = _validatorData[i];
+      bytes32 right = _rest[i];
+      assembly {
+        mstore(0, left)
+        mstore(0x20, right)
+        right := keccak256(0, 0x40)
+      }
+      left = _cas[i];
+      assembly {
+        mstore(0, left)
+        mstore(0x20, right)
+        right := keccak256(0, 0x40)
+      }
+      left = _consensusRoots[i];
+      assembly {
+        mstore(0, left)
+        mstore(0x20, right)
+        right := keccak256(0, 0x40)
+      }
+      (,height ,,) = bridge.periods(right);
       require(height > maxHeight, "unorderly claim");
       maxHeight = height;
       claimCount += 1;

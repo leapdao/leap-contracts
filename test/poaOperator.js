@@ -6,6 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+import { Period, Block, Tx } from 'leap-core';
 import EVMRevert from './helpers/EVMRevert';
 
 require('./helpers/setup');
@@ -25,6 +26,7 @@ contract('PoaOperator', (accounts) => {
     let proxy;
     const parentBlockInterval = 0;
     const epochLength = 3;
+    const p = [];
 
     before(async () => {
       const bridgeCont = await Bridge.new();
@@ -33,36 +35,42 @@ contract('PoaOperator', (accounts) => {
       bridge = await Bridge.at(proxyBridge.address);
 
       const opCont = await PoaOperator.new();
-      data = await opCont.contract.methods.initialize(bridge.address, epochLength).encodeABI();
+      data = await opCont.contract.methods.initialize(bridge.address, bridge.address, epochLength).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data,  {from: admin});
       operator = await PoaOperator.at(proxy.address);
 
       data = await bridge.contract.methods.setOperator(operator.address).encodeABI();
       await proxyBridge.applyProposal(data, {from: admin});
+      p[0] = await bridge.tipHash();
     });
-
-    describe('Slot', () => {
-      const p = [];
-      before(async () => {
-        p[0] = await bridge.tipHash();
+      
+    describe('Slot Management', () => {
+      it('should prevent submission by empty slot', async () => {
+        await operator.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
       });
-      describe('Auction', () => {
-        it('should prevent submission by empty slot', async () => {
-          await operator.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
-        });
 
-        it('should allow to set slot and submit block', async () => {
-          const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
-          await proxy.applyProposal(data, {from: admin});
-          await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
-          p[1] = await bridge.tipHash();
-        });
-        it('should allow to set slot and submit block with reward', async () => {
-          const data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
-          await proxy.applyProposal(data, {from: admin});
-          await operator.submitPeriodForReward(1, p[1], '0x02', { from: bob }).should.be.fulfilled;
-          p[2] = await bridge.tipHash();
-        });
+      it('should allow to set slot and submit block', async () => {
+        const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
+        p[1] = await bridge.tipHash();
+      });
+
+      it('period proof should match contract', async () => {
+        const data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+
+        const block = new Block(33);
+        const depositTx = Tx.deposit(0, 1000, alice);
+        block.addTx(depositTx);
+        const prevPeriodRoot = await bridge.tipHash();
+        const period = new Period(prevPeriodRoot, [block]);
+        period.setValidatorData(1, bob);
+        const proof = period.proof(depositTx);
+
+        await operator.submitPeriod(1, p[1], period.merkleRoot(), { from: bob }).should.be.fulfilled;
+        p[2] = await bridge.tipHash();
+        assert.equal(p[2], proof[0]);
       });
     });
   });

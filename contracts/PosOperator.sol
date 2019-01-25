@@ -9,80 +9,10 @@
 pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "./Adminable.sol";
-import "./Vault.sol";
-import "./Bridge.sol";
+import "./PoaOperator.sol";
 
-contract POSoperator is Adminable {
+contract PosOperator is PoaOperator {
   using SafeMath for uint256;
-
-  event Epoch(uint256 epoch);
-  event EpochLength(uint256 epochLength);
-
-  event ValidatorJoin(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 eventCounter,
-    uint256 epoch
-  );
-
-  event ValidatorLogout(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    address newSigner,
-    uint256 eventCounter,
-    uint256 epoch
-  );
-
-  event ValidatorLeave(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 epoch
-  );
-
-  event ValidatorUpdate(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 eventCounter
-  );
-
-  struct Slot {
-    uint32 eventCounter;
-    address owner;
-    uint64 stake;
-    address signer;
-    bytes32 tendermint;
-    uint32 activationEpoch;
-    address newOwner;
-    uint64 newStake;
-    address newSigner;
-    bytes32 newTendermint;
-  }
-
-  Vault public vault;
-  Bridge public bridge;
-
-  uint256 public epochLength; // length of epoch in periods (32 blocks)
-  uint256 public lastCompleteEpoch; // height at which last epoch was completed
-  uint256 public lastEpochBlockHeight;
-
-  mapping(uint256 => Slot) public slots;
-
-  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
-    vault = _vault;
-    bridge = _bridge;
-    epochLength = _epochLength;
-    emit EpochLength(epochLength);
-  }
-
-  function setEpochLength(uint256 _epochLength) public ifAdmin {
-    epochLength = _epochLength;
-    emit EpochLength(epochLength);
-  }
 
   // solium-disable security/no-tx-origin
   // TODO: consider not to use tx.origin
@@ -197,25 +127,6 @@ contract POSoperator is Adminable {
         slot.eventCounter,
         lastCompleteEpoch + 1
       );
-    }
-  }
-
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _root) public {
-    require(_slotId < epochLength, "Incorrect slotId");
-    Slot storage slot = slots[_slotId];
-    require(slot.signer == msg.sender);
-    // This is here so that I can submit in the same epoch I auction/logout but not after
-    if (slot.activationEpoch > 0) {
-      // if slot not active, prevent submission
-      require(lastCompleteEpoch.add(2) < slot.activationEpoch);
-    }
-
-    uint256 newHeight = bridge.submitPeriod(_prevHash, _root);
-    // check if epoch completed
-    if (newHeight >= lastEpochBlockHeight.add(epochLength)) {
-      lastCompleteEpoch++;
-      lastEpochBlockHeight = newHeight;
-      emit Epoch(lastCompleteEpoch);
     }
   }
 }
