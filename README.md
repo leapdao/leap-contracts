@@ -19,8 +19,8 @@ Contract may be customized via ENV variables:
 | ENV variable | Description | Default value |
 | ------- | ----------- | ------------- |
 | PROPOSAL_TIME | Governance proposal cool-off time (in seconds) | `1209600` (14 days) |
-|EXIT_STAKE| Exit stake (in LEAP cents) |0|
-|EXIT_DURATION| Exit duration (in seconds) |`1209600` (14 days)|
+|EXIT_STAKE| Exit stake (in WEI) |0|
+|EXIT_DURATION| Exit duration (in seconds) |`604800` (5 days)|
 
 E.g. `PROPOSAL_TIME=600 EXIT_DURATION=180 yarn deploy` deploys plasma contract with 3 minutes exit duration governed by MinGov with 10 minutes proposal time.
 
