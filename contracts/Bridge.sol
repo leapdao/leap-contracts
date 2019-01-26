@@ -23,11 +23,8 @@ contract Bridge is Adminable {
   event NewOperator(address operator);
 
   struct Period {
-    bytes32 parent; // the id of the parent node
     uint32 height;  // the height of last block in period
-    uint32 parentIndex; //  the position of this node in the Parent's children list
     uint32 timestamp;
-    bytes32[] children; // unordered list of children below this node
   }
 
   bytes32 constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
@@ -43,14 +40,11 @@ contract Bridge is Adminable {
   function initialize(uint256 _parentBlockInterval) public initializer {
     // init genesis preiod
     Period memory genesisPeriod = Period({
-      parent: GENESIS,
       height: 1,
-      timestamp: uint32(block.timestamp),
-      parentIndex: 0,
-      children: new bytes32[](0)
+      timestamp: uint32(block.timestamp)
     });
     tipHash = GENESIS;
-    periods[tipHash] = genesisPeriod;
+    periods[GENESIS] = genesisPeriod;
     genesisBlockNumber = block.number;
     parentBlockInterval = _parentBlockInterval;
     operator = msg.sender;
@@ -74,8 +68,8 @@ contract Bridge is Adminable {
     bytes32 _root) 
   public onlyOperator returns (uint256 newHeight) {
 
-    require(periods[_prevHash].parent > 0, "Parent node should exist");
-    require(periods[_root].height == 0, "Trying to submit the same root twice");
+    require(periods[_prevHash].timestamp > 0, "Parent node should exist");
+    require(periods[_root].timestamp == 0, "Trying to submit the same root twice");
 
     // calculate height
     newHeight = periods[_prevHash].height + 1;
@@ -92,11 +86,8 @@ contract Bridge is Adminable {
     }
     // store the period
     Period memory newPeriod = Period({
-      parent: _prevHash,
       height: uint32(newHeight),
-      timestamp: uint32(block.timestamp),
-      parentIndex: uint32(periods[_prevHash].children.push(_root) - 1),
-      children: new bytes32[](0)
+      timestamp: uint32(block.timestamp)
     });
     periods[_root] = newPeriod;
   }

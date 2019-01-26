@@ -46,7 +46,7 @@ contract DepositHandler is Vault {
 
     bytes32 tipHash = bridge.tipHash();
     uint256 timestamp;
-    (,,, timestamp) = bridge.periods(tipHash);
+    (, timestamp) = bridge.periods(tipHash);
 
     depositCount++;
     deposits[depositCount] = Deposit({
