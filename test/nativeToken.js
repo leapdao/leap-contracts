@@ -9,8 +9,13 @@ const NativeToken = artifacts.require('NativeToken');
 
 contract('NativeToken', (accounts) => {
 
+  let token;
+
+  before(async () => {
+    token = await NativeToken.new('SIM', 'sim', 18);
+  });
+
   it('is mintable', async () => {
-    const token = await NativeToken.deployed();
     assert.equal(await token.balanceOf(accounts[0]), 0);
     
     await token.mint(accounts[0], 200);
@@ -19,7 +24,6 @@ contract('NativeToken', (accounts) => {
   });
 
   it('is burnable', async () => {
-    const token = await NativeToken.deployed();
     const balance = await token.balanceOf(accounts[0]);
 
     await token.burn(100);
