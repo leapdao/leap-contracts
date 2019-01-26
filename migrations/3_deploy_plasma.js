@@ -7,7 +7,9 @@ const Vault = artifacts.require('Vault');
 const NativeToken = artifacts.require('NativeToken');
 const PoaOperator = artifacts.require('PoaOperator');
 const ExitHandler = artifacts.require('FastExitHandler');
+const SwapRegistry = artifacts.require('SwapRegistry');
 const PriorityQueue = artifacts.require('PriorityQueue');
+const AdminableProxy = artifacts.require('AdminableProxy');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
@@ -16,6 +18,7 @@ const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 const DEFAULT_EXIT_DURATION = duration.days(7);
 const DEFAULT_EXIT_STAKE = 100000000000000000;
 const DEFAULT_EPOCH_LENGTH = 4;
+const DEFAULT_TAX_RATE = 50;  // 5%
 const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
 
 module.exports = (deployer, network, accounts) => {
@@ -25,6 +28,8 @@ module.exports = (deployer, network, accounts) => {
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
   const epochLength = process.env.EPOCH_LENGTH || DEFAULT_EPOCH_LENGTH;
   const deployedToken = process.env.DEPLOYED_TOKEN;
+  const taxRate = process.env.TAX_RATE;
+  const poaReward = process.env.POA_REWARD || 0;
 
   let data;
 
@@ -55,6 +60,22 @@ module.exports = (deployer, network, accounts) => {
     const operatorCont = await deployer.deploy(PoaOperator);
     data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
+
+    const registryCont = await deployer.deploy(SwapRegistry);
+    data = await registryCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, poaReward).encodeABI();
+    const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin });
+
+    const swapRegistry = await SwapRegistry.at(registryProxy.address);
+    if (taxRate) {
+      data = await swapRegistry.contract.methods.setTaxRate(taxRate).encodeABI();
+      await bridgeProxy.applyProposal(data, {from: admin});
+    }
+
+    const isMinter = await nativeToken.isMinter(accounts[0]);
+    // if we got the right, then add registry as minter
+    if (isMinter) {
+      await nativeToken.addMinter(swapRegistry.address);
+    }
 
     const bridge = await Bridge.at(bridgeProxy.address);
     data = await bridge.contract.methods.setOperator(operatorProxy.address).encodeABI();

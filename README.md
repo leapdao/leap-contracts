@@ -19,8 +19,14 @@ Contract may be customized via ENV variables:
 | ENV variable | Description | Default value |
 | ------- | ----------- | ------------- |
 | PROPOSAL_TIME | Governance proposal cool-off time (in seconds) | `1209600` (14 days) |
-|EXIT_STAKE| Exit stake (in Wei) |0|
-|EXIT_DURATION| Exit duration (in seconds) |`604800` (7 days)|
+| EXIT_STAKE | Exit stake (in Wei) |100000000000000000|
+| EXIT_DURATION | Exit duration (in seconds) |`604800` (7 days)|
+| DEPLOYED_TOKEN | Token to be configured in vault | |
+| EPOCH_LENGTH | Number of initial slots for validators | 2 |
+| PARENT_BLOCK_INTERVAL | Number of Ethereum blocks between Plasma periods | 2 |
+| TAX_RATE | Initial tax rate (0 - 1000 equals 0% - 100%) | 50 |
+| POA_REWARD | Reward rate before supply of 7 million reached | 778000000000000000000 |
+
 
 E.g. `PROPOSAL_TIME=600 EXIT_DURATION=180 yarn deploy` deploys plasma contract with 3 minutes exit duration governed by MinGov with 10 minutes proposal time.
 

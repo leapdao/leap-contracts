@@ -9,6 +9,8 @@ const { durationToString, duration } = require('../test/helpers/duration');
 const log = require('./utils/log');
 
 const MinGov = artifacts.require('MinGov');
+const NativeToken = artifacts.require('NativeToken');
+const AdminableProxy = artifacts.require('AdminableProxy');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
@@ -17,10 +19,17 @@ const DEFAULT_PROPOSAL_TIME = duration.days(14);
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
+  const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
+  const ownerAddr = process.env.GOV_OWNER;
+  const deployedToken = process.env.DEPLOYED_TOKEN;
 
   deployer.then(async () => {
-    const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
-    const ownerAddr = process.env.GOV_OWNER;
+    let nativeToken;
+    if(deployedToken) {
+      nativeToken = await NativeToken.at(deployedToken);
+    } else {
+      nativeToken = await NativeToken.deployed();
+    }
 
     log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
     const governance = await deployer.deploy(MinGov, proposalTime);
@@ -37,9 +46,26 @@ module.exports = (deployer, network, accounts) => {
     log('  🔄 Transferring ownership for ExitHandler:', exitHandlerProxy.address);
     await exitHandlerProxy.changeAdmin(governance.address, { from: admin });
 
+    const registryProxy = await AdminableProxy.deployed();
+    log('  🔄 Transferring ownership for SwapRegistry:', registryProxy.address);
+    await registryProxy.changeAdmin(governance.address, { from: admin });
+
+    const isMinter = await nativeToken.isMinter(accounts[0]);
+    if (isMinter) {
+      log('  🔄 Transferring minting right for token:', nativeToken.address);
+      await nativeToken.addMinter(governance.address);
+      await nativeToken.renounceMinter();
+    }
+
     if (ownerAddr) {
       log('  🔄 Transferring ownership for Governance:', ownerAddr);
       await governance.transferOwnership(ownerAddr);
+    }
+
+    const isRegistryMinter = await nativeToken.isMinter(registryProxy.address);
+    if (!isRegistryMinter) {
+      log('  ⚠ Minting rights could not be set on token:', nativeToken.address);
+      log(`  ⚠ Add SwapRegistry (${registryProxy.address}) as minter manually.`);
     }
   });
 };
