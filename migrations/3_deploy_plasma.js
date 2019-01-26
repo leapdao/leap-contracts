@@ -16,7 +16,7 @@ const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
 
 const DEFAULT_EXIT_DURATION = duration.days(7);
-const DEFAULT_EXIT_STAKE = 100000000000000000;
+const DEFAULT_EXIT_STAKE = '0x016345785D8A0000'; // 10^17
 const DEFAULT_EPOCH_LENGTH = 4;
 const DEFAULT_TAX_RATE = 50;  // 5%
 const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
