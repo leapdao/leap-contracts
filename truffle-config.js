@@ -39,8 +39,6 @@ module.exports = {
       provider: () => new HDWalletProvider(
         process.env.RINKEBY_MNEMONIC, 'https://rinkeby.infura.io', 0, 2,
       ),
-      gasPrice: 10000000000, // 10 gwei
-      gas: 5500000,
       network_id: '4'
     },
     ganache: {

@@ -10,8 +10,13 @@ const log = require('./utils/log');
 const NativeToken = artifacts.require('NativeToken');
 
 module.exports = (deployer) => {
+
+  const deployedToken = process.env.DEPLOYED_TOKEN;
+
   deployer.then(async () => {
-    const nativeToken = await deployer.deploy(NativeToken, "LeapToken", "LEAP", 18);
-    log('Deployed LEAP Token at', nativeToken.address);
+  	if (!deployedToken) {
+    	const nativeToken = await deployer.deploy(NativeToken, "LeapToken", "LEAP", 18);
+    	log('Deployed LEAP Token at', nativeToken.address);
+    }
   });
 };

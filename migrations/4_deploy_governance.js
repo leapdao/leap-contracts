@@ -20,6 +20,7 @@ module.exports = (deployer, network, accounts) => {
 
   deployer.then(async () => {
     const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
+    const ownerAddr = process.env.GOV_OWNER;
 
     log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
     const governance = await deployer.deploy(MinGov, proposalTime);
@@ -35,5 +36,10 @@ module.exports = (deployer, network, accounts) => {
     const exitHandlerProxy = await ExitHandlerProxy.deployed();
     log('  🔄 Transferring ownership for ExitHandler:', exitHandlerProxy.address);
     await exitHandlerProxy.changeAdmin(governance.address, { from: admin });
+
+    if (ownerAddr) {
+      log('  🔄 Transferring ownership for Governance:', ownerAddr);
+      await governance.transferOwnership(ownerAddr);
+    }
   });
 };

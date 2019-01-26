@@ -13,16 +13,17 @@ const OperatorProxy = artifacts.require('OperatorProxy');
 const ExitHandlerProxy = artifacts.require('ExitHandlerProxy');
 
 
-const DEFAULT_EXIT_DURATION = duration.days(14);
-const DEFAULT_EXIT_STAKE = 0;
-const DEFAULT_EPOCH_LENGTH = 32;
-const DEFAULT_PARENT_BLOCK_INTERVAL = 0;
+const DEFAULT_EXIT_DURATION = duration.days(7);
+const DEFAULT_EXIT_STAKE = 100000000000000000;
+const DEFAULT_EPOCH_LENGTH = 4;
+const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
 
   const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
+  const epochLength = process.env.EPOCH_LENGTH || DEFAULT_EPOCH_LENGTH;
   const deployedToken = process.env.DEPLOYED_TOKEN;
 
   let data;
@@ -31,11 +32,11 @@ module.exports = (deployer, network, accounts) => {
     let nativeToken;
     if(deployedToken) {
       nativeToken = await NativeToken.at(deployedToken);
-      log('  ♻️♻️  found token in environment');
+      log('  ♻️  Found token in environment:', nativeToken.address);
     } else {
-      nativeToken = await NativeToken.deployed();  
+      nativeToken = await NativeToken.deployed();
+      log('  ♻️  Reusing existing Native Token:', nativeToken.address);
     }
-    log('  ♻️  Reusing existing Native Token:', nativeToken.address);
 
     const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(DEFAULT_PARENT_BLOCK_INTERVAL).encodeABI();
@@ -52,7 +53,7 @@ module.exports = (deployer, network, accounts) => {
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(PoaOperator);
-    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, DEFAULT_EPOCH_LENGTH).encodeABI();
+    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const bridge = await Bridge.at(bridgeProxy.address);
