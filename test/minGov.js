@@ -6,6 +6,7 @@ const Bridge = artifacts.require('BridgeMock');
 const Operator = artifacts.require('OperatorMock');
 const Vault = artifacts.require('VaultMock');
 const AdminableProxy = artifacts.require('AdminableProxy');
+const NativeToken = artifacts.require('NativeToken');
 const MinGov = artifacts.require('MinGov');
 
 chai.use(require('chai-as-promised')).should();
@@ -208,6 +209,20 @@ contract('MinGov', (accounts) => {
     // check value after
     operator = await bridge.operator();
     assert.equal(operator, '0x0000000000000000000000000000000000000000');
+  })
+
+  it('should allow to mint token', async () => {
+    const token = await NativeToken.new("Token", "TOK", 18);
+    await token.addMinter(gov.address);
+    // propose and finalize value change
+    const data = await token.contract.methods.addMinter(accounts[1]).encodeABI();
+    await gov.propose(token.address, data);
+    await gov.finalize();
+
+    // test minting rights
+    await token.mint(accounts[1], 100000);
+    const bal = await token.balanceOf(accounts[1]);
+    assert.equal(bal.toNumber(), 100000);
   })
 
   it('should allow to proxy SetSlot without goverance delay', async () => {
