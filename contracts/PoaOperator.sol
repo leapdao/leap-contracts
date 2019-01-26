@@ -150,7 +150,7 @@ contract PoaOperator is Adminable {
   }
 
   event Submission(
-    bytes32 indexed blockRoot,
+    bytes32 indexed blocksRoot,
     uint256 indexed slotId,
     address owner,
     bytes32 periodRoot

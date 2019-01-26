@@ -27,8 +27,9 @@ module.exports = (deployer, network, accounts) => {
   const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
   const epochLength = process.env.EPOCH_LENGTH || DEFAULT_EPOCH_LENGTH;
+  const parentBlockInterval = process.env.PARENT_BLOCK_INTERVAL || DEFAULT_PARENT_BLOCK_INTERVAL;
   const deployedToken = process.env.DEPLOYED_TOKEN;
-  const taxRate = process.env.TAX_RATE;
+  const taxRate = process.env.TAX_RATE || DEFAULT_TAX_RATE;
   const poaReward = process.env.POA_REWARD || 0;
 
   let data;
@@ -44,7 +45,7 @@ module.exports = (deployer, network, accounts) => {
     }
 
     const bridgeCont = await deployer.deploy(Bridge);
-    data = bridgeCont.contract.methods.initialize(DEFAULT_PARENT_BLOCK_INTERVAL).encodeABI();
+    data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
     const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin });
 
     const pqLib = await deployer.deploy(PriorityQueue);
