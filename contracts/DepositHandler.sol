@@ -19,6 +19,7 @@ contract DepositHandler is Vault {
     uint256 indexed color, 
     uint256 amount
   );
+  event MinGasPrice(uint256 minGasPrice);
 
   struct Deposit {
     uint64 time;
@@ -28,8 +29,14 @@ contract DepositHandler is Vault {
   }
 
   uint32 public depositCount;
+  uint256 public minGasPrice;
 
   mapping(uint32 => Deposit) public deposits;
+
+  function setMinGasPrice(uint256 _minGasPrice) public ifAdmin {
+    minGasPrice = _minGasPrice;
+    emit MinGasPrice(minGasPrice);
+  }
 
    /**
    * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
@@ -42,6 +49,7 @@ contract DepositHandler is Vault {
   function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
     TransferrableToken token = tokens[_color].addr;
     require(address(token) != address(0), "Token color not registered");
+    require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
     token.transferFrom(_owner, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
