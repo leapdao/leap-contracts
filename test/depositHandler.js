@@ -90,8 +90,31 @@ contract('DepositHandler', (accounts) => {
         const color = 1;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
       });
+
+      it('Can not deposit 0 amount', async () => {
+        const amount = 0;
+        const color = 0;
+        await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
+      });
     });
 
+  });
+
+  describe('Governance', () => {
+    let proxy;
+    let depositHandler;
+
+    it('should allow to change exit params', async () => {
+      const vaultCont = await DepositHandler.new();
+      let data = await vaultCont.contract.methods.initialize(accounts[0]).encodeABI();
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
+      depositHandler = await DepositHandler.at(proxy.address);
+
+      // set minGasPrice
+      data = await depositHandler.contract.methods.setMinGasPrice(100).encodeABI();
+      await proxy.applyProposal(data, {from: accounts[2]});
+      assert.equal(await depositHandler.minGasPrice(), 100);
+    });
   });
 
 });

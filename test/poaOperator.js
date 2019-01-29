@@ -75,4 +75,22 @@ contract('PoaOperator', (accounts) => {
     });
   });
 
+
+  describe('Governance', () => {
+    let proxy;
+    let operator;
+
+    it('should allow to change exit params', async () => {
+      const opCont = await PoaOperator.new();
+      let data = await opCont.contract.methods.initialize(accounts[0], accounts[0], 2).encodeABI();
+      proxy = await AdminableProxy.new(opCont.address, data, {from: accounts[2]});
+      operator = await PoaOperator.at(proxy.address);
+
+      // set epochLength
+      data = await operator.contract.methods.setEpochLength(2).encodeABI();
+      await proxy.applyProposal(data, {from: accounts[2]});
+      assert.equal(await operator.epochLength(), 2);
+    });
+  });
+
 });
