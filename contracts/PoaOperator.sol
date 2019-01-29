@@ -149,6 +149,13 @@ contract PoaOperator is Adminable {
     }
   }
 
+  event Submission(
+    bytes32 indexed blocksRoot,
+    uint256 indexed slotId,
+    address owner,
+    bytes32 periodRoot
+  );
+
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
@@ -195,5 +202,6 @@ contract PoaOperator is Adminable {
       lastEpochBlockHeight = newHeight;
       emit Epoch(lastCompleteEpoch);
     }
+    emit Submission(_blocksRoot, _slotId, slot.owner, hashRoot);
   }
 }

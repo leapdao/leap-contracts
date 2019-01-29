@@ -165,7 +165,7 @@ contract('PosOperator', (accounts) => {
           assert.equal(lastEpoch.toNumber(), 4);
           const height = await bridge.periods(p[11]);
           // we should have 12 blocks at this time
-          assert.equal(height[1].toNumber(), 12);
+          assert.equal(height[0].toNumber(), 12);
         });
       });
     });

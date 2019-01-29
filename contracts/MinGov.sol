@@ -66,9 +66,11 @@ contract MinGov is Ownable {
       if (prop.created + proposalTime <= now) {
         if (!prop.canceled) {
           bool rv;
-          if ( getSig(prop.msgData) == 0x8f283970 || // changeAdmin(address)
-            getSig(prop.msgData) == 0x3659cfe6 // upgradeTo(address)
-          ) {
+          bytes4 sig = getSig(prop.msgData);
+          // 0x8f283970 = changeAdmin(address)
+          // 0x3659cfe6 = upgradeTo(address)
+           // 0x983b2d56 = addMinter(address)
+          if (sig == 0x8f283970||sig == 0x3659cfe6||sig == 0x983b2d56) {
             // this changes proxy parameters 
             (rv, ) = prop.subject.call(prop.msgData);
           } else {

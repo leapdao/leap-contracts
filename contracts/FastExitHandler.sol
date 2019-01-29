@@ -15,7 +15,6 @@ import "./TxLib.sol";
 contract FastExitHandler is ExitHandler {
 
   struct Data {
-    bytes32 parent;
     uint32 timestamp;
     bytes32 txHash;
     uint64 txPos;
@@ -29,11 +28,11 @@ contract FastExitHandler is ExitHandler {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     Data memory data;
 
-    (data.parent,,,) = bridge.periods(_proof[0]);
-    require(data.parent > 0, "The referenced period was not submitted to bridge");
+    (,data.timestamp) = bridge.periods(_proof[0]);
+    require(data.timestamp > 0, "The referenced period was not submitted to bridge");
 
-    (data.parent,,, data.timestamp) = bridge.periods(_youngestInputProof[0]);
-    require(data.parent > 0, "The referenced period was not submitted to bridge");
+    (, data.timestamp) = bridge.periods(_youngestInputProof[0]);
+    require(data.timestamp > 0, "The referenced period was not submitted to bridge");
 
     // check exiting tx inclusion in the root chain block
     bytes memory txData;
