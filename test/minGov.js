@@ -220,7 +220,7 @@ contract('MinGov', (accounts) => {
     await gov.finalize();
 
     // test minting rights
-    await token.mint(accounts[1], 100000);
+    await token.mint(accounts[1], 100000, { from: accounts[1] });
     const bal = await token.balanceOf(accounts[1]);
     assert.equal(bal.toNumber(), 100000);
   })
