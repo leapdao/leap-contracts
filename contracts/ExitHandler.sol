@@ -171,6 +171,7 @@ contract ExitHandler is DepositHandler {
     initialize(_bridge);
     exitDuration = _exitDuration;
     exitStake = _exitStake;
+    emit MinGasPrice(0);
   }
 
   function setExitStake(uint256 _exitStake) public ifAdmin {
