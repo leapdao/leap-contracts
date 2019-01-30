@@ -138,6 +138,9 @@ contract('TxLib', (accounts) => {
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
         checkParse(rsp, transfer);
+        const outpoint = transfer.inputs[0].prevout;
+        const utxoId = await txLib.getUtxoId(outpoint.index, `0x${outpoint.hash.toString('hex')}`);
+        assert.equal(utxoId, outpoint.getUtxoId());
       });
 
       it('should parse 2 inputs and 2 outputs', async () => {

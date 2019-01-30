@@ -52,6 +52,10 @@ contract TxMock {
     return TxLib.getSigHash(_txData);
   }
 
+  function getUtxoId(uint256 _outputIndex, bytes32 _txHash) public pure returns (bytes32) {
+    return bytes32(uint256(_outputIndex) << 120 | uint120(uint256(_txHash)));
+  }
+
   function flattenInput(TxLib.Input memory _input, uint256 _offset, bytes32[] memory _rsp) internal pure {
     _rsp[_offset] = bytes32(_input.outpoint.hash);
     _rsp[_offset + 1] = bytes32(uint256(_input.outpoint.pos));
