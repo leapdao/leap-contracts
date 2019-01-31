@@ -11,7 +11,6 @@ import BN from 'bn.js';
 import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
-import EVMRevert from './helpers/EVMRevert';
 
 const TxMock = artifacts.require('./mocks/TxMock.sol');
 const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
