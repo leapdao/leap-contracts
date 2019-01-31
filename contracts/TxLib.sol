@@ -11,12 +11,7 @@ library TxLib {
 
   uint constant internal WORD_SIZE = 32;
   uint constant internal ONES = ~uint(0);
-//   DEPOSIT: 2,
-//   TRANSFER: 3,
-//   CONSOLIDATE: 4,
-//   COMP_REQ: 5,
-//   COMP_RESP: 6,
-  enum TxType { Deposit, Transfer, Consolidate, CompReq, CompRsp }
+  enum TxType { Deposit, Transfer }
 
   struct Outpoint {
     bytes32 hash;
@@ -69,8 +64,7 @@ library TxLib {
     }
     Outpoint memory outpoint = Outpoint(inputData, index);
     Input memory input = Input(outpoint, 0, 0, 0); // solium-disable-line arg-overflow
-    if (_type == TxType.Transfer ||
-      ((_type == TxType.CompReq || _type == TxType.CompRsp) && _pos > 0)) {
+    if (_type == TxType.Transfer) {
       bytes32 r;
       bytes32 s;
       uint8 v;
@@ -109,7 +103,7 @@ library TxLib {
   }
 
   function parseOutput(
-    TxType _type, bytes memory _txData, uint256 _pos, uint256 offset, Output[] memory _outs
+    bytes memory _txData, uint256 _pos, uint256 offset, Output[] memory _outs
   ) internal pure returns (uint256 newOffset) {
     uint256 value;
     uint16 color;
@@ -123,33 +117,6 @@ library TxLib {
     Output memory output = Output(value, color, owner, 0, data, 0);  // solium-disable-line arg-overflow
     _outs[_pos] = output;
     newOffset = offset + 54;
-    if (_type == TxType.CompReq && _pos == 0) {
-      // read gasPrice
-      // read length of msgData
-      uint32 gasPrice;
-      assembly {
-        gasPrice := mload(add(add(offset, 58), _txData))
-        value := mload(add(add(offset, 60), _txData))
-      }
-      output.gasPrice = gasPrice;
-      // read msgData
-      value = uint16(value); // using value for length here
-      data = new bytes(value);
-      uint src;
-      uint dest;
-      assembly {
-        src := add(add(add(offset, 60), 0x20), _txData)
-        dest := add(data, 0x20)
-      }
-      memcopy(src, dest, value);
-      output.msgData = data;
-      newOffset = offset + 60 + value;
-    } else if (_type == TxType.CompRsp && _pos == 0) {
-      // read new stateRoot
-      bytes32 stateRoot;
-      output.stateRoot = stateRoot;
-      newOffset = offset + 57 + 32;
-    }
   }
 
   function parseTx(bytes memory _txData) internal pure returns (Tx memory txn) {
@@ -164,12 +131,6 @@ library TxLib {
       txType = TxType.Deposit;
     } else if (a == 3) {
       txType = TxType.Transfer;
-    } else if (a == 4) {
-      txType = TxType.Consolidate;
-    } else if (a == 5) {
-      txType = TxType.CompReq;
-    } else if (a == 6) {
-      txType = TxType.CompRsp;
     } else {
       revert("unknown tx type");
     }
@@ -188,11 +149,8 @@ library TxLib {
     }
     a = (a >> 248) & 0x0f; // get outs-length nibble
     Output[] memory outs = new Output[](a);
-    if (txType == TxType.Consolidate && ins.length <= outs.length) {
-      revert("invalid consolidate");
-    }
     for (uint256 i = 0; i < outs.length; i++) {
-      offset = parseOutput(txType, _txData, i, offset, outs); // solium-disable-line arg-overflow
+      offset = parseOutput(_txData, i, offset, outs); // solium-disable-line arg-overflow
     }
     txn = Tx(txType, ins, outs);
   }
