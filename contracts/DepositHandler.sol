@@ -17,7 +17,8 @@ contract DepositHandler is Vault {
     uint32 indexed depositId, 
     address indexed depositor, 
     uint256 indexed color, 
-    uint256 amount
+    uint256 amount,
+    bytes32 storageRoot
   );
   event MinGasPrice(uint256 minGasPrice);
 
@@ -26,6 +27,7 @@ contract DepositHandler is Vault {
     uint16 color;
     address owner;
     uint256 amount;
+    bytes32 storageRoot;
   }
 
   uint32 public depositCount;
@@ -61,13 +63,15 @@ contract DepositHandler is Vault {
       time: uint32(timestamp),
       owner: _owner,
       color: _color,
-      amount: _amountOrTokenId
+      amount: _amountOrTokenId,
+      storageRoot: 0
     });
     emit NewDeposit(
       depositCount, 
       _owner, 
       _color, 
-      _amountOrTokenId
+      _amountOrTokenId,
+      0
     );
   }
 

@@ -380,9 +380,9 @@ contract('ExitHandler', (accounts) => {
       assert.equal(await exitHandler.exitDuration(), 100);
 
       // set exit stake
-      data = await exitHandler.contract.methods.setExitStake(200).encodeABI();
+      data = await exitHandler.contract.methods.setExitStake(200000000000).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
-      assert.equal(await exitHandler.exitStake(), 200);
+      assert.equal(await exitHandler.exitStake(), 200000000000);
     });
   });
 

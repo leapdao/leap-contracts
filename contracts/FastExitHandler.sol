@@ -25,7 +25,7 @@ contract FastExitHandler is ExitHandler {
     bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex, bytes32[] memory signedData
   ) public payable {
-    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    require(msg.value >= exitStake(), "Not enough ether sent to pay for exit stake");
     Data memory data;
 
     (,data.timestamp) = bridge.periods(_proof[0]);
@@ -89,15 +89,17 @@ contract FastExitHandler is ExitHandler {
       color: out.color,
       amount: out.value,
       finalized: false,
-      stake: exitStake,
-      priorityTimestamp: data.timestamp
+      stake: exitStakeGwei,
+      priorityTimestamp: data.timestamp,
+      storageRoot: 0
     });
     emit ExitStarted(
       data.txHash, 
       _outputIndex, 
       out.color, 
       msg.sender, 
-      out.value
+      out.value,
+      0
     );
   }
 

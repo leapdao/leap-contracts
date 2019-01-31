@@ -18,15 +18,19 @@ import "./TxLib.sol";
 import "./PriorityQueue.sol";
 
 contract ExitHandler is DepositHandler {
+  using SafeMath for uint256;
 
   using PriorityQueue for PriorityQueue.Token;
+
+  uint256 constant gWei = 1000000000;
 
   event ExitStarted(
     bytes32 indexed txHash, 
     uint8 indexed outIndex, 
     uint256 indexed color, 
     address exitor, 
-    uint256 amount
+    uint256 amount,
+    bytes32 storageRoot
   );
 
   struct Exit {
@@ -35,11 +39,12 @@ contract ExitHandler is DepositHandler {
     address owner;
     bool finalized;
     uint32 priorityTimestamp;
-    uint256 stake;
+    uint32 stake;
+    bytes32 storageRoot;
   }
 
   uint256 public exitDuration;
-  uint256 public exitStake;
+  uint32 exitStakeGwei;
   uint256 public nftExitCounter;
 
   /**
@@ -53,12 +58,16 @@ contract ExitHandler is DepositHandler {
     uint256 _exitStake) public initializer {
     initialize(_bridge);
     exitDuration = _exitDuration;
-    exitStake = _exitStake;
     emit MinGasPrice(0);
+    exitStakeGwei = uint32(_exitStake.div(gWei));
+  }
+
+  function exitStake() public view returns (uint256) {
+    return uint256(exitStakeGwei).mul(gWei);
   }
 
   function setExitStake(uint256 _exitStake) public ifAdmin {
-    exitStake = _exitStake;
+    exitStakeGwei = uint32(_exitStake.div(gWei));
   }
 
   function setExitDuration(uint256 _exitDuration) public ifAdmin {
@@ -69,7 +78,7 @@ contract ExitHandler is DepositHandler {
     bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex
   ) public payable {
-    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    require(msg.value == exitStake(), "Not enough ether sent to pay for exit stake");
     uint32 timestamp;
     (, timestamp) = bridge.periods(_proof[0]);
     require(timestamp > 0, "The referenced period was not submitted to bridge");
@@ -128,20 +137,22 @@ contract ExitHandler is DepositHandler {
       color: out.color,
       amount: out.value,
       finalized: false,
-      stake: exitStake,
-      priorityTimestamp: timestamp
+      stake: exitStakeGwei,
+      priorityTimestamp: timestamp,
+      storageRoot: 0
     });
     emit ExitStarted(
       txHash, 
       _outputIndex, 
       out.color, 
       out.owner, 
-      out.value
+      out.value,
+      0
     );
   }
 
   function startDepositExit(uint256 _depositId) public payable {
-    require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
+    require(msg.value == exitStake(), "Not enough ether sent to pay for exit stake");
     // check that deposit exits
     Deposit memory deposit = deposits[uint32(_depositId)];
     require(deposit.owner == msg.sender, "Only deposit owner can start exit");
@@ -164,15 +175,17 @@ contract ExitHandler is DepositHandler {
       color: deposit.color,
       amount: deposit.amount,
       finalized: false,
-      stake: exitStake,
-      priorityTimestamp: uint32(now)
+      stake: exitStakeGwei,
+      priorityTimestamp: uint32(now),
+      storageRoot: 0
     });
     emit ExitStarted(
       bytes32(_depositId), 
       0, 
       deposit.color, 
       deposit.owner, 
-      deposit.amount
+      deposit.amount,
+      0
     );
   }
 
