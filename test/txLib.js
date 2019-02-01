@@ -11,7 +11,6 @@ import BN from 'bn.js';
 import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
-import EVMRevert from './helpers/EVMRevert';
 
 const TxMock = artifacts.require('./mocks/TxMock.sol');
 const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
@@ -46,7 +45,7 @@ function checkParse(rsp, txn) {
   for (let i = 0; i < txn.inputs.length; i++) {
     assert.equal(rsp[1][2 + i * 5], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
     assert.equal(toInt(rsp[1][3 + i * 5]), i); // output position
-    if (txn.type === Type.TRANSFER || ((txn.type === Type.COMP_RSP || txn.type === Type.COMP_REQ) && i > 0)) {
+    if (txn.type === Type.TRANSFER) {
       assert.equal(rsp[1][4 + i * 5], `0x${txn.inputs[i].r.toString('hex')}`);
       assert.equal(rsp[1][5 + i * 5], `0x${txn.inputs[i].s.toString('hex')}`);
       assert.equal(toInt(rsp[1][6 + i * 5]), txn.inputs[i].v);
@@ -61,16 +60,8 @@ function checkParse(rsp, txn) {
     assert(equal(toInt(rsp[1][2 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].value));
     assert.equal(toInt(rsp[1][3 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].color);
     assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
-    if (txn.type === Type.COMP_RSP && i === 0) {
-      assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], txn.outputs[i].storageRoot); // storage root
-    } else if (txn.type === Type.COMP_REQ && i === 0) {
-      assert.equal(toInt(rsp[1][5 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].gasPrice); // gas price
-      assert.equal(rsp[2], `0x${txn.outputs[i].msgData.toString('hex')}`); // gas price
-    } else {
-      assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-      assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root
-    }
+    assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
+    assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root
   }
 }
 
@@ -197,41 +188,8 @@ contract('TxLib', (accounts) => {
         checkParse(rsp, transfer);
       });
     });
-
-    describe('Consolidate', () => {
-
-      it('should allow to parse consolidate tx', async () => {
-        const consolidate = Tx.consolidate([
-          new Input(new Outpoint(prevTx, 0)),
-          new Input(new Outpoint(prevTx, 1)),
-        ],
-          new Output(value, alice, color),
-        );
-        const block = new Block(32);
-        block.addTx(consolidate);
-        const period = new Period(alicePriv, [block]);
-        period.setValidatorData(slotId, alice);
-        const proof = period.proof(consolidate);
-
-        const rsp = await txLib.parse(proof).should.be.fulfilled;
-        checkParse(rsp, consolidate);
-      });
-
-      it('should fail to validate consolidate with only 1 input', async () => {
-        const consolidate = Tx.consolidate([
-          new Input(new Outpoint(prevTx, 0)),
-        ],
-          new Output(value, alice, color),
-        );
-        const block = new Block(32);
-        block.addTx(consolidate);
-        const period = new Period(alicePriv, [block]);
-        period.setValidatorData(slotId, alice);
-        const proof = period.proof(consolidate);
-        await txLib.parse(proof).should.be.rejectedWith(EVMRevert);
-      });
-    });
   });
+
   describe('Utils', () => {
     let txLib;
 

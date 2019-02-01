@@ -20,7 +20,7 @@ contract TxMock {
   using TxLib for TxLib.TxType;
 
   function parse(bytes32[] memory _proof)
-    public pure returns (uint256 txType, bytes32[] memory rsp, bytes memory msgData) {
+    public pure returns (uint256 txType, bytes32[] memory rsp) {
     bytes memory txData;
     (, , txData) = TxLib.validateProof(0, _proof);
 
@@ -37,9 +37,6 @@ contract TxMock {
     // output
     for (uint256 i = 0; i < txn.outs.length; i++) {
       flattenOutput(txn.outs[i], 2 + txn.ins.length * 5 + i * 5, rsp);
-    }
-    if (txn.txType == TxLib.TxType.CompReq) {
-      msgData = txn.outs[0].msgData;
     }
   }
 
@@ -77,12 +74,6 @@ contract TxMock {
       return 2;
     } else if (_type == TxLib.TxType.Transfer) {
       return 3;
-    } else if (_type == TxLib.TxType.Consolidate) {
-      return 4;
-    } else if (_type == TxLib.TxType.CompReq) {
-      return 5;
-    } else if (_type == TxLib.TxType.CompRsp) {
-      return 6;
     }
   }
 }

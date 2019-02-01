@@ -47,123 +47,6 @@ contract ExitHandler is DepositHandler {
    */
   mapping(bytes32 => Exit) public exits;
 
-  struct Verification {
-    uint32 startTime;
-    address owner;
-    uint256 stake;
-  }
-
-  event VerificationStarted(bytes32 indexed txHash);
-  /**
-   * txHash -> Verification Start Time mapping.
-   * Used to verify consolidate and computation transactions
-   * before they can be used to challenge exits.
-   */
-  mapping(bytes32 => Verification) public verifications;
-
-  /**
-   * Consolidate tx inputs are unsigned, hence an operator
-   * could create and include invalid consolidate txns to:
-   * a) challenge valid exits.
-   * b) decrease the priority of funds in exit queue by consolidating them,
-   *    putting the priority lower than his own transaction in the latest block.
-   *
-   * The following invalid txns are possible:
-   * - consolidates with out-of-no-where inputs. (a,b)
-   * - consolidates with inputs from utxos of other owners. (a,b)
-   * - consolidates with inputs from spent utxos of same owner. (a)
-   * - consolidates with duplicate inputs. (a)
-   *
-   * A verification process is introduced with half the duration of the exit procedure.
-   * During this verification a transaction can be challenged before it is whitelisted
-   * to be used in an exit challenge. We use this verification process to scrutinize 
-   * the validity of complex transactions (consolidate and spending conditions).
-   */
-  function startVerification(bytes32[] memory _proof, uint8 _outputIndex) public payable {
-    require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
-    uint32 timestamp;
-    (,timestamp) = bridge.periods(_proof[0]);
-    require(timestamp > 0, "The referenced period was not submitted to bridge");
-
-    // check exiting tx inclusion in the root chain block
-    bytes32 utxoId;
-    bytes memory txData;
-    (, utxoId, txData) = TxLib.validateProof(32, _proof);
-    if (_outputIndex > 0) {
-      utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(uint256(utxoId)));
-    }
-    require(verifications[utxoId].stake == 0, "Transaction already registered");
-
-    TxLib.Tx memory txn = TxLib.parseTx(txData);
-    require(_outputIndex < txn.outs.length, "Output index out of range");
-    address owner = txn.outs[_outputIndex].owner;
-
-    if (txn.txType == TxLib.TxType.Consolidate) {
-       // iterate over all inputs
-      // make sure these inputs have been registered for verification
-      // fail if not
-      // if yes, then delete them all and return stakes
-      uint256 stake = 0;
-      for (uint i = 0; i < txn.ins.length; i++) {
-        bytes32 prevUtxoId = txn.ins[i].outpoint.hash;
-        if (txn.ins[i].outpoint.pos > 0) {
-          prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(uint256(txn.ins[i].outpoint.hash)));
-        }
-        Verification memory prevVerification = verifications[prevUtxoId];
-        require(prevVerification.startTime > 0, "Input not found");
-        require(prevVerification.owner == owner, "Input belongs to different owner");
-        stake += prevVerification.stake;
-        delete verifications[prevUtxoId];
-      }
-      msg.sender.transfer(stake);
-    }
-
-    verifications[utxoId] = Verification(uint32(block.timestamp), txn.outs[_outputIndex].owner, msg.value);
-    emit VerificationStarted(utxoId);
-  }
-
-  /**
-   * An input to the consolidate tx has been spent by some other tx.
-   * Because consolidate inputs are not signed, the other transaction takes precedence,
-   * and the consolidate transaction should not be usable in a challenge.
-   */
-  function challengeConsolidateDoublespent(
-    bytes32[] memory _doublespendProof, bytes32[] memory _consolidateProof,
-    uint8 _inputIndex, uint8 _consolidateInputIndex) public {
-    // output owner of consolidate proof different then owner of some input
-    uint32 timestamp;
-    (,timestamp) = bridge.periods(_doublespendProof[0]);
-    require(timestamp > 0, "The period referenced in doublespendProof was not submitted to bridge");
-    (,timestamp) = bridge.periods(_consolidateProof[0]);
-    require(timestamp > 0, "The period referenced in consolidateProof was not submitted to bridge");
-
-    // check consolidate tx inclusion in the root chain block
-    bytes32 txHash;
-    bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32 * (_doublespendProof.length + 2) + 64, _consolidateProof);
-    Verification memory verification = verifications[txHash];
-    require(verification.startTime > 0, "Transaction not registered for verification");
-    require(
-      block.timestamp <= verification.startTime + (exitDuration / 2),
-      "Transaction passed challenge duration"
-    );
-    // parse consolidate tx
-    TxLib.Outpoint memory pointC = TxLib.parseTx(txData).ins[_consolidateInputIndex].outpoint;
-    bytes32 doublespendTxHash;
-    (, doublespendTxHash, txData) = TxLib.validateProof(96, _doublespendProof);
-    // parse input tx
-    TxLib.Outpoint memory pointD = TxLib.parseTx(txData).ins[_inputIndex].outpoint;
-    require(doublespendTxHash != txHash, "consolidate and doublespend are same tx");
-    require(
-      pointC.hash == pointD.hash && pointC.pos == pointD.pos,
-      "Doublespend is not a doublespend"
-    );
-    // award stake to challanger
-    msg.sender.transfer(verification.stake);
-    // delete invalid tx
-    delete verifications[txHash];
-  }
-
   function initializeWithExit(
     Bridge _bridge, 
     uint256 _exitDuration, 
@@ -355,17 +238,7 @@ contract ExitHandler is DepositHandler {
         );
         require(exits[utxoId].owner == signer);
       } else {
-        // check that transaction verified
-        uint256 verificationTime = verifications[txHash].startTime;
-        require(verificationTime > 0, "Transaction not verified");
-        require(block.timestamp >= verificationTime + (exitDuration / 2), "Transaction still in verification");
-
-        // if consolidate, make sure owner matches
-        if (txn.txType == TxLib.TxType.Consolidate) {
-          require(exits[utxoId].owner == txn.outs[0].owner);
-        } else {
-          revert("unknown tx type");
-        }
+        revert("unknown tx type");
       }
     } else {
       // challenging deposit exit
@@ -444,22 +317,6 @@ contract ExitHandler is DepositHandler {
   ) internal view returns (uint256 priority) {
     uint256 exitableAt = Math.max(timestamp + (2 * exitDuration), block.timestamp + exitDuration);
     return (exitableAt << 192) | uint256(txPos) << 128 | uint128(uint256(utxoId));
-  }
-
-  // Use this to find calldata offset - you are looking for the number:
-  // (offest of _proof in calldata (in bytes)) - 68
-  // ಠ_ಠ
-  event Debug(bytes data);
-  function emitCallData() internal {
-    uint256 size;
-    assembly {
-      size := calldatasize()
-    }
-    bytes memory callData = new bytes(size);
-    assembly {
-      calldatacopy(add(callData, 32), 0, size)
-    }
-    emit Debug(callData);
   }
 
   // solium-disable-next-line mixedcase
