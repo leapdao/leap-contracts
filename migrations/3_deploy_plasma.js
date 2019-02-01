@@ -23,7 +23,7 @@ const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
-
+  let estimate;
   const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
   const epochLength = process.env.EPOCH_LENGTH || DEFAULT_EPOCH_LENGTH;
@@ -44,27 +44,36 @@ module.exports = (deployer, network, accounts) => {
       log('  ♻️  Reusing existing Native Token:', nativeToken.address);
     }
 
-    const bridgeCont = await deployer.deploy(Bridge);
+    estimate = 599334; // guess
+    const bridgeCont = await deployer.deploy(Bridge, {gas: estimate});
     data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
-    const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin });
+    estimate = 955744; // guess
+    const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin, gas: estimate });
 
-    const pqLib = await deployer.deploy(PriorityQueue);
+    estimate = 498356; // guess
+    const pqLib = await deployer.deploy(PriorityQueue, {gas: estimate});
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     log('  🕐 Exit duration:', durationToString(exitDuration));
     log('  💰 Exit stake:', exitStake);
 
-    const exitHandlerCont = await deployer.deploy(ExitHandler);
+    estimate = 5416917;
+    const exitHandlerCont = await deployer.deploy(ExitHandler, {gas: estimate});
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
-    const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
+    estimate = 955744; // guess
+    const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin, gas: estimate});
 
-    const operatorCont = await deployer.deploy(PoaOperator);
+    estimate = 959662;
+    const operatorCont = await deployer.deploy(PoaOperator, {gas: estimate});
     data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
-    const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
+    estimate = 955744; // guess
+    const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin, gas: estimate });
 
-    const registryCont = await deployer.deploy(SwapRegistry);
+    estimate = 1399128;
+    const registryCont = await deployer.deploy(SwapRegistry, {gas: estimate});
     data = await registryCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, poaReward).encodeABI();
-    const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin });
+    estimate = 955744; // guess
+    const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin, gas: estimate });
 
     const swapRegistry = await SwapRegistry.at(registryProxy.address);
     if (taxRate) {
