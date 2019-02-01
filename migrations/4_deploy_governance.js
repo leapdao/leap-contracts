@@ -21,6 +21,7 @@ module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
   const proposalTime = process.env.PROPOSAL_TIME || DEFAULT_PROPOSAL_TIME;
   const ownerAddr = process.env.GOV_OWNER;
+  const govAddr = process.env.GOV_ADDR;
   const deployedToken = process.env.DEPLOYED_TOKEN;
 
   deployer.then(async () => {
@@ -31,9 +32,15 @@ module.exports = (deployer, network, accounts) => {
       nativeToken = await NativeToken.deployed();
     }
 
-    log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
-    const governance = await deployer.deploy(MinGov, proposalTime);
-    
+    let governance;
+    if (govAddr) {
+      log('  Using existing Governance at:', govAddr);
+      governance = await MinGov.at(govAddr);
+    } else {
+      log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
+      governance = await deployer.deploy(MinGov, proposalTime);
+    }
+
     const bridgeProxy = await BridgeProxy.deployed();
     log('  🔄 Transferring ownership for Bridge:', bridgeProxy.address);
     await bridgeProxy.changeAdmin(governance.address, { from: admin });
