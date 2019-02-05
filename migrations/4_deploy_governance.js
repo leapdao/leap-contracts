@@ -39,7 +39,7 @@ module.exports = (deployer, network, accounts) => {
       governance = await MinGov.at(govAddr);
     } else {
       log('  🕐 Deploying Governance with proposal time:', durationToString(proposalTime));
-      estimate = 1255744; // guess
+      estimate = 1455744; // guess
       governance = await deployer.deploy(MinGov, proposalTime, {gas: estimate});
     }
 
