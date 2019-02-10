@@ -147,9 +147,9 @@ contract('ExitHandler', (accounts) => {
         assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
       });
 
-      it('Should allow to challenge tx and prevent exit', async () => {
-        const period = await submitNewPeriod([depositTx, transferTx]);
-        const transferProof = period.proof(transferTx);
+      it('Should allow to challenge tx by output spend and prevent inflight exit', async () => {
+        const period = await submitNewPeriod([depositTx]);
+        const depositProof = period.proof(depositTx);
 
         //bob spends utxo1 by sending it to charlie
         const spendTx = Tx.transfer(
@@ -161,8 +161,8 @@ contract('ExitHandler', (accounts) => {
         const piggybackStake = exitHandler.piggybackStake();
         const challengeStake = exitHandler.challengeStake();
 
-        const inTxData = Tx.parseToParams(transferTx);
-        const spendTxData = Tx.parseToParams(spendTx);
+        const inTxData = transferTx.hex();
+        const spendTxData = spendTx.hex();
 
         // any user can start the exit for this transaction
         exitId = await exitHandler.startLimboExit(inTxData, {from: bob, value: exitStake});
@@ -171,23 +171,24 @@ contract('ExitHandler', (accounts) => {
         await exitHandler.joinLimboExit(exitId, 0, {from: bob, value: piggybackStake});
 
         const bobBalanceBefore = await nativeToken.balanceOf(bob);
-        await exitHandler.challengeLimboExit(exitId, spendTxData, {from: pete, value: challengeStake});
+        await exitHandler.challengeLimboExit(exitId, inTxData, 0, depositProof, spendProof, 0, {from: pete, value: challengeStake});
 
         const challengeTime = (await time.latest()) + (2 * time.duration.seconds(limboPeriod/2));
         await time.increaseTo(challengeTime);
 
-        await exitHandler.finalizeTopLimboExit(nativeTokenColor);
-
         // const responseTime = (await time.latest()) + (2 * time.duration.seconds(limboPeriod/2));
         // await time.increaseTo(responseTime);
+        
+        await exitHandler.finalizeTopLimboExit(nativeTokenColor);
 
         const bobBalanceAfter = await nativeToken.balanceOf(bob);
         assert(bobBalanceAfter.eq(bobBalanceBefore));
       });
 
-      it('Should allow user to challenge double spent inflight tx', async () => {
-        // const period = await submitNewPeriod([depositTx);
-
+      it('Should allow user to challenge input spent and prevent inflight tx', async () => {
+        const period = await submitNewPeriod([depositTx);
+        const depositProof = period.proof(depositTx);
+        
         //alice double spends utxo1 by sending it to charlie
         const spendTx = Tx.transfer(
           [new Input(new Outpoint(depositTx.hash(), 0))],
@@ -198,17 +199,17 @@ contract('ExitHandler', (accounts) => {
         const piggybackStake = exitHandler.piggybackStake();
         const challengeStake = exitHandler.challengeStake();
 
-        const inTxData = Tx.parseToParams(transferTx);
-        const spendTxData = Tx.parseToParams(spendTx);
+        const inTxData = transferTx.hex();
+        const spendTxData = spendTx.hex();
 
-        exitId = await exitHandler.startLimboExit(inTxData, {from: bob, value: exitStake});
+        exitId = await exitHandler.startLimboExit(inTxData, 0, {from: bob, value: exitStake});
 
         // Bob piggybacks and joins a Limo exit by its id
         await exitHandler.joinLimboExit(exitId, 0, {from: bob, value: piggybackStake});
 
         const bobBalanceBefore = await nativeToken.balanceOf(bob);
         // challenge to tx's canonicity
-        await exitHandler.challengeLimboExit(exitId, spendTxData, {from: pete, value: challengeStake});
+        await exitHandler.challengeLimboExit(exitId, inTxData, 0, depositProof, spendProof, 0, {from: pete, value: challengeStake});
 
         const challengeTime = (await time.latest()) + (2 * time.duration.seconds(limboPeriod/2));
         await time.increaseTo(challengeTime);
@@ -222,28 +223,34 @@ contract('ExitHandler', (accounts) => {
         assert(bobBalanceAfter.eq(bobBalanceBefore));
       });
 
-      it('Should resolve a challenge and exit', async () => {
+      it('Should resolve a output challenge and exit inflight tx', async () => {
         const period = await submitNewPeriod([depositTx);
         const depositProof = period.proof(depositTx);
+        
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 0))],
+          [new Output(50, charlie)]
+        ).sign([bobPriv]);
 
         const exitStake = exitHandler.exitStake();
         const piggybackStake = exitHandler.piggybackStake();
         const challengeStake = exitHandler.challengeStake();
 
-        const inTxData = Tx.parseToParams(transferTx);
+        const inTxData = transferTx.hex();
+        const spendTxData = spendTx.hex();
 
-        exitId = await exitHandler.startLimboExit(inTxData, {from: bob, value: exitStake});
+        exitId = await exitHandler.startLimboExit(inTxData, 0, {from: bob, value: exitStake});
 
         // Alice piggybacks and joins a Limo exit by its id
         await exitHandler.joinLimboExit(exitId, 0, {from: alice, value: piggybackStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
-        await exitHandler.challengeLimboExit(exitId, randomTx, {from: pete, value: challengeStake});
+        await exitHandler.challengeLimboExit(exitId, inTxData, 0, depositProof, spendProof, 0, {from: pete, value: challengeStake});
 
         const challengeTime = (await time.latest()) + (2 * time.duration.seconds(limboPeriod/2));
         await time.increaseTo(challengeTime);
 
-        await exitHandler.resolveChallengeOnInput(exitId, inTxData, 0, depositData, depositProof, 0, blockNo);
+        await exitHandler.resolveInputSpendChallenge(exitId, inTxData, 0, depositData, txProof, depositProof);
 
         const responseTime = (await time.latest()) + (2 * time.duration.seconds(limboPeriod/2));
         await time.increaseTo(responseTime);
