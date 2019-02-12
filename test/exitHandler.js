@@ -33,6 +33,7 @@ contract('ExitHandler', (accounts) => {
   const bob = accounts[1];
   const bobPriv = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
   const charlie = accounts[2];
+  const pete = accounts[3];
 
   describe('Test', () => {
     // contracts
@@ -58,7 +59,10 @@ contract('ExitHandler', (accounts) => {
 
     const parentBlockInterval = 0;
     const exitDuration = 5;
-    const exitStake = 0;    
+    const exitStake = 0;
+    const piggybackStake = 0;
+    const challengeStake = 0;
+    const limboPeriod = 2;    
 
     const seedTxs = async () => {
       await nativeToken.approve(exitHandler.address, 1000);
@@ -110,7 +114,8 @@ contract('ExitHandler', (accounts) => {
       await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await ExitHandler.new();
-      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, exitDuration, exitStake).encodeABI();
+      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, exitDuration, exitStake, piggybackStake, challengeStake, 
+        limboPeriod).encodeABI();
       proxy = await AdminableProxy.new(vaultCont.address, data, {from: accounts[2]});
       exitHandler = await ExitHandler.at(proxy.address);
 
@@ -157,10 +162,6 @@ contract('ExitHandler', (accounts) => {
           [new Output(50, charlie)]
         ).sign([bobPriv]);
 
-        const exitStake = exitHandler.exitStake();
-        const piggybackStake = exitHandler.piggybackStake();
-        const challengeStake = exitHandler.challengeStake();
-
         const inTxData = transferTx.hex();
         const spendTxData = spendTx.hex();
 
@@ -195,10 +196,6 @@ contract('ExitHandler', (accounts) => {
           [new Output(50, charlie)]
         ).sign([alicePriv]);
 
-        const exitStake = exitHandler.exitStake();
-        const piggybackStake = exitHandler.piggybackStake();
-        const challengeStake = exitHandler.challengeStake();
-
         const inTxData = transferTx.hex();
         const spendTxData = spendTx.hex();
 
@@ -231,10 +228,6 @@ contract('ExitHandler', (accounts) => {
           [new Input(new Outpoint(transferTx.hash(), 0))],
           [new Output(50, charlie)]
         ).sign([bobPriv]);
-
-        const exitStake = exitHandler.exitStake();
-        const piggybackStake = exitHandler.piggybackStake();
-        const challengeStake = exitHandler.challengeStake();
 
         const inTxData = transferTx.hex();
         const spendTxData = spendTx.hex();
