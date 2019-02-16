@@ -29,50 +29,87 @@ contract ExitHandler is DepositHandler {
     uint256 amount
   );
 
-  event LimboExitStarted(bytes32 indexed exitId, uint256 color);
-  event LimboExitChallengePublished(bytes32 indexed exitId, address indexed _from, uint8 _challengeNumber, uint8 _inputNumber);
+  // event LimboExitStarted(bytes32 indexed txHash, uint256 indexed color, bytes32 indexed exitId);
+  // event LimboExitChallengePublished(bytes32 indexed exitId, address indexed _from, uint8 _challengeNumber, uint8 _inputNumber);
 
   struct Exit {
     uint256 amount;
     uint16 color;
     address owner;
     bool finalized;
-    uint32 priorityTimestamp;
     uint256 stake;
-    bool isLimbo;
+    uint32 priorityTimestamp;
   }
 
   struct LimboExit {
-    LimboIn[] input;
-    LimboOut[] output;
+    uint256 amount;
+    uint16 color;
+    address owner;
     bool finalized;
+    uint256 priority;
+    uint256 stake;
     address exitor;
-    bool isValid; // a tx is valid if it is canonical and exitable and comes from valid txs
+    uint8 _outputIndex;
+    bytes32 txHash;
   }
 
-  struct LimboIn {
-    uint256 amount;
-    address owner;
-    bool isPegged;
-    bool exitable;
-    LimboChallenge challenge;
+  struct LimboTx {
+    LimboOut[] outputs;
+    LimboIn[] inputs;
+    bool isCanonical;
+    // LimboIn[] inputs;
+    bytes txnData;
+  }
+
+  // struct LimboExit {
+  //   bool finalized;
+  //   uint256 priority;
+  //   uint256 stake;
+  //   address exitor;
+  //   uint256 amount;
+  //   address owner;
+  //   uint8 color;
+  //   uint8 _outputIndex;
+  //   bytes32 txHash;
+  // }
+
+  // struct LimboTx {
+  //   LimboOut[] outputs;
+  //   LimboInputChallenge[] challenges;
+  // }
+
+  struct LimboChallenge {
+    address challenger;
+    bool resolved;
+    bytes32[] proof;
   }
 
   struct LimboOut {
     uint256 amount;
     address owner;
     bool isPegged;
-    uint256 color;
-    bool exitable;
+    bool unspent;
     LimboChallenge challenge;
-    // bytes32 utxoId;
   }
 
-  struct LimboChallenge {
+  struct LimboIn {
     address owner;
-    bool resolved;
-    bytes32[] proof;
+    uint256 amount;
+    // OutputId[] to;
+    bool isPegged;
+    LimboChallenge challenge;
   }
+
+  // struct Outputidx {
+  //   uint8 pos;
+  // }
+
+  // struct LimboInputChallenge {
+  //   address challenger;
+  //   bool resolved;
+  //   uint8 _inputIndex;
+  //   bytes32[] proof;
+  // }
 
   uint256 public exitDuration;
   uint256 public limboPeriod;
@@ -81,14 +118,13 @@ contract ExitHandler is DepositHandler {
   uint256 public exitStake;
   uint256 public nftExitCounter;
 
-  uint256 public constant LimboJoinDelay = (12 seconds);
-
   /**
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
    */
   mapping(bytes32 => Exit) public exits;
-  mapping(bytes32 => LimboExit) public limboExits;
-  mapping(bytes22 => bool) public succesfulLimboExits;
+  mapping(bytes32 => LimboExit) limboExits;
+  mapping(bytes32 => LimboTx) limboTxns;
+  // mapping(uint8 => LimboOut) txOuts;
 
   function initializeWithExit(
     Bridge _bridge, 
@@ -122,158 +158,137 @@ contract ExitHandler is DepositHandler {
     exitDuration = _exitDuration;
   }
 
-  function startLimboExit(bytes memory inTxData, bytes32[] memory _youngestInputProof) public payable returns (bytes32 utxoId) { 
+  function startLimboExit(bytes memory inTxData, bytes32[] memory _youngestInputProof, uint8 _outputIndex) public payable returns (bytes32 utxoId) { 
 
     // exitor assumes tx to be canonical
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
-    uint8 _outputIndex = 0;
     
-    mapping(uint8 => LimboIn) storage inputs;
-    mapping(uint8 => LimboOut) storage outputs;
+    TxLib.Output memory out = transferTx.outs[_outputIndex];
+
+    LimboTx memory limboTx;
+    limboTx.txn= transferTx;
 
     for (uint8 i =0; i < transferTx.outs.length; i++){
       TxLib.Output memory outs = transferTx.outs[i];
-      outputs[i] = LimboOut({
-        amount: outs.value, 
-        owner: outs.owner, 
-        isPegged: false, 
-        color: outs.color, 
-        exitable: true,
-        challenge: {}
-        // utxoId: bytes32(uint256(i) << 120 | uint120(uint256(inTxHash))); });
-    });
-    for (uint8 i =0; i < transferTx.ins.length; i++){
-      TxLib.Input memory ins = transferTx.ins[i];
-      TxLib.Output memory out = transferTx.outs[ins.outpoint.pos];
-      inputs[i] = LimboIn({
-        amount: out.value,
-        owner: out.owner, 
-        isPegged: false, 
-        exitable: true,
-        challenge: {}
-      });
+      LimboOut memory output;
+      output.amount = outs.value; 
+      output.owner = outs.owner; 
+      output.isPegged = false;
+      output.exitable = false;
+      limboTx.outputs[i] = output;
+      // txOuts[i] = output;
     }
-    
+    // limboTx.outputs= txOuts;
+
+    // for (uint8 i =0; i < transferTx.ins.length; i++){
+    //   TxLib.Input memory ins = transferTx.ins[i];
+    //   TxLib.Output memory out = transferTx.outs[ins.outpoint.pos];
+    //   inputs[i] = LimboIn({
+    //     amount: out.value,
+    //     owner: out.owner, 
+    //     isPegged: false, 
+    //     exitable: true,
+    //     challenge: {}
+    //   });
+
     bytes32 inTxHash = keccak256(inTxData);
-    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(inTxHash)));
+    utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(inTxHash)));
     uint256 priority;
     uint32 height;
     uint32 timestamp;
 
-    // priority based on youngestInput
-    if (_youngestInputProof.length > 0) {
-      (height, timestamp) = bridge.periods(_youngestInputProof[0]);
-      require(timestamp > 0, "The referenced period was not submitted to bridge");
-    }
+    // validate youngestinputproof
     bytes32 inputTxHash;
     uint64 txPos;
     (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
 
-    if (isNft(outs.color)) {
+    // priority based on youngestInput
+    (height, timestamp) = bridge.periods(_youngestInputProof[0]);
+    require(timestamp > 0, "The referenced period was not submitted to bridge");
+
+    if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
       nftExitCounter++;
     } else {      
       priority = getERC20ExitPriority(timestamp, utxoId, txPos);
     }
-    limboExits[utxoId] = LimboExit({
-      input: inputs,
-      output: outputs,
-      finalized: false,
-      exitor: msg.sender,
-      isValid: true
-    });
 
-    emit LimboExitStarted(
-      inTxHash, 
-      outs.color
-    );
-    tokens[outs.color].insert(priority);
+    LimboExit memory limboExit;
+    limboExit.finalized= false;
+    limboExit.priority= priority;
+    limboExit.exitor= msg.sender;
+    limboExit.amount= out.value;
+    limboExit.owner= out.owner;
+    limboExit.color= out.color;
+    limboExit._outputIndex= _outputIndex;
+    limboExit.txHash= inTxHash;    
+
+    limboExits[utxoId] = limboExit;
+    limboTxns[inTxHash] = limboTx;
+    // emit LimboExitStarted(
+    //   inTxHash, 
+    //   out.color,
+    //   utxoId
+    // );
+    tokens[out.color].insert(priority);
 
     return utxoId;
   }
 
-  }
-
   function joinLimboExit(
-    bytes32 exitId, uint8 _index) 
+    bytes32 exitId, uint8 _outputIndex) 
     public payable {
+    // honest owner of outputs will piggyback the exit if they also want to exit their funds
     require(msg.value >= piggybackStake, "Not enough ether sent to join the exit");
 
     address owner = msg.sender;
+
+    // exitId is utxoId
     LimboExit memory limboExit = limboExits[exitId];
+    bytes32 inTxHash = limboExit.txHash;
+    LimboTx memory limboTx = limboTxns[inTxHash];
+    
+    if (limboTx.outputs[_outputIndex].owner == owner) {
+        // output is piggybacking
+      require(limboTx.outputs[_outputIndex].isPegged = false, "Already joined the exit");
 
-    if (limboExit.input[_index].owner == owner){
-      // input is piggybacking
-      require(limboExit.input[_index].isPegged = false, "Already joined the exit");
-
-      limboExit.input[_index].isPegged = true;
-    } else if (limboExit.output[_index].owner == owner) {
-      // output is piggybacking
-      require(limboExit.output[_index].isPegged = false, "Already joined the exit");
-
-      limboExit.output[_index].isPegged = true;
+      limboTx.outputs[_outputIndex].isPegged = true;
+      limboTx.outputs[_outputIndex].exitable = true;
     }
-  
-  }
-
-  function challengeLimboExitByInclusionProof(
-    bytes32 exitId, bytes memory inTxData,
-    uint8 InputNo, bytes32[] memory _youngestInputProof, bytes32[] memory  _inclusionProof) 
-    public payable {
-    require(msg.value >= challengeStake, "Not enough ether sent to challenge exit");
-    LimboExit memory limboExit = limboExits[exitId];
-    
-    bytes32 inTxHash = keccak256(inTxData);
-    require(limboExit.isValid == true);
-    TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
-    
-    bytes32 txHash;
-    bytes memory txData;
-    uint64 txPos;
-    (txPos, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _inclusionProof);
-
-    require(inTxHash == txHash, "Invalid inclusion proof");
-
-    limboExit.isValid = false;
-    limboExit.input[InputNo].exitable = false;
-    limboExit.input[InputNo].challenge = LimboChallenge({
-    owner: msg.sender,
-    resolved: false,
-    proof: _inclusionProof
-    });  
   }
 
   function challengeLimboExitByInputSpend(
-    bytes32 exitId,
-    bytes memory inTxData, uint8 InputNo, uint8 _spendInputNo,
-    bytes32[] memory  _youngestInputProof, bytes32[] memory _spendProof) 
+    bytes32 txHash,
+    uint8 InputNo, uint8 _spendInputNo,
+    bytes32[] memory _spendProof) 
     public payable {
+    // challenging canonicity
+    
     require(msg.value >= challengeStake, "Not enough ether sent to challenge exit");
-    LimboExit memory limboExit = limboExits[exitId];
-    bytes32 inTxHash = keccak256(inTxData);
+    LimboTx memory limboTx = limboTxns[exitId];
 
     bytes32 competingHash;
     bytes memory competingTxData;
     uint32 blockHeight;
     uint64 competingPos;
 
-    TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
-    (competingPos, competingHash, competingTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _spendProof);
+    TxLib.Tx memory inputTx = TxLib.parseTx(limboTx.txnData);
+    (competingPos, competingHash, competingTxData) = TxLib.validateProof(96, _spendProof);
     TxLib.Tx memory competingTx = TxLib.parseTx(competingTxData);
 
     blockHeight = bridge.periods[_spendProof[0]].height;
     
     // if canonical till now
-    
-    if (limboExit.isValid == true){
-      TxLib.Input memory inInput = transferTx.ins[InputNo];
+    if (limboTx.isCanonical == true){
+      TxLib.Input memory inInput = inputTx.ins[InputNo];
       TxLib.Input memory competingInput = competingTx.ins[_spendInputNo];
       // proving non-canonical
       // if same inputs, add challenge
       require(inInput.r == competingInput.r);
       require(inInput.s == competingInput.s);
       require(inInput.v == competingInput.v);
+      limboTx.isCanonical = false;
 
     } else {
 
@@ -281,107 +296,117 @@ contract ExitHandler is DepositHandler {
       bytes32 previousHash;
       bytes memory previousTxData;
       uint64 previousPos;
-      LimboChallenge memory prevChallenge = limboExit.challenge;
+      LimboChallenge memory prevChallenge = limboTx.inputs[InputNo].challenge;
       bytes memory _prevProof = prevChallenge.proof;
-      (previousPos, previousHash, previousTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _prevProof);
+      (previousPos, previousHash, previousTxData) = TxLib.validateProof(96, _prevProof);
       TxLib.Tx memory previousTx = TxLib.parseTx(previousTxData);
       uint32 prevHeight = bridge.periods[_prevProof[0]].height;
       
       require(blockHeight < prevHeight);
       // pay challengeStake to winner from exitHandler
-      tokens[transferTx.outs[0].color].addr.transferFrom(address(this), msg.sender, challengeStake);
+      // tokens[transferTx.outs[0].color].addr.transferFrom(address(this), msg.sender, challengeStake);
 
     }
-    limboExit.isValid = false;
-    limboExit.input[InputNo].exitable = false;
-    limboExit.challenge = LimboChallenge({
+    limboTx.inputs[InputNo].challenge = LimboChallenge({
       owner: msg.sender,
       resolved: false,
       proof: _spendProof
     });
   }
 
-  function challengeLimboExitByOutputSpend(
-    bytes32 exitId,
-    bytes memory inTxData, uint8 OutputNo,
-    bytes memory _youngestInputProof, bytes memory _spendProof, uint8 InputNo) 
+  function challengeLimboExitByInclusionProof(
+    bytes32 txHash,
+    bytes32[] memory _inclusionProof)
     public payable {
     require(msg.value >= challengeStake, "Not enough ether sent to challenge exit");
-    LimboExit memory limboExit = limboExits[exitId];
-    bytes32 inTxHash = keccak256(inTxData);
+    LimboTx memory limboTx = limboTxns[txHash];
 
-    bytes32 competingHash;
+    // bytes32 competingHash;
     bytes memory competingTxData;
-    uint64 competingPos;
-    
-    TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
-    (competingPos, competingHash, competingTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _spendProof);
+    // uint32 blockHeight;
+    // uint64 competingPos;
+
+    TxLib.Tx memory inputTx = TxLib.parseTx(limboTx.txnData);
+    (,, competingTxData) = TxLib.validateProof(96, _inclusionProof);
     TxLib.Tx memory competingTx = TxLib.parseTx(competingTxData);
+    bytes32 inTxHash = keccak256(competingTxData);
+    
+    require(inTxHash == txHash, "Invalid inclusion proof");
 
-    uint32 blockHeight = bridge.periods[_spendProof[0]].height;
+    limboTx.isCanonical = true;
+  }
 
-    if (limboExit.isValid == true){
+
+  function challengeLimboExitByOutputSpend(
+    bytes32 txHash, uint8 outputNo, uint8 InputNo,
+    bytes memory _spendProof) 
+    public payable {
+    require(msg.value >= challengeStake, "Not enough ether sent to challenge exit");
+    LimboTx memory limboTx = limboTxns[inTxHash];
+    LimboOut memory limboOut = limboTx.outputs[outputNo];
+
+    TxLib.Tx memory transferTx = TxLib.parseTx(limboTx.txnData);
+    (spendPos, spendHash, spendData) = TxLib.validateProof(96, _spendProof);
+
+    if (limboOut.isPegged){
+      if (limboOut.unspent) {
       uint256 offset = uint8(uint256(_spendProof[1] >> 248));
       // getting spendTx input address
       address owner = TxLib.recoverTxSigner(offset, _spendProof);      
-      LimboOut memory inOutput = limboExit.output[OutputNo];
-      TxLib.Input memory competingInput = competingTx.input[InputNo];
+      TxLib.Input memory competingInput = competingTx.ins[InputNo];
 
       // check if same or not ?      
       require(inOutput.owner == owner);
       require(inOutput.amount == competingTx.outs[competingInput.outpoint.pos]);
-
-    } else {
-      // if someone challenged it before and became successful
-      LimboChallenge memory prevChallenge = limboExit.challenge;
-      bytes32[] memory _prevProof = prevChallenge.proof;
-      uint64 previousPos;
+      }
+      else{
+        // if someone challenged it before and became successful
       bytes32 previousHash;
       bytes memory previousTxData;
-
-      (previousPos, previousHash, previousTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _prevProof);
-      TxLib.Tx memory previousTx = TxLib.parseTx(previousTxData);      
+      uint64 previousPos;
+      LimboChallenge memory prevChallenge = limboTx.outputs[outputNo].challenge;
+      bytes memory _prevProof = prevChallenge.proof;
+      (previousPos, previousHash, previousTxData) = TxLib.validateProof(96, _prevProof);
+      TxLib.Tx memory previousTx = TxLib.parseTx(previousTxData);
       uint32 prevHeight = bridge.periods[_prevProof[0]].height;
-
+      
       require(blockHeight < prevHeight);
-      tokens[transferTx.outs[0].color].addr.transferFrom(address(this), msg.sender, challengeStake);
-
-    }
-    limboExit.isValid = false;
-    limboExit.output[OutputNo].exitable = false;
-    limboExit.challenge = LimboChallenge({
+      }
+    limboTxns[inTxHash].outputs[outputNo].unspent = false;
+    limboTxns[inTxHash].outputs[outputNo].challenge = LimboChallenge({
       owner: msg.sender,
       resolved: false,
       proof: _spendProof
     });
+    } 
   }
 
-  function resolveInputSpendChallenge(
-    bytes32 exitId, bytes memory inTxData, uint8 InputNo,
-    bytes32[] memory _txProof, bytes32[] memory _youngestInputProof
-  ) public {
-    LimboExit memory limboExit = limboExits[exitId];
-    LimboChallenge memory challenge = limboExit.input[InputNo].challenge;
-    bytes32[] memory _prevProof = challenge.proof;
-    TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
-    bytes32 inTxHash = keccak256(inTxData);
+  // function resolveInputSpendChallenge(
+  //   bytes32 exitId, bytes memory inTxData, uint8 InputNo,
+  //   bytes32[] memory _txProof, bytes32[] memory _youngestInputProof
+  // ) public {
+  //   LimboExit memory limboExit = limboExits[exitId];
+  //   LimboChallenge memory challenge = limboExit.input[InputNo].challenge;
+  //   bytes32[] memory _prevProof = challenge.proof;
+  //   TxLib.Tx memory transferTx = TxLib.parseTx(inTxData);
+  //   bytes32 inTxHash = keccak256(inTxData);
 
-    bytes32 previousHash;
-    bytes memory previousTxData;
-    uint64 previousPos;
+  //   bytes32 previousHash;
+  //   bytes memory previousTxData;
+  //   uint64 previousPos;
 
-    (previousPos, previousHash, previousTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _prevProof);
-    TxLib.Tx memory previousTx = TxLib.parseTx(previousTxData);      
-    uint32 prevHeight = bridge.periods[_prevProof[0]].height;
+  //   (previousPos, previousHash, previousTxData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _prevProof);
+  //   TxLib.Tx memory previousTx = TxLib.parseTx(previousTxData);      
+  //   uint32 prevHeight = bridge.periods[_prevProof[0]].height;
 
-    uint32 blockHeight = bridge.periods[_txProof[0]].height;
-    require(blockHeight < prevHeight);
+  //   uint32 blockHeight = bridge.periods[_txProof[0]].height;
+  //   require(blockHeight < prevHeight);
 
-    limboExit.isValid = true;
-    limboExit.input[InputNo].exitable = true;
-    limboExit.input[InputNo].challenge.resolved = true;
-    //[TODO] pay resolver exitStake
-  }
+  //   limboExit.isValid = true;
+  //   limboExit.input[InputNo].exitable = true;
+  //   limboExit.input[InputNo].challenge.resolved = true;
+  //   //[TODO] pay resolver exitStake
+  // }
 
   function finalizeTopLimboExit(uint16 _color) public {
     bytes32 utxoId;
@@ -392,26 +417,28 @@ contract ExitHandler is DepositHandler {
     require(tokens[_color].currentSize > 0, "The exit queue for color is empty");
 
     LimboExit memory currentExit = limboExits[utxoId];
-    uint256 amount;
-    if (currentExit.isValid == true){
-      // all piggybacked outputs are paid out
-      for(uint8 i=0; i < currentExit.output.length; i++){
-        LimboOut memory out = currentExit.output[i];
-        if (out.exitable){
-          amount = piggybackStake + out.amount;
-          tokens[out.color].addr.transferFrom(address(this), out.owner, amount);
+    bytes32 txHash = currentExit.txHash;
+    LimboTx memory txn = limboTxns[txHash];
+    if (txn.isCanonical){
+      // unspent piggybacked outputs will exit
+      for (uint8 i=0; i < txn.outputs.length; i++){
+        if (txn.outputs[i].isPegged){
+          if(txn.outputs[i].unspent){
+            // output will exit the chain
+          }
         }
       }
     } else {
-      // all piggybacked inputs are paid out
-      for(uint8 i=0; i < currentExit.input.length; i++){
-        LimboIn memory input = currentExit.input[i];
-        if (input.exitable){
-          amount = piggybackStake + input.amount;
-          tokens[input.color].addr.transferFrom(address(this), input.owner, amount);
+      // unspent piggybacked inputs will exit
+      for (uint8 i=0; i < txn.inputs.length; i++){
+        if (txn.inputs[i].isPegged){
+          if(txn.inputs[i].challenge.length == 0){
+            // unchallenged inputs will exit the chain
+          }
         }
       }
     }
+
     delete limboExits[utxoId];
   }
 
