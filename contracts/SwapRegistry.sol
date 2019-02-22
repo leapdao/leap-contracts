@@ -28,7 +28,7 @@ contract SwapRegistry is Adminable {
   uint256 inflationRate; // between 0 and maxInflation/inflationFactor
   uint256 constant poaSupplyTarget = 7000000 * 10 ** 18;
   uint256 poaReward;
-  mapping(uint256 => uint256) slotToHeight;
+  mapping(uint256 => uint256) public slotToHeight;
 
   function initialize(
     address _bridge,
