@@ -151,6 +151,7 @@ contract('SwapRegistry', (accounts) => {
       });
 
       it('should allow to claim multiple at once', async () => {
+        const heightBefore = await swapRegistry.slotToHeight(3);
         const period1 = await submitNewPeriod([depositTx], 3, bob);
         const depositTx2 = Tx.deposit(2, 34567890, alice);
         const period2 = await submitNewPeriod([depositTx2], 3, bob);
@@ -159,6 +160,8 @@ contract('SwapRegistry', (accounts) => {
         const consensusRoot2 = merkelize(period2.merkleRoot(), empty);
         const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
         await swapRegistry.claim(3, [consensusRoot1, consensusRoot2], [empty, empty], [validatorData, validatorData], [empty, empty], {from: bob}).should.be.fulfilled;
+        const heightAfter = await swapRegistry.slotToHeight(3);
+        assert(heightBefore.toNumber() < heightAfter.toNumber());
       });
     });
 
