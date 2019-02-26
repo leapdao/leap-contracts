@@ -108,8 +108,10 @@ contract('FastExitHandler', (accounts) => {
       const outputIndex = 0;
       const inputIndex = 0;
 
-      await exitHandler.startBoughtExit(depositProof, transferProof, outputIndex, 
+      const rsp = await exitHandler.startBoughtExit(depositProof, transferProof, outputIndex, 
         inputIndex, signedDataBytes32, {from: bob}).should.be.fulfilled;
+
+      assert.equal(rsp.receipt.logs[0].args.exitor, exitHandler.address);
 
       const aliceBalance2 = await nativeToken.balanceOf(alice);
       const bobBalance2 = await nativeToken.balanceOf(bob);

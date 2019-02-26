@@ -96,7 +96,7 @@ contract FastExitHandler is ExitHandler {
       data.txHash, 
       _outputIndex, 
       out.color, 
-      msg.sender, 
+      out.owner,
       out.value
     );
   }
