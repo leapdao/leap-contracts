@@ -46,7 +46,7 @@ contract('ExitHandler', (accounts) => {
     let depositTx;
     let transferTx;
     const depositAmount = new BN(100);
-    const depositId = 1;
+    let depositId = 1;
 
     // ERC721 token stuff
     let nftToken;
@@ -356,6 +356,67 @@ contract('ExitHandler', (accounts) => {
         exit = await exitHandler.exits(utxoId);
         // check that exit was deleted
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
+      });
+
+      it("Should allow to finalise multiple exits", async () => {
+
+        const exits = [];
+        let event;
+
+        /* eslint-disable */
+        for (let i=0; i<10; i++) {
+          await seedTxs();
+          depositId ++;
+          const period = await submitNewPeriod([depositTx, transferTx]);
+          const transferProof = period.proof(transferTx);
+          const outputIndex = 1;
+          const inputProof = period.proof(depositTx); // transferTx spends depositTx
+          const inputIndex = 0;
+
+          event = await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
+          exits.push(exitUtxoId(event));
+        }
+        /* eslint-enable */
+
+        (await Promise.all(exits.map(utxoId => exitHandler.exits(utxoId)))).forEach(exit => {
+          assert.equal(exit.finalized, false);
+        })
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        (await Promise.all(exits.map(utxoId => exitHandler.exits(utxoId)))).forEach(exit => {
+          assert.equal(exit.finalized, true);
+        })
+
+      });
+
+      it("Finalise exit should cost less than 6M gas", async () => {
+
+        depositId = 1;
+
+        /* eslint-disable */
+        for (let i=0; i<30; i++) {
+          await seedTxs();
+          depositId ++;
+          const period = await submitNewPeriod([depositTx, transferTx]);
+          const transferProof = period.proof(transferTx);
+          const outputIndex = 1;
+          const inputProof = period.proof(depositTx); // transferTx spends depositTx
+          const inputIndex = 0;
+
+          await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
+        }
+        /* eslint-enable */
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        const finEvent = await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        assert(finEvent.receipt.gasUsed < 6000000);
       });
 
     });
