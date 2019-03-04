@@ -152,7 +152,6 @@ contract PoaOperator is Adminable {
   event Submission(
     bytes32 indexed blocksRoot,
     uint256 indexed slotId,
-    uint256 newHeight,
     address owner,
     bytes32 periodRoot
   );
@@ -203,11 +202,6 @@ contract PoaOperator is Adminable {
       lastEpochBlockHeight = newHeight;
       emit Epoch(lastCompleteEpoch);
     }
-    emit Submission(
-      _blocksRoot,
-      _slotId,
-      newHeight,
-      slot.owner,
-      hashRoot);
+    emit Submission(_blocksRoot, _slotId, slot.owner, hashRoot);
   }
 }

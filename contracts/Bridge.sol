@@ -19,6 +19,7 @@ contract Bridge is Adminable {
     _;
   }
 
+  event NewHeight(uint256 height, bytes32 indexed root);
   event NewOperator(address operator);
 
   struct Period {
@@ -81,6 +82,7 @@ contract Bridge is Adminable {
       );
       tipHash = _root;
       lastParentBlock = block.number;
+      emit NewHeight(newHeight, _root);
     }
     // store the period
     Period memory newPeriod = Period({
