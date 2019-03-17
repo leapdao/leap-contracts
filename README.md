@@ -26,6 +26,7 @@ Contract may be customized via ENV variables:
 | PARENT_BLOCK_INTERVAL | Number of Ethereum blocks between Plasma periods | 2 |
 | TAX_RATE | Initial tax rate (0 - 1000 equals 0% - 100%) | 50 |
 | POA_REWARD | Reward rate before supply of 7 million reached | 778000000000000000000 |
+| GOV_OWNER | Owner address of the `MinGov.sol` contract, should be set to seed initial token supply. | |
 
 
 E.g. `PROPOSAL_TIME=600 EXIT_DURATION=180 yarn deploy` deploys plasma contract with 3 minutes exit duration governed by MinGov with 10 minutes proposal time.
@@ -43,6 +44,15 @@ This will deploy deploy token, plasma and governance contracts.
 ```
 yarn deploy:plasma
 ```
+
+### Good things to know
+
+`slotId` in `MinGov.setSlot` is encoded like this:
+
+| First 20 bytes  | last 12 bytes |
+| ---------------------- | ------ |
+| address(OperatorProxy) | slotId |
+
 
 # Contracts
 
