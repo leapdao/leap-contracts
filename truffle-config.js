@@ -34,7 +34,7 @@ module.exports = {
         process.env.MAINNET_MNEMONIC, 'https://mainnet.infura.io', 0, 2,
       ),
       network_id: '1',
-      gas: 200000,
+      gas: 1000000,
       gasPrice: 5000000000 // Specified in Wei
     },
     rinkeby: {
@@ -42,7 +42,8 @@ module.exports = {
         process.env.RINKEBY_MNEMONIC, 'https://rinkeby.infura.io', 0, 2,
       ),
       network_id: '4',
-      gas: 200000
+      gas: 1000000,
+      gasPrice: 3000000000
     },
     ganache: {
       host: 'localhost',
