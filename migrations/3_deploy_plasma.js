@@ -82,25 +82,27 @@ module.exports = (deployer, network, accounts) => {
     estimate = 955744; // guess
     const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin, gas: estimate });
 
+    // estimate for the remaining calls
+    estimate = 70000;
     const swapRegistry = await SwapRegistry.at(registryProxy.address);
     if (taxRate) {
       data = await swapRegistry.contract.methods.setTaxRate(taxRate).encodeABI();
-      await bridgeProxy.applyProposal(data, {from: admin});
+      await bridgeProxy.applyProposal(data, { from: admin, gas: estimate });
     }
 
     const isMinter = await nativeToken.isMinter(accounts[0]);
     // if we got the right, then add registry as minter
     if (isMinter) {
-      await nativeToken.addMinter(swapRegistry.address);
+      await nativeToken.addMinter(swapRegistry.address, { gas: estimate });
     }
 
     const bridge = await Bridge.at(bridgeProxy.address);
     data = await bridge.contract.methods.setOperator(operatorProxy.address).encodeABI();
-    await bridgeProxy.applyProposal(data, {from: admin});
+    await bridgeProxy.applyProposal(data, { from: admin, gas: estimate });
 
     const vault = await Vault.at(exitHandlerProxy.address);
     data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
-    await exitHandlerProxy.applyProposal(data, { from: admin });
+    await exitHandlerProxy.applyProposal(data, { from: admin, gas: estimate });
 
     writeConfig({
       bridgeProxy,
