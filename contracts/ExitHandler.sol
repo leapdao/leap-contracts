@@ -177,7 +177,7 @@ contract ExitHandler is DepositHandler {
   }
 
   // @dev Finalizes exit for the chosen color with the highest priority
-  function finalizeTopExit(uint16 _color) public {
+  function finalizeExits(uint16 _color) public {
     bytes32 utxoId;
     uint256 exitableAt;
     Exit memory currentExit;
@@ -215,6 +215,11 @@ contract ExitHandler is DepositHandler {
         return;
       }
     }
+  }
+
+  // @dev For backwards compatibility reasons...
+  function finalizeTopExit(uint16 _color) public {
+    finalizeExits(_color);
   }
 
   function challengeExit(
