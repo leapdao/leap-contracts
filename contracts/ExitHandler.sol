@@ -177,30 +177,50 @@ contract ExitHandler is DepositHandler {
   }
 
   // @dev Finalizes exit for the chosen color with the highest priority
-  function finalizeTopExit(uint16 _color) public {
+  function finalizeExits(uint16 _color) public {
     bytes32 utxoId;
     uint256 exitableAt;
+    Exit memory currentExit;
+
     (utxoId, exitableAt) = getNextExit(_color);
 
-    require(exitableAt <= block.timestamp, "The top exit can not be exited yet");
-    require(tokens[_color].currentSize > 0, "The exit queue for color is empty");
+    require(tokens[_color].currentSize > 0, "Queue empty for color.");
 
-    Exit memory currentExit = exits[utxoId];
-
-    if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was removed
-      // Note: for NFTs, the amount is actually the NFT id (both uint256)
-      if (isNft(currentExit.color)) {
-        tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
-      } else {
-        tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
-        tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+    for (uint i = 0; i<20; i++) {
+      // if queue is empty or top exit cannot be exited yet, stop
+      if (exitableAt > block.timestamp) {
+        return;
       }
-      // Pay exit stake
-      address(uint160(currentExit.owner)).transfer(currentExit.stake);
-    }
 
-    tokens[currentExit.color].delMin();
-    exits[utxoId].finalized = true;
+      currentExit = exits[utxoId];
+
+      if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was not removed
+        // Note: for NFTs, the amount is actually the NFT id (both uint256)
+        if (isNft(currentExit.color)) {
+          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+        } else {
+          tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
+          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+        }
+        // Pay exit stake
+        address(uint160(currentExit.owner)).send(currentExit.stake);
+
+      }
+
+      tokens[currentExit.color].delMin();
+      exits[utxoId].finalized = true;
+
+      if (tokens[currentExit.color].currentSize > 0) {
+        (utxoId, exitableAt) = getNextExit(_color);
+      } else {
+        return;
+      }
+    }
+  }
+
+  // @dev For backwards compatibility reasons...
+  function finalizeTopExit(uint16 _color) public {
+    finalizeExits(_color);
   }
 
   function challengeExit(
