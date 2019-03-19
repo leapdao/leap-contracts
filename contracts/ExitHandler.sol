@@ -199,7 +199,8 @@ contract ExitHandler is DepositHandler {
         if (isNft(currentExit.color)) {
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else {
-          tokens[currentExit.color].addr.transfer(currentExit.owner, currentExit.amount);
+          tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
+          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         }
         // Pay exit stake
         address(uint160(currentExit.owner)).send(currentExit.stake);
