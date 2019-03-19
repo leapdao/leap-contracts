@@ -11,7 +11,8 @@ library TxLib {
 
   uint constant internal WORD_SIZE = 32;
   uint constant internal ONES = ~uint(0);
-  enum TxType { None0, None1, Deposit, Transfer, None4, None5, None6, None7, None8, None9, None10, None11, None12, SpendCond }
+  enum TxType { None0, None1, Deposit, Transfer, None4, None5,
+  None6, None7, None8, None9, None10, None11, None12, SpendCond }
 
   struct Outpoint {
     bytes32 hash;

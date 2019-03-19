@@ -11,6 +11,7 @@ import BN from 'bn.js';
 import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
+
 const ethers = require('ethers');
 
 const TxMock = artifacts.require('./mocks/TxMock.sol');
@@ -26,11 +27,6 @@ function toInt(str) {
   // const buf = Buffer.from(str.replace('0x', ''), 'hex');
   // return new BN(buf);
   return BigInt(str);
-}
-
-function toAddr(str) {
-  const buf = Buffer.from(str.replace('0x', ''), 'hex');
-  return `0x${buf.slice(12, 32).toString('hex')}`;
 }
 
 function fromInt(num) {
@@ -73,12 +69,12 @@ function checkParse(rsp, txn) {
 }
 
 export async function deployContract(truffleContract, ...args) {
-  let _factory = new ethers.ContractFactory(
+  const factory = new ethers.ContractFactory(
     truffleContract.abi,
     truffleContract.bytecode,
     wallets[0]
   );
-  const contract = await _factory.deploy(...args);
+  const contract = await factory.deploy(...args);
 
   await contract.deployed();
   return contract;
@@ -216,9 +212,6 @@ contract('TxLib', (accounts) => {
 
       it('should parse single input and output', async () => {
         // create simple spending condition
-        const prevTx = '0x7777777777777777777777777777777777777777777777777777777777777777';
-        const value = BigInt('99000000');
-        const color = 1337;
         const condition = Tx.spendCond(
           [new Input({
             prevout: new Outpoint(prevTx, 0),
@@ -238,6 +231,57 @@ contract('TxLib', (accounts) => {
         const outpoint = condition.inputs[0].prevout;
         const utxoId = await txLib.getUtxoId(outpoint.index, `0x${outpoint.hash.toString('hex')}`);
         assert.equal(utxoId, outpoint.getUtxoId());
+      });
+
+      it('should parse 2 inputs and 2 outputs', async () => {
+        const condition = Tx.spendCond(
+          [new Input({
+            prevout: new Outpoint(prevTx, 0),
+            script: '0x123456',
+          }),
+          new Input({
+            prevout: new Outpoint(prevTx, 1),
+            script: '0x7890ab',
+          }),
+        ],[
+          new Output(value / 2, alice, color),
+          new Output(value / 2, bob, color),
+        ]);
+        condition.inputs[0].setMsgData('0xabcdef');
+        condition.inputs[1].setMsgData('0xfedcba');
+
+        const block = new Block(32);
+        block.addTx(condition);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(condition);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        console.log(rsp);
+        checkParse(rsp, condition);
+      });
+
+      it('should parse 1 inputs and 3 outputs', async () => {
+        const condition = Tx.spendCond([
+          new Input({
+            prevout: new Outpoint(prevTx, 0),
+            script: '0x123456',
+          }),
+        ],[
+          new Output(value / 3, alice, color),
+          new Output(value / 3, bob, color),
+          new Output(value / 3, charlie, color),
+        ]);
+        condition.inputs[0].setMsgData('0xabcdef');
+
+        const block = new Block(32);
+        block.addTx(condition);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(condition);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, condition);
       });
     });
   });
