@@ -184,9 +184,11 @@ contract ExitHandler is DepositHandler {
 
     (utxoId, exitableAt) = getNextExit(_color);
 
+    require(tokens[_color].currentSize > 0, "Queue empty for color.");
+
     for (uint i = 0; i<20; i++) {
       // if queue is empty or top exit cannot be exited yet, stop
-      if (exitableAt > block.timestamp || tokens[_color].currentSize < 1) {
+      if (exitableAt > block.timestamp) {
         return;
       }
 
@@ -197,8 +199,7 @@ contract ExitHandler is DepositHandler {
         if (isNft(currentExit.color)) {
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else {
-          tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
-          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+          tokens[currentExit.color].addr.transfer(currentExit.owner, currentExit.amount);
         }
         // Pay exit stake
         address(uint160(currentExit.owner)).send(currentExit.stake);

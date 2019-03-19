@@ -147,6 +147,10 @@ contract('ExitHandler', (accounts) => {
         assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
       });
 
+      it('Finalise exit should revert if queue is empty', async () => {
+        await exitHandler.finalizeTopExit(nativeTokenColor).should.be.rejectedWith(EVMRevert);
+      });
+
       it('Should allow to exit deposit utxo', async () => {
         const period = await submitNewPeriod([depositTx]);
 

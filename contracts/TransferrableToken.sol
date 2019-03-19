@@ -12,6 +12,7 @@ import "../node_modules/openzeppelin-solidity/contracts/introspection/ERC165.sol
 
 
 contract TransferrableToken is ERC165 {
+  function transfer(address _to, uint256 _valueOrTokenId) public;
   function transferFrom(address _from, address _to, uint256 _valueOrTokenId) public;
   function approve(address _to, uint256 _value) public;
 }
