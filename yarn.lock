@@ -1490,7 +1490,7 @@ esutils@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/esutils/-/esutils-2.0.2.tgz#0abf4f1caa5bcb1f7a9d8acc6dea4faaa04bac9b"
 
-ethereumjs-util@^6.0.0:
+ethereumjs-util@6.0.0, ethereumjs-util@^6.0.0:
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/ethereumjs-util/-/ethereumjs-util-6.0.0.tgz#f14841c182b918615afefd744207c7932c8536c0"
   dependencies:
@@ -2383,13 +2383,14 @@ lcid@^1.0.0:
   dependencies:
     invert-kv "^1.0.0"
 
-leap-core@^0.27.0:
-  version "0.27.1"
-  resolved "https://registry.yarnpkg.com/leap-core/-/leap-core-0.27.1.tgz#5c52a54499588b09e42cd68171014847a59faff5"
+leap-core@^0.28.2:
+  version "0.28.2"
+  resolved "https://registry.yarnpkg.com/leap-core/-/leap-core-0.28.2.tgz#bac24ef3bdd6e5bb8f1be0949829e70bf77fb78a"
+  integrity sha512-GaEKfZwK+U0RP/U3MWLw63qc8HNeVN9j5YUMv++P+VtbqojVl+qqMODoiO3gaKEYZMBi2HGkaj5LiYJAkQxVdA==
   dependencies:
     "@types/web3" "^1.0.18"
     babel-polyfill "^6.26.0"
-    ethereumjs-util "^6.0.0"
+    ethereumjs-util "6.0.0"
     jsbi-utils "^1.0.0"
 
 levn@^0.3.0, levn@~0.3.0:

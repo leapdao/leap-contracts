@@ -257,7 +257,6 @@ contract('TxLib', (accounts) => {
         const proof = period.proof(condition);
 
         const rsp = await txLib.parse(proof).should.be.fulfilled;
-        console.log(rsp);
         checkParse(rsp, condition);
       });
 

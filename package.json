@@ -45,7 +45,7 @@
     "ganache-cli": "^6.2.3",
     "husky": "^1.2.0",
     "jsbi": "^2.0.5",
-    "leap-core": "^0.27.0",
+    "leap-core": "^0.28.2",
     "solium": "^1.1.8",
     "truffle": "^5.0.0"
   },
