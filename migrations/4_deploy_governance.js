@@ -43,40 +43,43 @@ module.exports = (deployer, network, accounts) => {
       governance = await deployer.deploy(MinGov, proposalTime, {gas: estimate});
     }
 
+    // estimate for remaining calls
+    estimate = 70000;
+
     const bridgeProxy = await BridgeProxy.deployed();
     log('  🔄 Transferring ownership for Bridge:', bridgeProxy.address);
-    await bridgeProxy.changeAdmin(governance.address, { from: admin });
+    await bridgeProxy.changeAdmin(governance.address, { from: admin, gas: estimate });
 
     const operatorProxy = await OperatorProxy.deployed();
     log('  🔄 Transferring ownership for Operator:', operatorProxy.address);
-    await operatorProxy.changeAdmin(governance.address, { from: admin });
+    await operatorProxy.changeAdmin(governance.address, { from: admin, gas: estimate });
     
     const exitHandlerProxy = await ExitHandlerProxy.deployed();
     log('  🔄 Transferring ownership for ExitHandler:', exitHandlerProxy.address);
-    await exitHandlerProxy.changeAdmin(governance.address, { from: admin });
+    await exitHandlerProxy.changeAdmin(governance.address, { from: admin, gas: estimate });
 
     const registryProxy = await AdminableProxy.deployed();
     log('  🔄 Transferring ownership for SwapRegistry:', registryProxy.address);
-    await registryProxy.changeAdmin(governance.address, { from: admin });
+    await registryProxy.changeAdmin(governance.address, { from: admin, gas: estimate });
 
     const isMinter = await nativeToken.isMinter(accounts[0]);
     if (ownerAddr) {
       if (!govAddr) {
         log('  🔄 Transferring ownership for Governance:', ownerAddr);
-        await governance.transferOwnership(ownerAddr);
+        await governance.transferOwnership(ownerAddr, { gas: estimate });
       }
       if (isMinter) {
         log('  init supply.');
         const decimals = await nativeToken.decimals();
         const amount = (10**decimals.toNumber()).toString();
-        await nativeToken.mint(ownerAddr, amount);
+        await nativeToken.mint(ownerAddr, amount, { gas: estimate });
       }
     }
     
     if (isMinter) {
       log('  🔄 Transferring minting right for token:', nativeToken.address);
-      await nativeToken.addMinter(governance.address);
-      await nativeToken.renounceMinter();
+      await nativeToken.addMinter(governance.address, { gas: estimate });
+      await nativeToken.renounceMinter({ gas: estimate });
     }
 
     const isRegistryMinter = await nativeToken.isMinter(registryProxy.address);

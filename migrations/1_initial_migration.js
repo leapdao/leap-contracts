@@ -8,8 +8,9 @@
 const Migrations = artifacts.require('./Migrations.sol')
 
 module.exports = (deployer) => {
-	deployer.then(async () => {
-	  let estimate = (await Migrations.new.estimateGas()) * 2;
-	  await deployer.deploy(Migrations, {gas: estimate});
-	});
+  deployer.then(async () => {
+    // was 221171 on goerli, use a bit more to be safe
+    let estimate = 230000;
+    await deployer.deploy(Migrations, {gas: estimate});
+  });
 }
