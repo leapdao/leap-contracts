@@ -11,7 +11,8 @@ library TxLib {
 
   uint constant internal WORD_SIZE = 32;
   uint constant internal ONES = ~uint(0);
-  enum TxType { Deposit, Transfer }
+  enum TxType { None0, None1, Deposit, Transfer, None4, None5,
+  None6, None7, None8, None9, None10, None11, None12, SpendCond }
 
   struct Outpoint {
     bytes32 hash;
@@ -23,14 +24,14 @@ library TxLib {
     bytes32 r;
     bytes32 s;
     uint8 v;
+    bytes script;
+    bytes msgData;
   }
 
   struct Output {
     uint256 value;
     uint16 color;
     address owner;
-    uint32 gasPrice;
-    bytes msgData;
     bytes32 stateRoot;
   }
 
@@ -63,7 +64,39 @@ library TxLib {
       newOffset = offset + 33;
     }
     Outpoint memory outpoint = Outpoint(inputData, index);
-    Input memory input = Input(outpoint, 0, 0, 0); // solium-disable-line arg-overflow
+    bytes memory data = new bytes(0);
+    Input memory input = Input(outpoint, 0, 0, 0, data, data); // solium-disable-line arg-overflow
+    if (_type == TxType.SpendCond) {
+      uint16 len;
+      assembly {
+        len := mload(add(add(offset, 35), _txData)) 
+      }
+      // read msgData
+      data = new bytes(len);  
+      uint src;
+      uint dest;
+      assembly {  
+        src := add(add(add(offset, 35), 0x20), _txData) 
+        dest := add(data, 0x20) 
+      }
+      memcopy(src, dest, len);  
+      input.msgData = data;  
+      newOffset = offset + 37 + len;
+
+      assembly {
+        len := mload(add(newOffset, _txData)) 
+      }
+
+      // read script
+      data = new bytes(len);
+      assembly {  
+        src := add(add(add(newOffset, 0), 0x20), _txData) 
+        dest := add(data, 0x20) 
+      }
+      memcopy(src, dest, len);  
+      input.script = data;
+      newOffset = newOffset + len;
+    }
     if (_type == TxType.Transfer) {
       bytes32 r;
       bytes32 s;
@@ -113,8 +146,7 @@ library TxLib {
       color := mload(add(add(offset, 34), _txData))
       owner := mload(add(add(offset, 54), _txData))
     }
-    bytes memory data = new bytes(0);
-    Output memory output = Output(value, color, owner, 0, data, 0);  // solium-disable-line arg-overflow
+    Output memory output = Output(value, color, owner, 0);  // solium-disable-line arg-overflow
     _outs[_pos] = output;
     newOffset = offset + 54;
   }
@@ -131,6 +163,8 @@ library TxLib {
       txType = TxType.Deposit;
     } else if (a == 3) {
       txType = TxType.Transfer;
+    } else if (a == 13) {
+      txType = TxType.SpendCond;
     } else {
       revert("unknown tx type");
     }

@@ -40,6 +40,4 @@ else
   start_ganache
 fi
 
-truffle version
-
 node_modules/.bin/truffle test "$@"

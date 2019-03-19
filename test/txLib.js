@@ -12,20 +12,21 @@ import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
 import chai from 'chai';
 
+const ethers = require('ethers');
+
 const TxMock = artifacts.require('./mocks/TxMock.sol');
 const EMPTY =  '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 chai.use(require('chai-as-promised')).should();
 
+export const provider =
+  typeof web3 !== 'undefined' ? new ethers.providers.Web3Provider(web3.currentProvider) : undefined;
+export const wallets = [];
+
 function toInt(str) {
   // const buf = Buffer.from(str.replace('0x', ''), 'hex');
   // return new BN(buf);
   return BigInt(str);
-}
-
-function toAddr(str) {
-  const buf = Buffer.from(str.replace('0x', ''), 'hex');
-  return `0x${buf.slice(12, 32).toString('hex')}`;
 }
 
 function fromInt(num) {
@@ -34,35 +35,49 @@ function fromInt(num) {
 
 function checkParse(rsp, txn) {
   // transaction header
-  assert.equal(rsp[0], txn.type);
+  assert.equal(rsp.txType, txn.type);
   if (txn.type === Type.DEPOSIT) {
     // eslint-disable-next-line no-param-reassign
     txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
   }
-  assert.equal(toInt(rsp[1][0]), txn.inputs.length);
-  assert.equal(toInt(rsp[1][1]), txn.outputs.length);
+  assert.equal(rsp.ins.length, txn.inputs.length);
+  assert.equal(rsp.outs.length, txn.outputs.length);
   // inputs
   for (let i = 0; i < txn.inputs.length; i++) {
-    assert.equal(rsp[1][2 + i * 5], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
-    assert.equal(toInt(rsp[1][3 + i * 5]), i); // output position
+    assert.equal(rsp.ins[i].outpoint[0], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
+    assert.equal(toInt(rsp.ins[i].outpoint[1]), i); // output position
     if (txn.type === Type.TRANSFER) {
-      assert.equal(rsp[1][4 + i * 5], `0x${txn.inputs[i].r.toString('hex')}`);
-      assert.equal(rsp[1][5 + i * 5], `0x${txn.inputs[i].s.toString('hex')}`);
-      assert.equal(toInt(rsp[1][6 + i * 5]), txn.inputs[i].v);
-    } else  {
-      assert.equal(rsp[1][4 + i * 5], EMPTY);
-      assert.equal(rsp[1][5 + i * 5], EMPTY);
-      assert.equal(toInt(rsp[1][6 + i * 5]), 0);
+      assert.equal(rsp.ins[i].r, `0x${txn.inputs[i].r.toString('hex')}`);
+      assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
+      assert.equal(rsp.ins[i].v, txn.inputs[i].v);
+    } else if (txn.type === Type.SPEND_COND) {
+      assert.equal(rsp.ins[i].msgData, `0x${txn.inputs[i].msgData.toString('hex')}`);
+      assert.equal(rsp.ins[i].script, `0x${txn.inputs[i].script.toString('hex')}`);
+    } else {
+      assert.equal(rsp.ins[i].r, EMPTY);
+      assert.equal(rsp.ins[i].s, EMPTY);
+      assert.equal(toInt(rsp.ins[i].v), 0);
     }
   }
   // outputs
   for (let i = 0; i < txn.outputs.length; i++) {
-    assert(equal(toInt(rsp[1][2 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].value));
-    assert.equal(toInt(rsp[1][3 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].color);
-    assert.equal(toAddr(rsp[1][4 + txn.inputs.length * 5 + i * 5]), txn.outputs[i].address.toLowerCase());
-    assert.equal(toAddr(rsp[1][5 + txn.inputs.length * 5 + i * 5]), 0); // gas price
-    assert.equal(rsp[1][6 + txn.inputs.length * 5 + i * 5], EMPTY); // storage root
+    assert(equal(toInt(rsp.outs[i].value), txn.outputs[i].value));
+    assert.equal(toInt(rsp.outs[i].color), txn.outputs[i].color);
+    assert.equal(rsp.outs[i].owner, txn.outputs[i].address);
+    assert.equal(rsp.outs[i].stateRoot, EMPTY); // storage root
   }
+}
+
+export async function deployContract(truffleContract, ...args) {
+  const factory = new ethers.ContractFactory(
+    truffleContract.abi,
+    truffleContract.bytecode,
+    wallets[0]
+  );
+  const contract = await factory.deploy(...args);
+
+  await contract.deployed();
+  return contract;
 }
 
 contract('TxLib', (accounts) => {
@@ -77,12 +92,16 @@ contract('TxLib', (accounts) => {
   const nftTokenId = '3378025004445879814397';
   const nftColor = 32769;
   const slotId = 4;
+  let wallet = new ethers.Wallet(alicePriv, provider);
+  wallets.push(wallet);
+  wallet = new ethers.Wallet(bobPriv, provider);
+  wallets.push(wallet);
 
   describe('Parser', () => {
     let txLib;
 
     before(async () => {
-      txLib = await TxMock.new();
+      txLib = await deployContract(TxMock);
     });
 
     describe('Deposit', () => {
@@ -188,13 +207,89 @@ contract('TxLib', (accounts) => {
         checkParse(rsp, transfer);
       });
     });
+
+    describe('Spending Condition', () => {
+
+      it('should parse single input and output', async () => {
+        // create simple spending condition
+        const condition = Tx.spendCond(
+          [new Input({
+            prevout: new Outpoint(prevTx, 0),
+            script: '0x123456',
+          })], [new Output(value, alice, color)],
+        );
+        condition.inputs[0].setMsgData('0xabcdef');
+
+        const block = new Block(32);
+        block.addTx(condition);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(condition);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, condition);
+        const outpoint = condition.inputs[0].prevout;
+        const utxoId = await txLib.getUtxoId(outpoint.index, `0x${outpoint.hash.toString('hex')}`);
+        assert.equal(utxoId, outpoint.getUtxoId());
+      });
+
+      it('should parse 2 inputs and 2 outputs', async () => {
+        const condition = Tx.spendCond(
+          [new Input({
+            prevout: new Outpoint(prevTx, 0),
+            script: '0x123456',
+          }),
+          new Input({
+            prevout: new Outpoint(prevTx, 1),
+            script: '0x7890ab',
+          }),
+        ],[
+          new Output(value / 2, alice, color),
+          new Output(value / 2, bob, color),
+        ]);
+        condition.inputs[0].setMsgData('0xabcdef');
+        condition.inputs[1].setMsgData('0xfedcba');
+
+        const block = new Block(32);
+        block.addTx(condition);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(condition);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, condition);
+      });
+
+      it('should parse 1 inputs and 3 outputs', async () => {
+        const condition = Tx.spendCond([
+          new Input({
+            prevout: new Outpoint(prevTx, 0),
+            script: '0x123456',
+          }),
+        ],[
+          new Output(value / 3, alice, color),
+          new Output(value / 3, bob, color),
+          new Output(value / 3, charlie, color),
+        ]);
+        condition.inputs[0].setMsgData('0xabcdef');
+
+        const block = new Block(32);
+        block.addTx(condition);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(condition);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, condition);
+      });
+    });
   });
 
   describe('Utils', () => {
     let txLib;
 
     before(async () => {
-      txLib = await TxMock.new();
+      txLib = await deployContract(TxMock);
     });
 
     it('should allow to verify proof', async () => {
