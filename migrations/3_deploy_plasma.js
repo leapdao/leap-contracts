@@ -83,7 +83,7 @@ module.exports = (deployer, network, accounts) => {
     const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin, gas: estimate });
 
     // estimate for the remaining calls
-    estimate = 70000;
+    estimate = 70000 * 2;
     const swapRegistry = await SwapRegistry.at(registryProxy.address);
     if (taxRate) {
       data = await swapRegistry.contract.methods.setTaxRate(taxRate).encodeABI();

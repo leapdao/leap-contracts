@@ -44,7 +44,7 @@ module.exports = (deployer, network, accounts) => {
     }
 
     // estimate for remaining calls
-    estimate = 70000;
+    estimate = 70000 * 2;
 
     const bridgeProxy = await BridgeProxy.deployed();
     log('  🔄 Transferring ownership for Bridge:', bridgeProxy.address);
