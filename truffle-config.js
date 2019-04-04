@@ -35,7 +35,7 @@ module.exports = {
       ),
       network_id: '1',
       // hard gas limit
-      gas: 6000000,
+      gas: 5500000,
       gasPrice: 5000000000 // Specified in Wei
     },
     rinkeby: {
@@ -44,7 +44,7 @@ module.exports = {
       ),
       network_id: '4',
       // hard gas limit
-      gas: 6000000,
+      gas: 5500000,
       // 3 Gwei
       gasPrice: 3000000000
     },

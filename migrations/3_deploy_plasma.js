@@ -30,7 +30,6 @@ const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
-  let estimate;
   const exitDuration = process.env.EXIT_DURATION || DEFAULT_EXIT_DURATION;
   const exitStake = process.env.EXIT_STAKE || DEFAULT_EXIT_STAKE;
   const epochLength = process.env.EPOCH_LENGTH || DEFAULT_EPOCH_LENGTH;
@@ -51,58 +50,47 @@ module.exports = (deployer, network, accounts) => {
       log('  ♻️  Reusing existing Native Token:', nativeToken.address);
     }
 
-    estimate = 599334; // guess
-    const bridgeCont = await deployer.deploy(Bridge, {gas: estimate});
+    const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
-    estimate = 955744; // guess
-    const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin, gas: estimate });
+    const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin});
 
-    estimate = 498356; // guess
-    const pqLib = await deployer.deploy(PriorityQueue, {gas: estimate});
+    const pqLib = await deployer.deploy(PriorityQueue);
     ExitHandler.link('PriorityQueue', pqLib.address);
 
     log('  🕐 Exit duration:', durationToString(exitDuration));
     log('  💰 Exit stake:', exitStake);
 
-    estimate = 5416917;
-    const exitHandlerCont = await deployer.deploy(ExitHandler, {gas: estimate});
+    const exitHandlerCont = await deployer.deploy(ExitHandler);
     data = await exitHandlerCont.contract.methods.initializeWithExit(bridgeProxy.address, exitDuration, exitStake).encodeABI();
-    estimate = 955744; // guess
-    const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin, gas: estimate});
+    const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
-    estimate = 959662;
-    const operatorCont = await deployer.deploy(PoaOperator, {gas: estimate});
+    const operatorCont = await deployer.deploy(PoaOperator);
     data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength).encodeABI();
-    estimate = 955744; // guess
-    const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin, gas: estimate });
+    const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
-    estimate = 1399128;
-    const registryCont = await deployer.deploy(SwapRegistry, {gas: estimate});
+    const registryCont = await deployer.deploy(SwapRegistry);
     data = await registryCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, poaReward).encodeABI();
-    estimate = 955744; // guess
-    const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin, gas: estimate });
+    const registryProxy = await deployer.deploy(AdminableProxy, registryCont.address, data, { from: admin });
 
-    // estimate for the remaining calls
-    estimate = 70000;
     const swapRegistry = await SwapRegistry.at(registryProxy.address);
     if (taxRate) {
       data = await swapRegistry.contract.methods.setTaxRate(taxRate).encodeABI();
-      await bridgeProxy.applyProposal(data, { from: admin, gas: estimate });
+      await bridgeProxy.applyProposal(data, { from: admin });
     }
 
     const isMinter = await nativeToken.isMinter(accounts[0]);
     // if we got the right, then add registry as minter
     if (isMinter) {
-      await nativeToken.addMinter(swapRegistry.address, { gas: estimate });
+      await nativeToken.addMinter(swapRegistry.address);
     }
 
     const bridge = await Bridge.at(bridgeProxy.address);
     data = await bridge.contract.methods.setOperator(operatorProxy.address).encodeABI();
-    await bridgeProxy.applyProposal(data, { from: admin, gas: estimate });
+    await bridgeProxy.applyProposal(data, { from: admin });
 
     const vault = await Vault.at(exitHandlerProxy.address);
     data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
-    await exitHandlerProxy.applyProposal(data, { from: admin, gas: estimate });
+    await exitHandlerProxy.applyProposal(data, { from: admin });
 
     writeConfig({
       bridgeProxy,
