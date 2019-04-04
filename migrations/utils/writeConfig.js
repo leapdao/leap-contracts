@@ -17,8 +17,8 @@ function writeConfig({ bridgeProxy, operatorProxy, exitHandlerProxy }, network) 
   const networkData = truffleConfig.networks[network];
   const rootNetwork = `http://${networkData.host}:${networkData.port}`;
   const networkId = Math.floor(Math.random() * Math.floor(1000000000));
-  const advanceBlock = process.env.ADVANCE_BLOCK || 0;
-  const eventsDelay = process.env.EVENTS_DELAY || 0;
+  const bridgeDelay = process.env.BRIDGE_DELAY || 6;
+  const eventsDelay = process.env.EVENTS_DELAY || 2;
   const config = {
     "bridgeAddr": bridgeProxy.address,
     "operatorAddr": operatorProxy.address,
@@ -27,7 +27,7 @@ function writeConfig({ bridgeProxy, operatorProxy, exitHandlerProxy }, network) 
     "network": network,
     "networkId": networkId,
     "peers": [],
-    "advanceBlock": advanceBlock,
+    "bridgeDelay": bridgeDelay,
     "eventsDelay": eventsDelay
   }
   fs.writeFile(
