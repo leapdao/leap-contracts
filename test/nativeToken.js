@@ -12,7 +12,13 @@ contract('NativeToken', (accounts) => {
   let token;
 
   before(async () => {
+<<<<<<< HEAD:test/nativeToken.js
     token = await NativeToken.new('SIM', 'sim', 18);
+=======
+    dai = await NativeToken.new('DAI', 'dai', 18);
+    token = await SunDAI.new(dai.address, bridge.address, '0x00444149', '0x00444149');
+
+>>>>>>> fix linter:test/sunDai.js
   });
 
   it('is mintable', async () => {
