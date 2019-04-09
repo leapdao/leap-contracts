@@ -20,7 +20,7 @@ contract('SunDAI', (accounts) => {
 
   beforeEach(async () => {
     dai = await NativeToken.new('DAI', 'dai', 18);
-    bridge = accounts[2];
+    [,,bridge] = accounts;
     sunDai = await SunDAI.new(dai.address, bridge, '0x00444149', '0x00444149');
   });
 
