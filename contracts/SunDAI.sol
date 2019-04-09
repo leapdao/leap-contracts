@@ -28,7 +28,7 @@ contract SunDAI is IERC20, MinterRole {
   // 2. sunDAI are minted in amount of DAI deposited
   // 3. sunDAI transfered to the Bridge
   function _pullAndMint(address from, address to, uint256 value) internal {
-    dai.transferFrom(from, address(this), value);
+    require(dai.transferFrom(from, address(this), value));
     daiBalance[from] = daiBalance[from].add(value);
     _mint(to, value);
   }
