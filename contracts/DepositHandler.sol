@@ -38,12 +38,11 @@ contract DepositHandler is Vault {
     emit MinGasPrice(minGasPrice);
   }
 
-  function _deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) internal {
-    require(_owner == msg.sender, "trying to deposit other token");
+  function _deposit(uint256 _amountOrTokenId, uint16 _color) internal {
     TransferrableToken token = tokens[_color].addr;
     require(address(token) != address(0), "Token color not registered");
     require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
-    token.transferFrom(_owner, address(this), _amountOrTokenId);
+    token.transferFrom(msg.sender, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
     uint256 timestamp;
@@ -52,13 +51,13 @@ contract DepositHandler is Vault {
     depositCount++;
     deposits[depositCount] = Deposit({
       time: uint32(timestamp),
-      owner: _owner,
+      owner: msg.sender,
       color: _color,
       amount: _amountOrTokenId
     });
     emit NewDeposit(
       depositCount, 
-      _owner, 
+      msg.sender, 
       _color, 
       _amountOrTokenId
     );
@@ -67,17 +66,21 @@ contract DepositHandler is Vault {
    /**
    * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
    * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
+   *
+   * !!!! DEPRECATED, use depositBySender() instead !!!!
+   *
    * @dev Token should be registered with the Bridge first.
    * @param _owner Account to transfer tokens from
    * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer
    * @param _color Color of the token to deposit
    */
   function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
-    _deposit(_owner, _amountOrTokenId, _color);
+    require(_owner == msg.sender, "owner different from msg.sender");
+    _deposit(_amountOrTokenId, _color);
   }
 
   function depositBySender(uint256 _amountOrTokenId, uint16 _color) public {
-    _deposit(msg.sender, _amountOrTokenId, _color);
+    _deposit(_amountOrTokenId, _color);
   }
 
   // solium-disable-next-line mixedcase
