@@ -78,21 +78,26 @@ contract SunDAI is IERC20, MinterRole {
     return true;
   }
 
-  function burn(address owner) public {
-    require(daiBalance[owner] > 0);
+  function _burn(address owner) internal {
     uint256 amount = _balances[owner];
-    if (daiBalance[owner] < amount) {
-      amount = daiBalance[owner];
+    if (!isMinter(owner)) {
+      require(daiBalance[owner] > 0);
+      if (daiBalance[owner] < amount) {
+        amount = daiBalance[owner];
+      }
+      daiBalance[owner] = daiBalance[owner].sub(amount);
     }
-    daiBalance[owner] = daiBalance[owner].sub(amount);
     _burn(owner, amount);
     require(dai.transfer(owner, amount), "dai transfer failed");
   }
 
   function burnSender() public {
-    burn(msg.sender);
+    _burn(msg.sender);
   }
 
+  function addMinter(address _newMinter) public onlyMinter {
+    _addMinter(_newMinter);
+  }
 
 
   // default open zepplin code from here on
