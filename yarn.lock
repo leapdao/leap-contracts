@@ -2383,9 +2383,10 @@ lcid@^1.0.0:
   dependencies:
     invert-kv "^1.0.0"
 
-leap-core@leapdao/leap-core#9a497a7c98d524ad26de7b8589d4de34cca5398f:
-  version "0.28.4"
-  resolved "https://codeload.github.com/leapdao/leap-core/tar.gz/9a497a7c98d524ad26de7b8589d4de34cca5398f"
+leap-core@0.28.5:
+  version "0.28.5"
+  resolved "https://registry.yarnpkg.com/leap-core/-/leap-core-0.28.5.tgz#43e48794dd17649270d1e8df956445d50f10daef"
+  integrity sha512-0nzrgYrY0Szk8b6MRpBC/8T717U3+OMyf/DXHWrrT50Y2A4hLq0fKxgnWPZciVAACIksCRr/3v5rGxAK4n+wSA==
   dependencies:
     "@types/web3" "^1.0.18"
     babel-polyfill "^6.26.0"
