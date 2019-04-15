@@ -137,18 +137,34 @@ library TxLib {
 
   function parseOutput(
     bytes memory _txData, uint256 _pos, uint256 offset, Output[] memory _outs
-  ) internal pure returns (uint256 newOffset) {
+  ) internal pure returns (uint256) {
     uint256 value;
     uint16 color;
     address owner;
+    bytes32 data;
+
     assembly {
-      value := mload(add(add(offset, 32), _txData))
-      color := mload(add(add(offset, 34), _txData))
-      owner := mload(add(add(offset, 54), _txData))
+      offset := add(offset, 32)
+      value := mload(add(offset, _txData))
+
+      offset := add(offset, 2)
+      color := and(mload(add(offset, _txData)), 0xffff)
+
+      offset := add(offset, 20)
+      owner := mload(add(offset, _txData))
+
+      // NST - data
+      // (2 ** 15) + (2 ** 14);
+      if gt(color, 49152) {
+        offset := add(offset, 32)
+        data := mload(add(offset, _txData))
+      }
     }
-    Output memory output = Output(value, color, owner, 0);  // solium-disable-line arg-overflow
+
+    Output memory output = Output(value, color, owner, data);  // solium-disable-line arg-overflow
     _outs[_pos] = output;
-    newOffset = offset + 54;
+
+    return offset;
   }
 
   function parseTx(bytes memory _txData) internal pure returns (Tx memory txn) {
@@ -313,5 +329,4 @@ library TxLib {
     }
     return string(bstr);
   }
-
 }
