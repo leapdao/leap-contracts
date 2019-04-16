@@ -204,8 +204,10 @@ contract ExitHandler is DepositHandler {
     });
 
     if (isNST(deposit.color)) {
-      exitsTokenData[bytes32(_depositId)] = deposit.stateRoot;
-
+      //IERC1537 bla = IERC1537(deposit.amount);
+      //bytes32 _tokenData = bla.readData(deposit.);
+      //exitsTokenData[bytes32(_depositId)] = _tokenData;
+/*
       emit ExitStartedV2(
         bytes32(_depositId),
         0, 
@@ -214,6 +216,7 @@ contract ExitHandler is DepositHandler {
         deposit.amount,
         deposit.stateRoot
       );
+      */
     } else {
       emit ExitStarted(
         bytes32(_depositId), 
@@ -245,9 +248,18 @@ contract ExitHandler is DepositHandler {
 
       if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was not removed
         // Note: for NFTs, the amount is actually the NFT id (both uint256)
-        // XXX
         if (isNft(currentExit.color)) {
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+        } else if (isNST(currentExit.color)) {
+          bytes32 tokenData = exitsTokenData[utxoId];
+          address tokenAddr = address(tokens[currentExit.color].addr);
+          IERC1537 nst = IERC1537(tokenAddr);
+
+          // XXX can this fail, should we care?
+          // we do not care
+          nst.writeData(currentExit.amount, tokenData);
+          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+          //nst.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else {
           tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
@@ -321,8 +333,8 @@ contract ExitHandler is DepositHandler {
         require(deposit.amount == txn.outs[0].value, "value mismatch");
         require(deposit.owner == txn.outs[0].owner, "owner mismatch");
         require(deposit.color == txn.outs[0].color, "color mismatch");
-        if (isNST(deposit.data)) {
-          require(tokenData[bytes32(_depositId)] == txn.outs[0].stateRoot, "data mismatch");
+        if (isNST(deposit.color)) {
+          require(tokenData[uint32(uint256(utxoId))] == txn.outs[0].stateRoot, "data mismatch");
         }
         // todo: check timely inclusion of deposit tx
         // this will prevent grieving attacks by the operator

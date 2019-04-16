@@ -15,6 +15,7 @@ const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
+const NST = artifacts.require('ERC1537.sol');
 
 
 contract('DepositHandler', (accounts) => {
@@ -87,19 +88,22 @@ contract('DepositHandler', (accounts) => {
         nftOwner.should.be.equal(depositHandler.address);
       });
 
-      it('NST: Can deposit ERC721 with (token)data and depositHandler becomes owner', async () => {
-        const nftToken = await SpaceDustNFT.new();
-        const receipt = await nftToken.mint(tali, 10, true, 2);
+      it('Can deposit NST', async () => {
+        const nftToken = await NST.new();
+        const receipt = await nftToken.mint(tali, 10);
         const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NSTcolor = 49153;
         const storageRoot = `0x${Buffer.alloc(32).fill(0xff).toString('hex')}`;
 
+        // fails here?
         const data = await depositHandler.contract.methods.registerNST(nftToken.address).encodeABI();
-        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
+        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
         await nftToken.approve(depositHandler.address, tokenId, {from : tali});
 
-        const res = await depositHandler.depositV2(tali, tokenId, NSTcolor, storageRoot, { from: tali });
+        console.log('---------------');
+        const res = await depositHandler.deposit(tali, tokenId, NSTcolor, { from: tali });
+        console.log(res);
         assert.equal(res.receipt.status, true);
 
         const { depositId } = res.logs[0].args;
@@ -115,27 +119,21 @@ contract('DepositHandler', (accounts) => {
         const amount = 100;
         const color = 1;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
-        await depositHandler.depositV2(alice, amount, color, BYTES32_ZERO).should.be.rejectedWith(EVMRevert);
-      });
-
-      it('Can not deposit() with NST_COLOR', async () => {
-        const amount = 100;
-        const color = 49153;
-        await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
       });
 
       it('Can not deposit 0 amount', async () => {
         const amount = 0;
         const color = 0;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
-        await depositHandler.depositV2(alice, amount, color, BYTES32_ZERO).should.be.rejectedWith(EVMRevert);
       });
 
-      it('Can not deposit with data without being color is not a NST', async () => {
-        const amount = 100;
-        const color = 14124;
-        const data = `0x${Buffer.alloc(32).fill(1).toString('hex')}`;
-        await depositHandler.depositV2(alice, amount, color, data).should.be.rejectedWith(EVMRevert);
+      it('Can not deposit a NST without token being an NST', async () => {
+        const color = 49153;
+        const nftToken = await SpaceDustNFT.new();
+        const receipt = await nftToken.mint(bob, 10, true, 2);
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
+
+        await depositHandler.deposit(alice, tokenId, color).should.be.rejectedWith(EVMRevert);
       });
     });
   });

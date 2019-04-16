@@ -12,6 +12,7 @@ import "./Bridge.sol";
 import "./Adminable.sol";
 import "./PriorityQueue.sol";
 import "./TransferrableToken.sol";
+import "./IERC1537.sol";
 
 contract Vault is Adminable {
   // 2**15 + 1

@@ -10,6 +10,7 @@ pragma solidity 0.5.2;
 
 import "./Vault.sol";
 import "./Bridge.sol";
+import "./IERC1537.sol";
 
 contract DepositHandler is Vault {
 
@@ -54,10 +55,6 @@ contract DepositHandler is Vault {
     require(_color < NST_FIRST_COLOR);
     token.transferFrom(msg.sender, address(this), _amountOrTokenId);
 
-    bytes32 tipHash = bridge.tipHash();
-    uint256 timestamp;
-    (, timestamp) = bridge.periods(tipHash);
-
     depositCount++;
     deposits[depositCount] = Deposit({
       time: uint32(timestamp),
@@ -98,10 +95,13 @@ contract DepositHandler is Vault {
     require(address(token) != address(0), "Token color not registered");
     require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
 
-    if (_data != 0) {
-      require(_color >= NST_FIRST_COLOR);
+    if (_color >= NST_FIRST_COLOR) {
+      IERC1537 nst = IERC1537(address(token));
+      // XXX: maybe we need a 'support' getter here?
+      _tokenData = nst.readData(_amountOrTokenId);
     }
-    // TODO: can this fail?
+
+    //that shit fails for NST ????
     token.transferFrom(_owner, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
@@ -116,14 +116,24 @@ contract DepositHandler is Vault {
       amount: _amountOrTokenId
     });
 
-    tokenData[depositCount] = _data;
-    emit NewDepositV2(
-      depositCount,
-      _owner,
-      _color,
-      _amountOrTokenId,
-      _data
-    );
+    if (_color >= NST_FIRST_COLOR) {
+      tokenData[depositCount] = _tokenData;
+
+      emit NewDepositV2(
+        depositCount,
+        _owner,
+        _color,
+        _amountOrTokenId,
+        _tokenData
+      );
+    } else {
+      emit NewDeposit(
+        depositCount, 
+        _owner, 
+        _color, 
+        _amountOrTokenId
+      );
+    }
   }
 
   // solium-disable-next-line mixedcase
