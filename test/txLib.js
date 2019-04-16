@@ -220,10 +220,11 @@ contract('TxLib', (accounts) => {
         checkParse(rsp, transfer);
       });
 
-      it('should parse NST transfers', async () => {
+      it('should parse NST transfer with multiple outputs', async () => {
         const transfer = Tx.transfer(
           [new Input(new Outpoint(prevTx, 0))],
-          [new Output(nftTokenId, bob, nstColor, storageRoot)],
+          [new Output(nftTokenId, bob, nstColor, storageRoot),
+           new Output(value, bob, color)],
         );
         transfer.sign([alicePriv]);
         const block = new Block(32);
