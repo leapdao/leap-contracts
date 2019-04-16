@@ -255,11 +255,9 @@ contract ExitHandler is DepositHandler {
           address tokenAddr = address(tokens[currentExit.color].addr);
           IERC1537 nst = IERC1537(tokenAddr);
 
-          // XXX can this fail, should we care?
-          // we do not care
+          // if this fails, we do not care
           nst.writeData(currentExit.amount, tokenData);
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
-          //nst.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else {
           tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
