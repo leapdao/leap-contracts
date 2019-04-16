@@ -21,7 +21,6 @@ const NST = artifacts.require('ERC1537.sol');
 contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
-  const tali = accounts[3];
   const BYTES32_ZERO = `0x${Buffer.alloc(32).toString('hex')}`;
 
   describe('Test', () => {
@@ -90,20 +89,17 @@ contract('DepositHandler', (accounts) => {
 
       it('Can deposit NST', async () => {
         const nftToken = await NST.new();
-        const receipt = await nftToken.mint(tali, 10);
+        const receipt = await nftToken.mint(bob, 10);
         const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NSTcolor = 49153;
-        const storageRoot = `0x${Buffer.alloc(32).fill(0xff).toString('hex')}`;
+        const storageRoot = `0x${Buffer.alloc(32).toString('hex')}`;
 
-        // fails here?
         const data = await depositHandler.contract.methods.registerNST(nftToken.address).encodeABI();
 
-        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
-        await nftToken.approve(depositHandler.address, tokenId, {from : tali});
+        await proxy.applyProposal(data, { from: accounts[2] }).should.be.fulfilled;
+        await nftToken.approve(depositHandler.address, tokenId, { from : bob });
 
-        console.log('---------------');
-        const res = await depositHandler.deposit(tali, tokenId, NSTcolor, { from: tali });
-        console.log(res);
+        const res = await depositHandler.deposit(bob, tokenId, NSTcolor, { from: bob });
         assert.equal(res.receipt.status, true);
 
         const { depositId } = res.logs[0].args;

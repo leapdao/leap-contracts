@@ -92,16 +92,17 @@ contract DepositHandler is Vault {
 
   function depositV2(address _owner, uint256 _amountOrTokenId, uint16 _color, bytes32 _data) public {
     TransferrableToken token = tokens[_color].addr;
-    require(address(token) != address(0), "Token color not registered");
+    require(address(token) != address(0), "Token color already registered");
     require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
+
+    bytes32 _tokenData;
 
     if (_color >= NST_FIRST_COLOR) {
       IERC1537 nst = IERC1537(address(token));
-      // XXX: maybe we need a 'support' getter here?
+      // XXX: maybe we need a 'support' getter here, to announce support?
       _tokenData = nst.readData(_amountOrTokenId);
     }
 
-    //that shit fails for NST ????
     token.transferFrom(_owner, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
