@@ -14,6 +14,10 @@ import "./PriorityQueue.sol";
 import "./TransferrableToken.sol";
 
 contract Vault is Adminable {
+  // 2**15 + 1
+  uint16 constant NFT_FIRST_COLOR = 32769;
+  // 2**15 + 2**14 + 1
+  uint16 constant NST_FIRST_COLOR = 49153;
 
   event NewToken(address indexed tokenAddr, uint16 color);
 
@@ -21,6 +25,7 @@ contract Vault is Adminable {
 
   uint16 public erc20TokenCount;
   uint16 public nftTokenCount;
+  uint16 public nstTokenCount;
 
   mapping(uint16 => PriorityQueue.Token) public tokens;
   mapping(address => bool) public tokenColors;
@@ -39,8 +44,11 @@ contract Vault is Adminable {
     require(!tokenColors[_token], "Token already registered");
     uint16 color;
     if (_isERC721) {
+      // max nft count without being an NST is 16384
+      // color must be < 49153
+      require(nftTokenCount < 0x4000);
       require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
-      color = 32769 + nftTokenCount; // NFT color namespace starts from 2^15 + 1
+      color = NFT_FIRST_COLOR + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
       require(ERC20(_token).totalSupply() >= 0, "Not an ERC20 token");
@@ -57,7 +65,26 @@ contract Vault is Adminable {
     emit NewToken(_token, color);
   }
 
+  function registerNST(address _token) public ifAdmin {
+    // make sure token is not 0x0 and that it has not been registered yet
+    require(_token != address(0), "Tried to register 0x0 address");
+    require(!tokenColors[_token], "Token already registered");
+    require(nstTokenCount < 0x3ffe);
+    require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
+
+    uint16 color = NST_FIRST_COLOR + nftTokenCount; // NFT color namespace starts from 2^15 + 2^14 + 1
+    nstTokenCount += 1;
+
+    uint256[] memory arr = new uint256[](1);
+    tokenColors[_token] = true;
+    tokens[color] = PriorityQueue.Token({
+      addr: TransferrableToken(_token),
+      heapList: arr,
+      currentSize: 0
+    });
+    emit NewToken(_token, color);
+  }
   // solium-disable-next-line mixedcase
-  uint256[50] private ______gap;
+  uint256[49] private ______gap;
 
 }

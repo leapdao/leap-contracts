@@ -20,6 +20,14 @@ contract DepositHandler is Vault {
     uint256 amount
   );
   event MinGasPrice(uint256 minGasPrice);
+  // Support for NSTs
+  event NewDepositV2(
+    uint32 indexed depositId,
+    address indexed depositor,
+    uint256 indexed color,
+    uint256 amount,
+    bytes32 data
+  );
 
   struct Deposit {
     uint64 time;
@@ -32,6 +40,7 @@ contract DepositHandler is Vault {
   uint256 public minGasPrice;
 
   mapping(uint32 => Deposit) public deposits;
+  mapping(uint32 => bytes32) public tokenData;
 
   function setMinGasPrice(uint256 _minGasPrice) public ifAdmin {
     minGasPrice = _minGasPrice;
@@ -42,6 +51,7 @@ contract DepositHandler is Vault {
     TransferrableToken token = tokens[_color].addr;
     require(address(token) != address(0), "Token color not registered");
     require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
+    require(_color < NST_FIRST_COLOR);
     token.transferFrom(msg.sender, address(this), _amountOrTokenId);
 
     bytes32 tipHash = bridge.tipHash();
@@ -83,6 +93,39 @@ contract DepositHandler is Vault {
     _deposit(_amountOrTokenId, _color);
   }
 
+  function depositV2(address _owner, uint256 _amountOrTokenId, uint16 _color, bytes32 _data) public {
+    TransferrableToken token = tokens[_color].addr;
+    require(address(token) != address(0), "Token color not registered");
+    require(_amountOrTokenId > 0 || _color > 32769, "no 0 deposits for fungible tokens");
+
+    if (_data != 0) {
+      require(_color >= NST_FIRST_COLOR);
+    }
+    // TODO: can this fail?
+    token.transferFrom(_owner, address(this), _amountOrTokenId);
+
+    bytes32 tipHash = bridge.tipHash();
+    uint256 timestamp;
+    (, timestamp) = bridge.periods(tipHash);
+
+    depositCount++;
+    deposits[depositCount] = Deposit({
+      time: uint32(timestamp),
+      owner: _owner,
+      color: _color,
+      amount: _amountOrTokenId
+    });
+
+    tokenData[depositCount] = _data;
+    emit NewDepositV2(
+      depositCount,
+      _owner,
+      _color,
+      _amountOrTokenId,
+      _data
+    );
+  }
+
   // solium-disable-next-line mixedcase
-  uint256[50] private ______gap;
+  uint256[49] private ______gap;
 }

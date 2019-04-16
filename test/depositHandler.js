@@ -20,6 +20,8 @@ const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
+  const tali = accounts[3];
+  const BYTES32_ZERO = `0x${Buffer.alloc(32).toString('hex')}`;
 
   describe('Test', () => {
     let bridge;
@@ -85,9 +87,40 @@ contract('DepositHandler', (accounts) => {
         nftOwner.should.be.equal(depositHandler.address);
       });
 
+      it('NST: Can deposit ERC721 with (token)data and depositHandler becomes owner', async () => {
+        const nftToken = await SpaceDustNFT.new();
+        const receipt = await nftToken.mint(tali, 10, true, 2);
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
+        const NSTcolor = 49153;
+        const storageRoot = `0x${Buffer.alloc(32).fill(0xff).toString('hex')}`;
+
+        const data = await depositHandler.contract.methods.registerNST(nftToken.address).encodeABI();
+        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+        await nftToken.approve(depositHandler.address, tokenId, {from : tali});
+
+        const res = await depositHandler.depositV2(tali, tokenId, NSTcolor, storageRoot, { from: tali });
+        assert.equal(res.receipt.status, true);
+
+        const { depositId } = res.logs[0].args;
+        const nftOwner = await nftToken.ownerOf(tokenId);
+        nftOwner.should.be.equal(depositHandler.address);
+
+        const storedStorageRoot = await depositHandler.tokenData(depositId);
+
+        assert.equal(storedStorageRoot, storageRoot);
+      });
+
       it('Can not deposit non-registered token', async () => {
         const amount = 100;
         const color = 1;
+        await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
+        await depositHandler.depositV2(alice, amount, color, BYTES32_ZERO).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('Can not deposit() with NST_COLOR', async () => {
+        const amount = 100;
+        const color = 49153;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
       });
 
@@ -95,9 +128,16 @@ contract('DepositHandler', (accounts) => {
         const amount = 0;
         const color = 0;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
+        await depositHandler.depositV2(alice, amount, color, BYTES32_ZERO).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('Can not deposit with data without being color is not a NST', async () => {
+        const amount = 100;
+        const color = 14124;
+        const data = `0x${Buffer.alloc(32).fill(1).toString('hex')}`;
+        await depositHandler.depositV2(alice, amount, color, data).should.be.rejectedWith(EVMRevert);
       });
     });
-
   });
 
   describe('Governance', () => {
