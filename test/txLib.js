@@ -64,7 +64,7 @@ function checkParse(rsp, txn) {
     assert(equal(toInt(rsp.outs[i].value), txn.outputs[i].value));
     assert.equal(toInt(rsp.outs[i].color), txn.outputs[i].color);
     assert.equal(rsp.outs[i].owner, txn.outputs[i].address);
-    assert.equal(rsp.outs[i].stateRoot, EMPTY); // storage root
+    assert.equal(rsp.outs[i].stateRoot, txn.outputs[i].isNST() ? txn.outputs[i].data : EMPTY); // storage root
   }
 }
 
@@ -91,7 +91,9 @@ contract('TxLib', (accounts) => {
   const color = 1337;
   const nftTokenId = '3378025004445879814397';
   const nftColor = 32769;
+  const nstColor = 49153;
   const slotId = 4;
+  const storageRoot = '0x0101010101010101010101010101010101010101010101010101010101010101';
   let wallet = new ethers.Wallet(alicePriv, provider);
   wallets.push(wallet);
   wallet = new ethers.Wallet(bobPriv, provider);
@@ -130,6 +132,17 @@ contract('TxLib', (accounts) => {
         checkParse(rsp, deposit);
       });
 
+      it('should allow to parse NST deposit', async () => {
+        const deposit = Tx.deposit(12, nftTokenId, bob, nstColor, storageRoot);
+        const block = new Block(32);
+        block.addTx(deposit);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(deposit);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, deposit);
+      });
     });
 
     describe('Transfer', () => {
@@ -195,6 +208,23 @@ contract('TxLib', (accounts) => {
         const transfer = Tx.transfer(
           [new Input(new Outpoint(prevTx, 0))],
           [new Output(nftTokenId, bob, nftColor)],
+        );
+        transfer.sign([alicePriv]);
+        const block = new Block(32);
+        block.addTx(transfer);
+        const period = new Period(alicePriv, [block]);
+        period.setValidatorData(slotId, alice);
+        const proof = period.proof(transfer);
+
+        const rsp = await txLib.parse(proof).should.be.fulfilled;
+        checkParse(rsp, transfer);
+      });
+
+      it('should parse NST transfer with multiple outputs', async () => {
+        const transfer = Tx.transfer(
+          [new Input(new Outpoint(prevTx, 0))],
+          [new Output(nftTokenId, bob, nstColor, storageRoot),
+           new Output(value, bob, color)],
         );
         transfer.sign([alicePriv]);
         const block = new Block(32);
