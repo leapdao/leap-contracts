@@ -9,10 +9,10 @@
 pragma solidity ^0.5.2;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import "./IERC1537.sol";
 
-contract ERC1537 is ERC721 {
-  
-  event DataUpdated(uint256 indexed tokenId, bytes32 oldData, bytes32 newData);
+contract ERC1537 is IERC1537, ERC721 {
+
   mapping(uint256 => bytes32) data;
 
   function mint(address _to, uint256 _tokenId) public {
