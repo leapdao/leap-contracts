@@ -122,7 +122,7 @@ contract DepositHandler is Vault {
 
       emit NewDepositV2(
         depositCount,
-        _owner,
+        msg.sender,
         _color,
         _amountOrTokenId,
         _tokenData
@@ -130,7 +130,7 @@ contract DepositHandler is Vault {
     } else {
       emit NewDeposit(
         depositCount, 
-        _owner, 
+        msg.sender,
         _color, 
         _amountOrTokenId
       );
