@@ -6,25 +6,31 @@
  */
 pragma solidity 0.5.2;
 
-import "../../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Metadata.sol";
+import "../ERC1537.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRole.sol";
+import "./IDelayedBreeder.sol";
 
 /**
  * @title SpaceDustNFT
  * @dev Simple ERC721 token mintable by whitelisted accounts
  */
 
-contract DelayedBreeder is ERC721Metadata, ERC1537, MinterRole {
+contract DelayedBreeder is ERC1537, MinterRole, IDelayedBreeder {
   uint96 public queenCounter = 0;
 
-  constructor() public ERC721Metadata("dBreed", "DBR") MinterRole() {
+  function mintQueen() public onlyMinter {
+    queenCounter += 1;
+    uint256 queenId = uint256(keccak256(abi.encodePacked(address(this), queenCounter)));
+    super._mint(msg.sender, queenId);
+    data[queenId] = bytes32(uint256(1));
   }
 
-  function mintQeen(address _to) public onlyMinter {
-    queenCounter += 1;
-    uint256 nftId = uint256(kechak256(address(this), queenCounter));
-    super._mint(_to, nftId);
-    data[nftId] = 0x01;
+  function breed(uint256 _queenId, uint256 _workerId, address _to) public {
+    require(ownerOf(_queenId) == msg.sender, "breed called by non-owner");
+    uint256 breedCounter = uint256(readData(_queenId));
+    require(breedCounter > 0 && breedCounter < 2 ** 32, "queenId not queen");
+    require(_to != address(0), "owner should not be null");
+    super._mint(_to, _workerId);
   }
 
 }
