@@ -204,10 +204,7 @@ contract ExitHandler is DepositHandler {
     });
 
     if (isNST(deposit.color)) {
-      //IERC1537 bla = IERC1537(deposit.amount);
-      //bytes32 _tokenData = bla.readData(deposit.);
-      //exitsTokenData[bytes32(_depositId)] = _tokenData;
-/*
+      // no need to update root, as it only got deposit now.
       emit ExitStartedV2(
         bytes32(_depositId),
         0, 
@@ -216,7 +213,6 @@ contract ExitHandler is DepositHandler {
         deposit.amount,
         deposit.stateRoot
       );
-      */
     } else {
       emit ExitStarted(
         bytes32(_depositId), 
