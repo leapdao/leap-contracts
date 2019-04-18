@@ -1,7 +1,7 @@
 pragma solidity 0.5.2;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
-import './IERC1537.sol';
+import "./IERC1537.sol";
 
 
 contract ERC1537Mint is IERC1537, ERC721 {

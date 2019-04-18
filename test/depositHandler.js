@@ -21,7 +21,6 @@ const NST = artifacts.require('ERC1537.sol');
 contract('DepositHandler', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
-  const BYTES32_ZERO = `0x${Buffer.alloc(32).toString('hex')}`;
 
   describe('Test', () => {
     let bridge;
