@@ -1,10 +1,10 @@
 pragma solidity 0.5.2;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
-import "./IERC1537.sol";
+import "./IERC1948.sol";
 
 
-contract ERC1537Mint is IERC1537, ERC721 {
+contract ERC1948Mint is IERC1948, ERC721 {
   mapping(uint256 => bytes32) data;
 
   modifier onlyMinter() {

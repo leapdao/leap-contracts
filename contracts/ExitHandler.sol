@@ -253,7 +253,7 @@ contract ExitHandler is DepositHandler {
         } else if (isNST(currentExit.color)) {
           bytes32 tokenData = exitsTokenData[utxoId];
           address tokenAddr = address(tokens[currentExit.color].addr);
-          IERC1537 nst = IERC1537(tokenAddr);
+          IERC1948 nst = IERC1948(tokenAddr);
 
           // if this fails, we do not care
           nst.writeData(currentExit.amount, tokenData);
