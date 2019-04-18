@@ -1,8 +1,8 @@
-const ERC1537 = artifacts.require('./ERC1537.sol');
+const ERC1948 = artifacts.require('./ERC1948.sol');
 
 require('./helpers/setup');
 
-contract('ERC1537', (accounts) => {
+contract('ERC1948', (accounts) => {
   const firstTokenId = 100;
   const creator = accounts[0];
   const empty = '0x0000000000000000000000000000000000000000000000000000000000000000';
@@ -10,7 +10,7 @@ contract('ERC1537', (accounts) => {
   let dataToken;
 
   beforeEach(async () => {
-    dataToken = await ERC1537.new();
+    dataToken = await ERC1948.new();
     await dataToken.mint(creator, firstTokenId);
   });
 

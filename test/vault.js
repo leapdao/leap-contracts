@@ -76,6 +76,18 @@ contract('Vault', (accounts) => {
         const newToken = await SimpleToken.new();
         await vault.registerToken(newToken.address, false, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
+
+      it('Owner can register ERC721 NST', async () => {
+        const newNSTtoken = await SpaceDustNFT.new();
+
+        const data = await vault.contract.methods.registerNST(newNSTtoken.address).encodeABI();
+        await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+        // NSTs have their own space
+        const NSTstartIndex = 49153;
+        const tokenTwoAddr = (await vault.tokens(NSTstartIndex))[0];
+        tokenTwoAddr.should.be.equal(newNSTtoken.address);
+      });
     });
 
   });

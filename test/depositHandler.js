@@ -15,6 +15,7 @@ const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
+const NST = artifacts.require('ERC1948.sol');
 
 
 contract('DepositHandler', (accounts) => {
@@ -85,6 +86,30 @@ contract('DepositHandler', (accounts) => {
         nftOwner.should.be.equal(depositHandler.address);
       });
 
+      it('Can deposit NST', async () => {
+        const nftToken = await NST.new();
+        const receipt = await nftToken.mint(bob, 10);
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
+        const NSTcolor = 49153;
+        const storageRoot = `0x${Buffer.alloc(32).toString('hex')}`;
+
+        const data = await depositHandler.contract.methods.registerNST(nftToken.address).encodeABI();
+
+        await proxy.applyProposal(data, { from: accounts[2] }).should.be.fulfilled;
+        await nftToken.approve(depositHandler.address, tokenId, { from : bob });
+
+        const res = await depositHandler.deposit(bob, tokenId, NSTcolor, { from: bob });
+        assert.equal(res.receipt.status, true);
+
+        const { depositId } = res.logs[0].args;
+        const nftOwner = await nftToken.ownerOf(tokenId);
+        nftOwner.should.be.equal(depositHandler.address);
+
+        const storedStorageRoot = await depositHandler.tokenData(depositId);
+
+        assert.equal(storedStorageRoot, storageRoot);
+      });
+
       it('Can not deposit non-registered token', async () => {
         const amount = 100;
         const color = 1;
@@ -96,8 +121,16 @@ contract('DepositHandler', (accounts) => {
         const color = 0;
         await depositHandler.deposit(alice, amount, color).should.be.rejectedWith(EVMRevert);
       });
-    });
 
+      it('Can not deposit a NST without token being an NST', async () => {
+        const color = 49153;
+        const nftToken = await SpaceDustNFT.new();
+        const receipt = await nftToken.mint(bob, 10, true, 2);
+        const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
+
+        await depositHandler.deposit(alice, tokenId, color).should.be.rejectedWith(EVMRevert);
+      });
+    });
   });
 
   describe('Governance', () => {

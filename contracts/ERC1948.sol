@@ -5,7 +5,7 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
- 
+
 pragma solidity ^0.5.2;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";

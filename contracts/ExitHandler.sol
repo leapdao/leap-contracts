@@ -22,11 +22,20 @@ contract ExitHandler is DepositHandler {
   using PriorityQueue for PriorityQueue.Token;
 
   event ExitStarted(
-    bytes32 indexed txHash, 
-    uint8 indexed outIndex, 
-    uint256 indexed color, 
-    address exitor, 
+    bytes32 indexed txHash,
+    uint8 indexed outIndex,
+    uint256 indexed color,
+    address exitor,
     uint256 amount
+  );
+
+  event ExitStartedV2(
+    bytes32 indexed txHash,
+    uint8 indexed outIndex,
+    uint256 indexed color,
+    address exitor,
+    uint256 amount,
+    bytes32 data
   );
 
   struct Exit {
@@ -41,15 +50,18 @@ contract ExitHandler is DepositHandler {
   uint256 public exitDuration;
   uint256 public exitStake;
   uint256 public nftExitCounter;
+  uint256 public nstExitCounter;
 
   /**
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
    */
   mapping(bytes32 => Exit) public exits;
+  // mapping for NST data
+  mapping(bytes32 => bytes32) public exitsTokenData;
 
   function initializeWithExit(
-    Bridge _bridge, 
-    uint256 _exitDuration, 
+    Bridge _bridge,
+    uint256 _exitDuration,
     uint256 _exitStake) public initializer {
     initialize(_bridge);
     exitDuration = _exitDuration;
@@ -101,13 +113,16 @@ contract ExitHandler is DepositHandler {
       bytes32 inputTxHash;
       (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
       require(
-        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
         "Input from the proof is not referenced in exiting tx"
       );
       
       if (isNft(out.color)) {
         priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
         nftExitCounter++;
+      } else if (isNST(out.color)) {
+        priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
+        nstExitCounter++;
       } else {      
         priority = getERC20ExitPriority(timestamp, utxoId, txPos);
       }
@@ -116,7 +131,10 @@ contract ExitHandler is DepositHandler {
       if (isNft(out.color)) {
         priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
         nftExitCounter++;
-      } else {      
+      } else if (isNST(out.color)) {
+        priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
+        nstExitCounter++;
+      } else {
         priority = getERC20ExitPriority(timestamp, utxoId, txPos);
       }
     }
@@ -131,13 +149,27 @@ contract ExitHandler is DepositHandler {
       stake: exitStake,
       priorityTimestamp: timestamp
     });
-    emit ExitStarted(
-      txHash, 
-      _outputIndex, 
-      out.color, 
-      out.owner, 
-      out.value
-    );
+
+    if (isNST(out.color)) {
+      exitsTokenData[utxoId] = out.stateRoot;
+
+      emit ExitStartedV2(
+        txHash,
+        _outputIndex,
+        out.color,
+        out.owner,
+        out.value,
+        out.stateRoot
+      );
+    } else {
+      emit ExitStarted(
+        txHash,
+        _outputIndex,
+        out.color,
+        out.owner,
+        out.value
+      );
+    }
   }
 
   function startDepositExit(uint256 _depositId) public payable {
@@ -148,12 +180,15 @@ contract ExitHandler is DepositHandler {
     require(deposit.amount > 0, "deposit has no value");
     require(exits[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
     require(!exits[bytes32(_depositId)].finalized, "The exit for deposit has already been finalized");
-    
+
     uint256 priority;
     if (isNft(deposit.color)) {
       priority = (nftExitCounter << 128) | uint128(_depositId);
       nftExitCounter++;
-    } else {      
+    } else if (isNST(deposit.color)) {
+      priority = (nstExitCounter << 128) | uint128(_depositId);
+      nstExitCounter++;
+    } else {
       priority = getERC20ExitPriority(uint32(deposit.time), bytes32(_depositId), 0);
     }
 
@@ -167,13 +202,26 @@ contract ExitHandler is DepositHandler {
       stake: exitStake,
       priorityTimestamp: uint32(now)
     });
-    emit ExitStarted(
-      bytes32(_depositId), 
-      0, 
-      deposit.color, 
-      deposit.owner, 
-      deposit.amount
-    );
+
+    if (isNST(deposit.color)) {
+      // no need to update root, as it only got deposit now.
+      emit ExitStartedV2(
+        bytes32(_depositId),
+        0,
+        deposit.color,
+        deposit.owner,
+        deposit.amount,
+        deposit.stateRoot
+      );
+    } else {
+      emit ExitStarted(
+        bytes32(_depositId),
+        0,
+        deposit.color,
+        deposit.owner,
+        deposit.amount
+      );
+    }
   }
 
   // @dev Finalizes exit for the chosen color with the highest priority
@@ -197,6 +245,14 @@ contract ExitHandler is DepositHandler {
       if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was not removed
         // Note: for NFTs, the amount is actually the NFT id (both uint256)
         if (isNft(currentExit.color)) {
+          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+        } else if (isNST(currentExit.color)) {
+          bytes32 tokenData = exitsTokenData[utxoId];
+          address tokenAddr = address(tokens[currentExit.color].addr);
+          IERC1948 nst = IERC1948(tokenAddr);
+
+          // if this fails, we do not care
+          nst.writeData(currentExit.amount, tokenData);
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else {
           tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
@@ -224,8 +280,8 @@ contract ExitHandler is DepositHandler {
   }
 
   function challengeExit(
-    bytes32[] memory _proof, 
-    bytes32[] memory _prevProof, 
+    bytes32[] memory _proof,
+    bytes32[] memory _prevProof,
     uint8 _outputIndex,
     uint8 _inputIndex
   ) public {
@@ -235,7 +291,7 @@ contract ExitHandler is DepositHandler {
     bytes memory txData;
     (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash1)));
-    
+
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
       // validate spending tx
@@ -251,9 +307,9 @@ contract ExitHandler is DepositHandler {
       if (txn.txType == TxLib.TxType.Transfer) {
         bytes32 sigHash = TxLib.getSigHash(txData);
         address signer = ecrecover(
-          sigHash, 
-          txn.ins[_inputIndex].v, 
-          txn.ins[_inputIndex].r, 
+          sigHash,
+          txn.ins[_inputIndex].v,
+          txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
         require(exits[utxoId].owner == signer);
@@ -271,6 +327,9 @@ contract ExitHandler is DepositHandler {
         require(deposit.amount == txn.outs[0].value, "value mismatch");
         require(deposit.owner == txn.outs[0].owner, "owner mismatch");
         require(deposit.color == txn.outs[0].color, "color mismatch");
+        if (isNST(deposit.color)) {
+          require(tokenData[uint32(uint256(utxoId))] == txn.outs[0].stateRoot, "data mismatch");
+        }
         // todo: check timely inclusion of deposit tx
         // this will prevent grieving attacks by the operator
       } else {
@@ -289,8 +348,8 @@ contract ExitHandler is DepositHandler {
 
   function challengeYoungestInput(
     bytes32[] memory _youngerInputProof,
-    bytes32[] memory _exitingTxProof, 
-    uint8 _outputIndex, 
+    bytes32[] memory _exitingTxProof,
+    uint8 _outputIndex,
     uint8 _inputIndex
   ) public {
     // validate exiting input tx
@@ -306,10 +365,10 @@ contract ExitHandler is DepositHandler {
 
     // validate younger input tx
     (,txHash,) = TxLib.validateProof(96, _youngerInputProof);
-    
+
     // check younger input is actually an input of exiting tx
     require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
-    
+
     uint32 youngerInputTimestamp;
     (,youngerInputTimestamp) = bridge.periods(_youngerInputProof[0]);
     require(youngerInputTimestamp > 0, "The referenced period was not submitted to bridge");
@@ -329,7 +388,11 @@ contract ExitHandler is DepositHandler {
   }
 
   function isNft(uint16 _color) internal pure returns (bool) {
-    return _color > 32768; // 2^15
+    return (_color >= NFT_FIRST_COLOR) && (_color < NST_FIRST_COLOR);
+  }
+
+  function isNST(uint16 _color) internal pure returns (bool) {
+    return _color >= NST_FIRST_COLOR;
   }
 
   function getERC20ExitPriority(
@@ -340,5 +403,5 @@ contract ExitHandler is DepositHandler {
   }
 
   // solium-disable-next-line mixedcase
-  uint256[50] private ______gap;
+  uint256[49] private ______gap;
 }
