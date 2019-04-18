@@ -15,7 +15,7 @@ const Bridge = artifacts.require('Bridge');
 const DepositHandler = artifacts.require('DepositHandler');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
-const NST = artifacts.require('ERC1537.sol');
+const NST = artifacts.require('ERC1948.sol');
 
 
 contract('DepositHandler', (accounts) => {
