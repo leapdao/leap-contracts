@@ -8,7 +8,7 @@
  
 pragma solidity ^0.5.2;
 
-contract IERC1537 {
+contract IERC1948 {
   
   event DataUpdated(uint256 indexed tokenId, bytes32 oldData, bytes32 newData);
 

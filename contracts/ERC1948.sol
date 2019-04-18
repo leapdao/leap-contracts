@@ -9,9 +9,9 @@
 pragma solidity ^0.5.2;
 
 import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
-import "./IERC1537.sol";
+import "./IERC1948.sol";
 
-contract ERC1537 is IERC1537, ERC721 {
+contract ERC1948 is IERC1948, ERC721 {
 
   mapping(uint256 => bytes32) data;
 
@@ -24,11 +24,21 @@ contract ERC1537 is IERC1537, ERC721 {
     delete(data[_tokenId]);
   }
 
+  /**
+   * @dev Reads the data of a specified token.
+   * @param _tokenId The token to read the data off.
+   * @return A bytes32 representing the current data stored in the token.
+   */
   function readData(uint256 _tokenId) public view returns (bytes32) {
     require(_exists(_tokenId));
     return data[_tokenId];
   }
 
+  /**
+   * @dev Updates the data of a specified token.
+   * @param _tokenId The token to write data to.
+   * @param _newData The data to be written to the token.
+   */
   function writeData(uint256 _tokenId, bytes32 _newData) public {
     require(msg.sender == ownerOf(_tokenId));
     emit DataUpdated(_tokenId, data[_tokenId], _newData);
