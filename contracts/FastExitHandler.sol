@@ -49,13 +49,13 @@ contract FastExitHandler is ExitHandler {
     require(out.owner == address(this), "Funds were not sent to this contract");
     require(
       ecrecover(
-        TxLib.getSigHash(txData), 
+        TxLib.getSigHash(txData),
         exitingTx.ins[0].v, exitingTx.ins[0].r, exitingTx.ins[0].s
       ) == signer,
       "Signer was not the previous owner of UTXO"
     );
     require(
-      data.utxoId == utxoIdSigned, 
+      data.utxoId == utxoIdSigned,
       "The signed utxoid does not match the one in the proof"
     );
 
@@ -69,14 +69,14 @@ contract FastExitHandler is ExitHandler {
     bytes32 inputTxHash;
     (data.txPos, inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
     require(
-      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
       "Input from the proof is not referenced in exiting tx"
     );
-    
+
     if (isNft(out.color)) {
       priority = (nftExitCounter << 128) | uint128(uint256(data.utxoId));
       nftExitCounter++;
-    } else {      
+    } else {
       priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
     }
 
@@ -93,9 +93,9 @@ contract FastExitHandler is ExitHandler {
       priorityTimestamp: data.timestamp
     });
     emit ExitStarted(
-      data.txHash, 
-      _outputIndex, 
-      out.color, 
+      data.txHash,
+      _outputIndex,
+      out.color,
       out.owner,
       out.value
     );
@@ -113,9 +113,9 @@ contract FastExitHandler is ExitHandler {
     uint8 v = uint8(uint256(signedData[4]));
     // solium-disable-next-line
     bytes32 sigHash = keccak256(abi.encodePacked(
-      "\x19Ethereum Signed Message:\n", 
+      "\x19Ethereum Signed Message:\n",
       uint2str(64),
-      utxoId, 
+      utxoId,
       buyPrice
     ));
     signer = ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow

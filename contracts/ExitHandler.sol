@@ -22,18 +22,18 @@ contract ExitHandler is DepositHandler {
   using PriorityQueue for PriorityQueue.Token;
 
   event ExitStarted(
-    bytes32 indexed txHash, 
-    uint8 indexed outIndex, 
-    uint256 indexed color, 
-    address exitor, 
+    bytes32 indexed txHash,
+    uint8 indexed outIndex,
+    uint256 indexed color,
+    address exitor,
     uint256 amount
   );
 
   event ExitStartedV2(
-    bytes32 indexed txHash, 
-    uint8 indexed outIndex, 
-    uint256 indexed color, 
-    address exitor, 
+    bytes32 indexed txHash,
+    uint8 indexed outIndex,
+    uint256 indexed color,
+    address exitor,
     uint256 amount,
     bytes32 data
   );
@@ -60,8 +60,8 @@ contract ExitHandler is DepositHandler {
   mapping(bytes32 => bytes32) public exitsTokenData;
 
   function initializeWithExit(
-    Bridge _bridge, 
-    uint256 _exitDuration, 
+    Bridge _bridge,
+    uint256 _exitDuration,
     uint256 _exitStake) public initializer {
     initialize(_bridge);
     exitDuration = _exitDuration;
@@ -113,7 +113,7 @@ contract ExitHandler is DepositHandler {
       bytes32 inputTxHash;
       (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
       require(
-        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash, 
+        inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
         "Input from the proof is not referenced in exiting tx"
       );
       
@@ -134,7 +134,7 @@ contract ExitHandler is DepositHandler {
       } else if (isNST(out.color)) {
         priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
         nstExitCounter++;
-      } else {      
+      } else {
         priority = getERC20ExitPriority(timestamp, utxoId, txPos);
       }
     }
@@ -154,19 +154,19 @@ contract ExitHandler is DepositHandler {
       exitsTokenData[utxoId] = out.stateRoot;
 
       emit ExitStartedV2(
-        txHash, 
-        _outputIndex, 
-        out.color, 
-        out.owner, 
+        txHash,
+        _outputIndex,
+        out.color,
+        out.owner,
         out.value,
         out.stateRoot
       );
     } else {
       emit ExitStarted(
-        txHash, 
-        _outputIndex, 
-        out.color, 
-        out.owner, 
+        txHash,
+        _outputIndex,
+        out.color,
+        out.owner,
         out.value
       );
     }
@@ -180,7 +180,7 @@ contract ExitHandler is DepositHandler {
     require(deposit.amount > 0, "deposit has no value");
     require(exits[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
     require(!exits[bytes32(_depositId)].finalized, "The exit for deposit has already been finalized");
-    
+
     uint256 priority;
     if (isNft(deposit.color)) {
       priority = (nftExitCounter << 128) | uint128(_depositId);
@@ -188,7 +188,7 @@ contract ExitHandler is DepositHandler {
     } else if (isNST(deposit.color)) {
       priority = (nstExitCounter << 128) | uint128(_depositId);
       nstExitCounter++;
-    } else {      
+    } else {
       priority = getERC20ExitPriority(uint32(deposit.time), bytes32(_depositId), 0);
     }
 
@@ -207,18 +207,18 @@ contract ExitHandler is DepositHandler {
       // no need to update root, as it only got deposit now.
       emit ExitStartedV2(
         bytes32(_depositId),
-        0, 
-        deposit.color, 
-        deposit.owner, 
+        0,
+        deposit.color,
+        deposit.owner,
         deposit.amount,
         deposit.stateRoot
       );
     } else {
       emit ExitStarted(
-        bytes32(_depositId), 
-        0, 
-        deposit.color, 
-        deposit.owner, 
+        bytes32(_depositId),
+        0,
+        deposit.color,
+        deposit.owner,
         deposit.amount
       );
     }
@@ -280,8 +280,8 @@ contract ExitHandler is DepositHandler {
   }
 
   function challengeExit(
-    bytes32[] memory _proof, 
-    bytes32[] memory _prevProof, 
+    bytes32[] memory _proof,
+    bytes32[] memory _prevProof,
     uint8 _outputIndex,
     uint8 _inputIndex
   ) public {
@@ -291,7 +291,7 @@ contract ExitHandler is DepositHandler {
     bytes memory txData;
     (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash1)));
-    
+
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
       // validate spending tx
@@ -307,9 +307,9 @@ contract ExitHandler is DepositHandler {
       if (txn.txType == TxLib.TxType.Transfer) {
         bytes32 sigHash = TxLib.getSigHash(txData);
         address signer = ecrecover(
-          sigHash, 
-          txn.ins[_inputIndex].v, 
-          txn.ins[_inputIndex].r, 
+          sigHash,
+          txn.ins[_inputIndex].v,
+          txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
         require(exits[utxoId].owner == signer);
@@ -348,8 +348,8 @@ contract ExitHandler is DepositHandler {
 
   function challengeYoungestInput(
     bytes32[] memory _youngerInputProof,
-    bytes32[] memory _exitingTxProof, 
-    uint8 _outputIndex, 
+    bytes32[] memory _exitingTxProof,
+    uint8 _outputIndex,
     uint8 _inputIndex
   ) public {
     // validate exiting input tx
@@ -365,10 +365,10 @@ contract ExitHandler is DepositHandler {
 
     // validate younger input tx
     (,txHash,) = TxLib.validateProof(96, _youngerInputProof);
-    
+
     // check younger input is actually an input of exiting tx
     require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
-    
+
     uint32 youngerInputTimestamp;
     (,youngerInputTimestamp) = bridge.periods(_youngerInputProof[0]);
     require(youngerInputTimestamp > 0, "The referenced period was not submitted to bridge");

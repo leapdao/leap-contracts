@@ -64,8 +64,8 @@ contract Bridge is Adminable {
   }
 
   function submitPeriod(
-    bytes32 _prevHash, 
-    bytes32 _root) 
+    bytes32 _prevHash,
+    bytes32 _root)
   public onlyOperator returns (uint256 newHeight) {
 
     require(periods[_prevHash].timestamp > 0, "Parent node should exist");
@@ -77,7 +77,7 @@ contract Bridge is Adminable {
     if (newHeight > periods[tipHash].height) {
       // new periods can only be submitted every x Ethereum blocks
       require(
-        block.number >= lastParentBlock + parentBlockInterval, 
+        block.number >= lastParentBlock + parentBlockInterval,
         "Tried to submit new period too soon"
       );
       tipHash = _root;

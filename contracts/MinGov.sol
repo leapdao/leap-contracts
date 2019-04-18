@@ -13,23 +13,23 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./proxies/AdminableProxy.sol";
 
 contract MinGov is Ownable {
-  
+
   uint256 public proposalTime;
   uint256 public first;
   uint256 public size;
-  
+
   struct Proposal {
     address subject;
     uint32 created;
     bool canceled;
     bytes msgData;
   }
-  
+
   mapping(uint256 => Proposal) public proposals;
-  
+
   event NewProposal(uint256 indexed proposalId, address indexed subject, bytes msgData);
   event Execution(uint256 indexed proposalId, address indexed subject, bytes msgData);
-  
+
   constructor(uint256 _proposalTime) public {
     proposalTime = _proposalTime;
     first = 1;
@@ -47,7 +47,7 @@ contract MinGov is Ownable {
     emit NewProposal(first + size, _subject, _msgData);
     size++;
   }
-  
+
   function cancel(uint256 _proposalId) public onlyOwner() {
     Proposal storage prop = proposals[_proposalId];
     require(prop.created > 0);
@@ -71,7 +71,7 @@ contract MinGov is Ownable {
           // 0x3659cfe6 = upgradeTo(address)
            // 0x983b2d56 = addMinter(address)
           if (sig == 0x8f283970||sig == 0x3659cfe6||sig == 0x983b2d56) {
-            // this changes proxy parameters 
+            // this changes proxy parameters
             (rv, ) = prop.subject.call(prop.msgData);
           } else {
             // this changes governance parameters to the implementation

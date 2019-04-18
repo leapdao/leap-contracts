@@ -15,9 +15,9 @@ import "./IERC1948.sol";
 contract DepositHandler is Vault {
 
   event NewDeposit(
-    uint32 indexed depositId, 
-    address indexed depositor, 
-    uint256 indexed color, 
+    uint32 indexed depositId,
+    address indexed depositor,
+    uint256 indexed color,
     uint256 amount
   );
   event MinGasPrice(uint256 minGasPrice);
@@ -46,6 +46,26 @@ contract DepositHandler is Vault {
   function setMinGasPrice(uint256 _minGasPrice) public ifAdmin {
     minGasPrice = _minGasPrice;
     emit MinGasPrice(minGasPrice);
+  }
+
+ /**
+  * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
+  * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
+  *
+  * !!!! DEPRECATED, use depositBySender() instead !!!!
+  *
+  * @dev Token should be registered with the Bridge first.
+  * @param _owner Account to transfer tokens from
+  * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer
+  * @param _color Color of the token to deposit
+  */
+  function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
+    require(_owner == msg.sender, "owner different from msg.sender");
+    _deposit(_amountOrTokenId, _color);
+  }
+
+  function depositBySender(uint256 _amountOrTokenId, uint16 _color) public {
+    _deposit(_amountOrTokenId, _color);
   }
 
   function _deposit(uint256 _amountOrTokenId, uint16 _color) internal {
@@ -87,32 +107,12 @@ contract DepositHandler is Vault {
       );
     } else {
       emit NewDeposit(
-        depositCount, 
+        depositCount,
         msg.sender,
-        _color, 
+        _color,
         _amountOrTokenId
       );
     }
-  }
-
-   /**
-   * @notice Add to the network `(_amountOrTokenId)` amount of a `(_color)` tokens
-   * or `(_amountOrTokenId)` token id if `(_color)` is NFT.
-   *
-   * !!!! DEPRECATED, use depositBySender() instead !!!!
-   *
-   * @dev Token should be registered with the Bridge first.
-   * @param _owner Account to transfer tokens from
-   * @param _amountOrTokenId Amount (for ERC20) or token ID (for ERC721) to transfer
-   * @param _color Color of the token to deposit
-   */
-  function deposit(address _owner, uint256 _amountOrTokenId, uint16 _color) public {
-    require(_owner == msg.sender, "owner different from msg.sender");
-    _deposit(_amountOrTokenId, _color);
-  }
-
-  function depositBySender(uint256 _amountOrTokenId, uint16 _color) public {
-    _deposit(_amountOrTokenId, _color);
   }
 
   // solium-disable-next-line mixedcase

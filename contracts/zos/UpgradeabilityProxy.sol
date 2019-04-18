@@ -1,6 +1,6 @@
 pragma solidity 0.5.2;
 
-//copied from zos-lib due to import fix needed: 
+//copied from zos-lib due to import fix needed:
 //import "openzeppelin-solidity/contracts/AddressUtils.sol" -> import "openzeppelin-solidity/contracts/utils/Address.sol"
 
 import "./Proxy.sol";
