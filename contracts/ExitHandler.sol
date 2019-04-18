@@ -203,25 +203,15 @@ contract ExitHandler is DepositHandler {
       priorityTimestamp: uint32(now)
     });
 
-    if (isNST(deposit.color)) {
-      // no need to update root, as it only got deposit now.
-      emit ExitStartedV2(
-        bytes32(_depositId),
-        0,
-        deposit.color,
-        deposit.owner,
-        deposit.amount,
-        deposit.stateRoot
-      );
-    } else {
-      emit ExitStarted(
-        bytes32(_depositId),
-        0,
-        deposit.color,
-        deposit.owner,
-        deposit.amount
-      );
-    }
+    // no need to emit ExitStartedV2
+    // no need to update emit data root for NSTs, as it only got deposit now.
+    emit ExitStarted(
+      bytes32(_depositId),
+      0,
+      deposit.color,
+      deposit.owner,
+      deposit.amount
+    );
   }
 
   // @dev Finalizes exit for the chosen color with the highest priority
