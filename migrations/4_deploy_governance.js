@@ -10,6 +10,8 @@ const log = require('./utils/log');
 
 const MinGov = artifacts.require('MinGov');
 const NativeToken = artifacts.require('NativeToken');
+const SimpleToken = artifacts.require('SimpleToken');
+const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 const AdminableProxy = artifacts.require('AdminableProxy');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
@@ -57,6 +59,32 @@ module.exports = (deployer, network, accounts) => {
     log('  🔄 Transferring ownership for SwapRegistry:', registryProxy.address);
     await registryProxy.changeAdmin(governance.address, { from: admin });
 
+    const { SEED_ACCOUNT } = process.env;
+
+    if (SEED_ACCOUNT && network === 'development') {
+      const decimals = await nativeToken.decimals();
+      const amount = (100 * 10**decimals.toNumber()).toString();
+      
+      // mint some LEAPs
+      await nativeToken.mint(SEED_ACCOUNT, amount);
+
+      // get some localnet ETH
+      await web3.eth.sendTransaction({ 
+        to: SEED_ACCOUNT, from: admin, value: web3.utils.toWei('10', 'ether'),
+      });
+
+      // mint another ERC20 token
+      const simple = await deployer.deploy(SimpleToken);
+      await simple.transfer(SEED_ACCOUNT, '1000000000000');
+
+      // mint some NFTs
+      const nft = await deployer.deploy(SpaceDustNFT);
+      await nft.mint(SEED_ACCOUNT, 14, false, 3);
+      await nft.mint(SEED_ACCOUNT, 13, false, 2);
+      await nft.mint(SEED_ACCOUNT, 12, true, 6);
+      await nft.mint(SEED_ACCOUNT, 11, false, 1);
+    }
+
     const isMinter = await nativeToken.isMinter(accounts[0]);
     if (ownerAddr) {
       if (!govAddr) {
@@ -71,7 +99,7 @@ module.exports = (deployer, network, accounts) => {
       }
     }
     
-    if (isMinter) {
+    if (isMinter && network !== 'development') {
       log('  🔄 Transferring minting right for token:', nativeToken.address);
       await nativeToken.addMinter(governance.address);
       await nativeToken.renounceMinter();
