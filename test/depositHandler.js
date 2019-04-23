@@ -87,27 +87,34 @@ contract('DepositHandler', (accounts) => {
       });
 
       it('Can deposit NST', async () => {
-        const nftToken = await NST.new();
-        const receipt = await nftToken.mint(bob, 10);
+        const nstToken1 = await NST.new();
+        const nstToken2 = await NST.new();
+        const receipt = await nstToken1.mint(bob, 10);
         const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NSTcolor = 49153;
         const storageRoot = `0x${Buffer.alloc(32).toString('hex')}`;
 
-        const data = await depositHandler.contract.methods.registerNST(nftToken.address).encodeABI();
+        const data = await depositHandler.contract.methods.registerNST(nstToken1.address).encodeABI();
 
         await proxy.applyProposal(data, { from: accounts[2] }).should.be.fulfilled;
-        await nftToken.approve(depositHandler.address, tokenId, { from : bob });
+        await nstToken1.approve(depositHandler.address, tokenId, { from : bob });
 
         const res = await depositHandler.deposit(bob, tokenId, NSTcolor, { from: bob });
         assert.equal(res.receipt.status, true);
 
         const { depositId } = res.logs[0].args;
-        const nftOwner = await nftToken.ownerOf(tokenId);
-        nftOwner.should.be.equal(depositHandler.address);
+        const nstOwner = await nstToken1.ownerOf(tokenId);
+        nstOwner.should.be.equal(depositHandler.address);
 
         const storedStorageRoot = await depositHandler.tokenData(depositId);
 
         assert.equal(storedStorageRoot, storageRoot);
+
+        const data2 = await depositHandler.contract.methods.registerNST(nstToken2.address).encodeABI();
+
+        await proxy.applyProposal(data2, { from: accounts[2] }).should.be.fulfilled;
+        const rsp = await depositHandler.getTokenAddr(NSTcolor + 1);
+        assert.equal(rsp, nstToken2.address);
       });
 
       it('Can not deposit non-registered token', async () => {
