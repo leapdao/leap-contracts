@@ -73,7 +73,7 @@ contract Vault is Adminable {
     require(nstTokenCount < 0x3ffe);
     require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
 
-    uint16 color = NST_FIRST_COLOR + nftTokenCount; // NFT color namespace starts from 2^15 + 2^14 + 1
+    uint16 color = NST_FIRST_COLOR + nstTokenCount; // NST color namespace starts from 2^15 + 2^14 + 1
     nstTokenCount += 1;
 
     uint256[] memory arr = new uint256[](1);
