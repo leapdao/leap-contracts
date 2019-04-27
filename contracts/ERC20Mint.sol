@@ -8,7 +8,7 @@ contract ERC20Mint is ERC20 {
     _;
   }
 
-  function mint(address _to, uint256 _tokenId) public onlyMinter {
-    super._mint(_to, _tokenId);
+  function mint(address _to, uint256 _value) public onlyMinter {
+    super._mint(_to, _value);
   }
 }
