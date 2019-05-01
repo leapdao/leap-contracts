@@ -239,18 +239,24 @@ contract ExitHandler is DepositHandler {
         } else if (isNST(currentExit.color)) {
           bytes32 tokenData = exitsTokenData[utxoId];
           address tokenAddr = address(tokens[currentExit.color].addr);
-          IERC1948 nst = IERC1948(tokenAddr);
 
-          // if this fails, we do not care
-          nst.writeData(currentExit.amount, tokenData);
-          tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+          bool success;
+          (success, ) = tokenAddr.call(abi.encodeWithSignature("writeData(uint256,bytes32)", currentExit.amount, tokenData));
+          // if set data did not work, we assume the token hasn't been minted yet
+          if (!success) {
+            (success, ) = tokenAddr.call(abi.encodeWithSignature("breed(uint256,bytes32)", currentExit.amount, tokenData));
+          }
+          // only if we were able to setData or breed we try to transfer
+          if (success) {
+            tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
+          }
         } else {
+          // why so complicated? why not transfer()?
           tokens[currentExit.color].addr.approve(address(this), currentExit.amount);
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         }
         // Pay exit stake
         address(uint160(currentExit.owner)).send(currentExit.stake);
-
       }
 
       tokens[currentExit.color].delMin();
