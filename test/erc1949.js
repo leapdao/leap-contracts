@@ -1,40 +1,46 @@
 import { keccak256 } from 'ethereumjs-util';
 import { EVMRevert } from './helpers';
 
-const ERC1949BreedMock = artifacts.require('../mocks/ERC1949BreedMock.sol');
+const ERC1949 = artifacts.require('../mocks/ERC1949.sol');
 
 require('./helpers/setup');
 
 contract('ERC1949', (accounts) => {
-  const firstTokenId = 100;
+  let queenId;
   const creator = accounts[0];
-  const queen = '0x0000000000000000000000000000000000000000000000000000000000000001';
-  const data = '0x0101010101010101010101010101010101010101010101010101010101010101';
+  const workerData = '0x0101010101010101010101010101010101010101010101010101010101010101';
   let breedToken;
 
   beforeEach(async () => {
-    breedToken = await ERC1949BreedMock.new();
-    await breedToken.mint(creator, firstTokenId, queen);
+    breedToken = await ERC1949.new();
+    const rsp = await breedToken.mintQueen(creator);
+    queenId = rsp.logs[0].args.tokenId;
   });
 
   it('should allow breed new worker', async () => {
-    let rsp = await breedToken.readData(firstTokenId);
-    assert.equal(rsp, queen);
-    rsp = await breedToken.breed(firstTokenId, accounts[0], data);
+    // check queenCounter
+    const queenCounter = '0x0000000000000000000000000000000000000000000000000000000000000001';
+    let rsp = await breedToken.readData(queenId);
+    assert.equal(rsp, queenCounter);
 
-    // create workerId
+    // generate workerId
     const buffer = Buffer.alloc(64, 0);
-    buffer.writeUInt32BE(firstTokenId, 28);
+    queenId.toBuffer().copy(buffer);
     buffer.writeUInt32BE(1, 60);
-    const predictedId = keccak256(buffer).toString('hex');
-    const mintedId = rsp.logs[1].args.tokenId.toString('hex');
-    assert.equal(predictedId, mintedId);
-    const workerData = await breedToken.readData(`0x${predictedId}`);
-    assert.equal(workerData, data);
+    const workerId = `0x${keccak256(buffer).toString('hex')}`;
+
+    // breed and check result
+    rsp = await breedToken.breed(workerId, workerData);
+    const mintedId = `0x${rsp.logs[1].args.tokenId.toString('hex')}`;
+    assert.equal(workerId, mintedId);
+
+    // check worker data
+    const data = await breedToken.readData(workerId);
+    assert.equal(data, workerData);
   });
 
   it('should fail if breed called by non-owner', async () => {
-    await breedToken.breed(firstTokenId, accounts[0], data, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
+    await breedToken.breed(123, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
   });
 
 });

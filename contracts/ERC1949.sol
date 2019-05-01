@@ -1,10 +1,10 @@
 pragma solidity 0.5.2;
 
-import "./ERC1948Mint.sol";
+import "./ERC1948.sol";
 import "./IERC1949.sol";
 
 
-contract ERC1949 is IERC1949, ERC1948Mint {
+contract ERC1949 is IERC1949, ERC1948 {
   uint256 public queenCounter = 0;
   mapping(address => uint256) queenOwners;
 
