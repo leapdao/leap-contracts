@@ -18,6 +18,7 @@ const ExitHandler = artifacts.require('ExitHandler');
 const PriorityQueue = artifacts.require('PriorityQueue');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
+const ERC1949 = artifacts.require('ERC1949');
 
 const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -219,6 +220,39 @@ contract('ExitHandler', (accounts) => {
         assert.equal(await nftToken.ownerOf(nftTokenId), bob);
         // exit was markeed as finalized
         assert.equal((await exitHandler.exits(exitUtxoId(event)))[3], true);
+      });
+
+      it('Should allow to finalize delayed breeder', async () => {
+        // deposit queen
+        const breedToken = await ERC1949.new();
+        await breedToken.mintQueen(exitHandler.address);
+
+        // register token
+        const data = await exitHandler.contract.methods.registerNST(breedToken.address).encodeABI();
+        const receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+        const nstColor = Buffer.from(receipt.receipt.rawLogs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
+
+        // deposit
+        const workerId = 1337;
+        const workerData = '0x0101010101010101010101010101010101010101010101010101010101010101';
+        const nstDepositTx = Tx.deposit(13, workerId, alice, nstColor, workerData);
+        // transfer
+        const nstTransferTx = Tx.transfer(
+          [new Input(new Outpoint(nstDepositTx.hash(), 0))],
+          [new Output(workerId, bob, nstColor, workerData)]
+        ).sign([alicePriv]);
+
+        const period = await submitNewPeriod([nstDepositTx, nstTransferTx]);
+
+        const proof = period.proof(nstTransferTx);
+        const inputProof = period.proof(nstDepositTx);
+        // withdraw output
+        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob });
+        await exitHandler.finalizeTopExit(nstColor);
+
+        assert.equal(await breedToken.ownerOf(workerId), bob);
+        assert.equal((await exitHandler.exits(exitUtxoId(event)))[3], true);
+        assert.equal(await breedToken.readData(workerId), workerData);
       });
 
       it('Should allow to exit only for utxo owner', async () => {
