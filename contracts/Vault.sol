@@ -15,6 +15,8 @@ import "./TransferrableToken.sol";
 import "./IERC1948.sol";
 
 contract Vault is Adminable {
+  using PriorityQueue for PriorityQueue.Token;
+
   // 2**15 + 1
   uint16 constant NFT_FIRST_COLOR = 32769;
   // 2**15 + 2**14 + 1
