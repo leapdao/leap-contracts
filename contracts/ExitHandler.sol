@@ -244,17 +244,14 @@ contract ExitHandler is DepositHandler {
           (success, ) = tokenAddr.call(abi.encodeWithSignature("writeData(uint256,bytes32)", currentExit.amount, tokenData));
           // if set data did not work, we assume the token hasn't been minted yet
           if (!success) {
-            (success, ) = tokenAddr.call(
-                abi.encodeWithSignature(
-                    "breed(uint256,bytes32)",
-                    currentExit.amount, tokenData
-                )
+            tokenAddr.call(
+              abi.encodeWithSignature(
+                "breed(uint256,address,bytes32)",
+                currentExit.amount, currentExit.owner, tokenData
+              )
             );
-            // just for testing
-            require(success == true, 'breeding should be true');
-          }
-          // only if we were able to setData or breed we try to transfer
-          if (success) {
+          } else {
+            // only if we were able to setData we try to transfer
             tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
           }
         } else {
