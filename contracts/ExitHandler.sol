@@ -245,10 +245,9 @@ contract ExitHandler is DepositHandler {
           // if set data did not work, we assume the token hasn't been minted yet
           if (!success) {
             (success, ) = tokenAddr.call(
-                // bs, we need the parent(tokenId/value) who breed that thing
                 abi.encodeWithSignature(
-                    "breed(uint256,address,bytes32)",
-                    currentExit.amount, currentExit.owner, tokenData
+                    "breed(uint256,bytes32)",
+                    currentExit.amount, tokenData
                 )
             );
             // just for testing
