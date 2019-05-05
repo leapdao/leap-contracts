@@ -19,9 +19,9 @@ contract ERC1949 is IERC1949, ERC1948 {
 
   modifier onlyQueenOwner(address _to) {
     require(
-        (queenOwners[msg.sender] > 0) ||
-        ((queenOwners[_to] > 0) && _isApprovedOrOwner(msg.sender, queenOwners[_to])),
-        "sender not queen owner nor approved"
+      (queenOwners[msg.sender] > 0) ||
+      ((queenOwners[_to] > 0) && _isApprovedOrOwner(msg.sender, queenOwners[_to])),
+      "sender not queen owner nor approved"
     );
     _;
   }

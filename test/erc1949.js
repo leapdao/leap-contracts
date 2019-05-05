@@ -30,7 +30,7 @@ contract('ERC1949', (accounts) => {
     const workerId = `0x${keccak256(buffer).toString('hex')}`;
 
     // breed and check result
-    rsp = await breedToken.breed(workerId, workerData);
+    rsp = await breedToken.breed(workerId, creator, workerData);
     const mintedId = `0x${rsp.logs[1].args.tokenId.toString('hex')}`;
     assert.equal(workerId, mintedId);
 
@@ -40,7 +40,7 @@ contract('ERC1949', (accounts) => {
   });
 
   it('should fail if breed called by non-owner', async () => {
-    await breedToken.breed(123, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
+    await breedToken.breed(123, creator, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
   });
 
 });
