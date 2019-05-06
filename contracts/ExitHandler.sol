@@ -244,14 +244,10 @@ contract ExitHandler is DepositHandler {
           (success, ) = tokenAddr.call(abi.encodeWithSignature("writeData(uint256,bytes32)", currentExit.amount, tokenData));
           // if set data did not work, we assume the token hasn't been minted yet
           if (!success) {
-            tokenAddr.call(
-              abi.encodeWithSignature(
-                "breed(uint256,address,bytes32)",
-                currentExit.amount, currentExit.owner, tokenData
-              )
-            );
-          } else {
-            // only if we were able to setData we try to transfer
+            (success, ) = tokenAddr.call(abi.encodeWithSignature("breed(uint256,bytes32)", currentExit.amount, tokenData));
+          }
+          // only if we were able to setData or breed we try to transfer
+          if (success) {
             tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
           }
         } else {

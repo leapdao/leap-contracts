@@ -17,17 +17,13 @@ contract ERC1949 is IERC1949, ERC1948 {
     data[queenId] = bytes32(uint256(1));
   }
 
-  modifier onlyQueenOwner(address _to) {
-    require(
-      (queenOwners[msg.sender] > 0) ||
-      ((queenOwners[_to] > 0) && _isApprovedOrOwner(msg.sender, queenOwners[_to])),
-      "sender not queen owner nor approved"
-    );
+  modifier onlyQueenOwner() {
+    require(queenOwners[msg.sender] > 0, "sender not queen owner");
     _;
   }
 
-  function breed(uint256 _workerId, address _to, bytes32 _workerData) public onlyQueenOwner(_to) {
-    super._mint(_to, _workerId);
+  function breed(uint256 _workerId, bytes32 _workerData) public onlyQueenOwner() {
+    super._mint(msg.sender, _workerId);
     emit DataUpdated(_workerId, data[_workerId], _workerData);
     data[_workerId] = _workerData;
   }
