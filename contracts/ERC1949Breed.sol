@@ -3,6 +3,7 @@ pragma solidity 0.5.2;
 import "./ERC1948Mint.sol";
 
 
+// this contract is intended for the leap-node execution environment
 contract ERC1949Breed is ERC1948Mint {
 
   modifier onlyQueenOwner(uint256 _queenId) {

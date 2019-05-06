@@ -15,7 +15,6 @@ const NativeToken = artifacts.require('NativeToken');
 const PoaOperator = artifacts.require('PoaOperator');
 const ExitHandler = artifacts.require('FastExitHandler');
 const SwapRegistry = artifacts.require('SwapRegistry');
-const PriorityQueue = artifacts.require('PriorityQueue');
 const AdminableProxy = artifacts.require('AdminableProxy');
 const BridgeProxy = artifacts.require('BridgeProxy');
 const OperatorProxy = artifacts.require('OperatorProxy');
@@ -53,9 +52,6 @@ module.exports = (deployer, network, accounts) => {
     const bridgeCont = await deployer.deploy(Bridge);
     data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
     const bridgeProxy = await deployer.deploy(BridgeProxy, bridgeCont.address, data, { from: admin});
-
-    const pqLib = await deployer.deploy(PriorityQueue);
-    ExitHandler.link('PriorityQueue', pqLib.address);
 
     log('  🕐 Exit duration:', durationToString(exitDuration));
     log('  💰 Exit stake:', exitStake);
