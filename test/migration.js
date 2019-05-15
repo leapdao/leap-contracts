@@ -126,7 +126,7 @@ contract('Migration', (accounts) => {
       await proxy.upgradeTo(exitHandlerMigrated.address, {from: accounts[2]}).should.be.fulfilled;
       exitHandler = await FastExitHandlerMigration.at(proxy.address);
 
-      [,, exitOwner] = (await exitHandler.exits(utxoId));
+      exitOwner = (await exitHandler.exits(utxoId))[2]; // eslint-disable-line prefer-destructuring
       exitOwner.should.be.equal(bob);
 
       await exitHandler.finalizeTopExit(0);
