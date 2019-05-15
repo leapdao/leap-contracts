@@ -17,6 +17,7 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 const Bridge = artifacts.require('Bridge');
 const Vault = artifacts.require('Vault');
 const SwapRegistry = artifacts.require('SwapRegistry');
+const SwapRegistryMigration = artifacts.require('SwapRegistryMigration');
 const SwapExchange = artifacts.require('SwapExchange');
 const NativeToken = artifacts.require('NativeToken');
 const MinGov = artifacts.require('./MinGov.sol');
@@ -29,6 +30,8 @@ const merkelize = (hash1, hash2) => {
   buffer.write(hash2.replace('0x', ''), 32, 'hex');
   return `0x${ethUtil.keccak256(buffer).toString('hex')}`;
 };
+
+const replaceAll = (str, find, replace) => str.replace(new RegExp(find, 'g'), replace.replace('0x', ''));
 
 contract('SwapRegistry', (accounts) => {
   const alice = accounts[0];
@@ -47,6 +50,10 @@ contract('SwapRegistry', (accounts) => {
     const initialTotalSupply = new BN(web3.utils.toWei('7000000', 'ether')); // 7kk
     const inflationRate = new BN(2637549827);  // ~ 100% in 262800 periods
     const taxRate = 0.5; // 50%
+
+    const submitNewPeriod = (txs, slotId, signerAddr) => submitNewPeriodWithTx(txs, bridge, {
+      from: bob, slotId, signerAddr
+    });
 
     beforeEach(async () => {
       nativeToken = await deployToken();
@@ -80,10 +87,6 @@ contract('SwapRegistry', (accounts) => {
 
       // make swapRegistry a minter
       await nativeToken.addMinter(swapRegistry.address);
-    });
-
-    const submitNewPeriod = (txs, slotId, signerAddr) => submitNewPeriodWithTx(txs, bridge, {
-      from: bob, slotId, signerAddr
     });
 
     describe('Period claim', async () => {
@@ -276,5 +279,65 @@ contract('SwapRegistry', (accounts) => {
         assert.equal(decimals.toNumber(), 18);
       });
     });
+  });
+  describe('minting rights transfer', async () => {
+    let swapRegistry;
+    let nativeToken;
+    let bridge;
+    let proxy;
+    const parentBlockInterval = 0;
+
+    const submitNewPeriod = (txs, slotId, signerAddr) => submitNewPeriodWithTx(txs, bridge, {
+      from: bob, slotId, signerAddr
+    });
+
+    before(async () => {
+      nativeToken = await deployToken();
+
+      const bridgeCont = await Bridge.new();
+      let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
+      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      bridge = await Bridge.at(proxy.address);
+
+      data = await bridge.contract.methods.setOperator(bob).encodeABI();
+      await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+      const vaultCont = await Vault.new();
+      data = await vaultCont.contract.methods.initialize(bridge.address).encodeABI();
+      proxy = await AdminableProxy.new(vaultCont.address, data,  {from: accounts[2]});
+      const vault = await Vault.at(proxy.address);
+
+      // register first token
+      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
+
+      let tmp = SwapRegistryMigration._json.bytecode; // eslint-disable-line no-underscore-dangle
+      // multi address
+      tmp = replaceAll(tmp, 'c5cdcd5470aef35fc33bddff3f8ecec027f95b1d', accounts[0].replace('0x', '').toLowerCase());
+      SwapRegistryMigration._json.bytecode = tmp; // eslint-disable-line no-underscore-dangle
+
+      swapRegistry = await SwapRegistryMigration.new();
+
+      data = await swapRegistry.contract.methods.initialize(bridge.address, vault.address, 0).encodeABI();
+      proxy = await AdminableProxy.new(swapRegistry.address, data,  {from: accounts[2]});
+      swapRegistry = await SwapRegistryMigration.at(proxy.address);
+
+      // make swapRegistry a minter
+      await nativeToken.addMinter(swapRegistry.address).should.be.fulfilled;
+    });
+
+    it('should allow to transfer rights', async () => {
+      // transfer rights
+      await swapRegistry.transferMinter(accounts[1], {from: accounts[0]});
+      // test that new minter can minte
+      await nativeToken.mint(accounts[1], 100000, {from: accounts[1]}).should.be.fulfilled;
+      // test that old minter can NOT mint any more
+      const period = await submitNewPeriod([depositTx], 3, bob);
+      const consensusRoot = merkelize(period.merkleRoot(), empty);
+      const validatorData = `0x000000000000000000000003${bob.replace('0x', '')}`;
+      await swapRegistry.claim(3, [consensusRoot], [empty], [validatorData], [empty], {from: bob}).should.be.rejectedWith(EVMRevert);
+
+    });
+
   });
 });
