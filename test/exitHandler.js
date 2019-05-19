@@ -8,6 +8,8 @@
 import { Tx, Input, Output, Outpoint } from 'leap-core';
 import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 
+const ethUtil = require('ethereumjs-util');
+
 const time = require('./helpers/time');
 require('./helpers/setup');
 
@@ -19,6 +21,7 @@ const PriorityQueue = artifacts.require('PriorityQueue');
 const SimpleToken = artifacts.require('SimpleToken');
 const SpaceDustNFT = artifacts.require('SpaceDustNFT');
 const ERC1949 = artifacts.require('ERC1949');
+const SpendingCondition = artifacts.require('SpendingCondition');
 
 const aSecond = async () => new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -144,6 +147,35 @@ contract('ExitHandler', (accounts) => {
         await exitHandler.finalizeTopExit(nativeTokenColor);
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
+
+        assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
+      });
+
+      it('Should allow to exit valid utxo to spending condition', async () => {
+        const condition = await SpendingCondition.new();
+        const codeBuf = Buffer.from(condition.constructor._json.deployedBytecode.replace('0x', ''), 'hex'); // eslint-disable-line no-underscore-dangle
+        const codeHash = ethUtil.ripemd160(ethUtil.keccak256(codeBuf));
+
+        const transferToSpTx = Tx.transfer(
+          [new Input(new Outpoint(depositTx.hash(), 0))],
+          [new Output(50, bob), new Output(50, `0x${codeHash.toString('hex')}`)]
+        ).sign([alicePriv]);
+        const period = await submitNewPeriod([depositTx, transferToSpTx]);
+
+        const transferProof = period.proof(transferToSpTx);
+        const outputIndex = 1;
+        const inputProof = period.proof(depositTx); // transferTx spends depositTx
+        const inputIndex = 0;
+        await condition.startExit(inputProof, transferProof, outputIndex, inputIndex, exitHandler.address);
+
+        const aliceBalanceBefore = await nativeToken.balanceOf(condition.address);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        const aliceBalanceAfter = await nativeToken.balanceOf(condition.address);
 
         assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
       });
