@@ -13,11 +13,12 @@ pragma solidity 0.5.2;
 import "../node_modules/openzeppelin-solidity/contracts/math/Math.sol";
 
 import "./DepositHandler.sol";
+import "./IExitHandler.sol";
 import "./Bridge.sol";
 import "./TxLib.sol";
 import "./PriorityQueue.sol";
 
-contract ExitHandler is DepositHandler {
+contract ExitHandler is IExitHandler, DepositHandler {
 
   using PriorityQueue for PriorityQueue.Token;
 
@@ -102,12 +103,22 @@ contract ExitHandler is DepositHandler {
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
-    require(out.owner == msg.sender, "Only UTXO owner can start exit");
+    uint256 priority;
+    if (msg.sender != out.owner) {
+      // or caller code hashes to owner
+      address a = msg.sender;
+      assembly {
+        priority := extcodehash(a) // abusing priority for hashBytes here, to save stack
+      }
+      require(priority != 0, "caller not contract");
+      require(bytes20(out.owner) == ripemd160(abi.encode(priority)), "Only UTXO owner or contract can start exit");
+      out.owner = msg.sender;
+    }
     require(out.value > 0, "UTXO has no value");
     require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
 
-    uint256 priority;
+    
     if (_youngestInputProof.length > 0) {
       // check youngest input tx inclusion in the root chain block
       bytes32 inputTxHash;
