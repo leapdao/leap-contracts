@@ -108,8 +108,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
       // or caller code hashes to owner
       address a = msg.sender;
       assembly {
-        priority := extcodehash(a)
+        priority := extcodehash(a) // abusing priority for hashBytes here, to save stack
       }
+      require(priority != 0, "caller not contract");
       require(bytes20(out.owner) == ripemd160(abi.encode(priority)), "Only UTXO owner or contract can start exit");
       out.owner = msg.sender;
     }
