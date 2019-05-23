@@ -26,13 +26,13 @@ library PriorityQueue {
     uint256 currentSize;
   }
 
-  function insert(Token storage self, uint256 k) internal {
+  function insert(Token storage self, uint256 k) public {
     self.heapList.push(k);
     self.currentSize = self.currentSize.add(1);
     percUp(self, self.currentSize);
   }
 
-  function minChild(Token storage self, uint256 i) internal view returns (uint256) {
+  function minChild(Token storage self, uint256 i) public view returns (uint256) {
     if (i.mul(2).add(1) > self.currentSize) {
       return i.mul(2);
     } else {
@@ -44,11 +44,11 @@ library PriorityQueue {
     }
   }
 
-  function getMin(Token storage self) internal view returns (uint256) {
+  function getMin(Token storage self) public view returns (uint256) {
     return self.heapList[1];
   }
 
-  function delMin(Token storage self) internal returns (uint256) {
+  function delMin(Token storage self) public returns (uint256) {
     uint256 retVal = self.heapList[1];
     self.heapList[1] = self.heapList[self.currentSize];
     delete self.heapList[self.currentSize];
