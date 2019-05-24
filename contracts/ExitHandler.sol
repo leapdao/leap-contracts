@@ -84,7 +84,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
    * to be used in an exit challenge. We use this verification process to scrutinize 
    * the validity of spending conditions.
    */
-  function startWhitelisting(bytes32[] memory _proof, uint8 _outputIndex) public payable {
+  function startWhitelisting(bytes32[] memory _proof, uint8 _outputIndex, bytes32 _rootHash) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for verification stake");
     uint32 timestamp;
     (,timestamp) = bridge.periods(_proof[0]);
@@ -93,14 +93,14 @@ contract ExitHandler is IExitHandler, DepositHandler {
     // check exiting tx inclusion in the root chain block
     bytes32 utxoId;
     bytes memory txData;
-    (, utxoId, txData) = TxLib.validateProof(32, _proof);
-    if (_outputIndex > 0) {
+    (, utxoId, txData) = TxLib.validateProof(64, _proof);
+    if (uint256(_rootHash) == 0) {
       utxoId = bytes32(uint256(_outputIndex) << 248 | uint248(uint256(utxoId)));
     }
     require(verifications[utxoId].stake == 0, "Transaction already registered");
     TxLib.Tx memory txn = TxLib.parseTx(txData);
 
-    if (_outputIndex > txn.outs.length) {
+    if (uint256(_rootHash) > 0) {
        // iterate over all inputs
       // make sure these inputs have been registered for verification
       // fail if not
@@ -108,20 +108,18 @@ contract ExitHandler is IExitHandler, DepositHandler {
       uint256 stake = 0;
       for (uint i = 0; i < txn.ins.length; i++) {
         bytes32 prevUtxoId = txn.ins[i].outpoint.hash;
-        if (txn.ins[i].outpoint.pos > 0) {
-          prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(uint256(txn.ins[i].outpoint.hash)));
-        }
+        prevUtxoId = bytes32((uint256(txn.ins[i].outpoint.pos) << 248) | uint248(uint256(txn.ins[i].outpoint.hash)));
         WhitelistVerification memory prevVerification = verifications[prevUtxoId];
         require(prevVerification.startTime > 0, "Input not found");
         stake += prevVerification.stake;
         delete verifications[prevUtxoId];
       }
       msg.sender.transfer(stake);
+      verifications[utxoId] = WhitelistVerification(uint32(block.timestamp), txn.outs[0], msg.value);
+    } else {
+      verifications[utxoId] = WhitelistVerification(uint32(block.timestamp), txn.outs[_outputIndex], msg.value);
     }
-
-    verifications[utxoId] = WhitelistVerification(uint32(block.timestamp), txn.outs[_outputIndex], msg.value);
     emit WhitelistStarted(utxoId);
-    // call solEVM here and register game
   }
 
   function initializeWithExit(
@@ -375,8 +373,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
-      require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
-      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+      require(txHash1 == txn.ins[_inputIndex].outpoint.hash, "hash does not match");
+      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos, "outputs do not match");
 
       // if transfer, make sure signature correct
       if (txn.txType == TxLib.TxType.Transfer) {
@@ -387,7 +385,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
-        require(exits[utxoId].owner == signer);
+        require(exits[utxoId].owner == signer, "output owner not signer");
       } else if (txn.txType == TxLib.TxType.SpendCond) {
         // check that transaction whitelisted
         uint256 verificationTime = verifications[txHash].startTime;
