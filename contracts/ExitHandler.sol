@@ -17,6 +17,7 @@ import "./IExitHandler.sol";
 import "./Bridge.sol";
 import "./TxLib.sol";
 import "./PriorityQueue.sol";
+import "./PlasmaEnforcer.sol";
 
 contract ExitHandler is IExitHandler, DepositHandler {
 
@@ -52,6 +53,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
   uint256 public exitStake;
   uint256 public nftExitCounter;
   uint256 public nstExitCounter;
+  address public plasmaEnforcer;
 
   /**
    * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
@@ -76,6 +78,10 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
   function setExitDuration(uint256 _exitDuration) public ifAdmin {
     exitDuration = _exitDuration;
+  }
+
+  function setPlasmaEnforcer(address _enforcerAddress) public ifAdmin {
+    plasmaEnforcer = _enforcerAddress;
   }
 
   function startExit(
@@ -311,8 +317,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
-      require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
-      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+      require(txHash1 == txn.ins[_inputIndex].outpoint.hash, "hash does not match");
+      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos, "outputs do not match");
 
       // if transfer, make sure signature correct
       if (txn.txType == TxLib.TxType.Transfer) {
@@ -323,7 +329,13 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
-        require(exits[utxoId].owner == signer);
+        require(exits[utxoId].owner == signer, "output owner not signer");
+      } else if (txn.txType == TxLib.TxType.SpendCond) {
+        // check that transaction whitelisted
+        uint256 verificationTime = PlasmaEnforcer(plasmaEnforcer).verificationStartTime(txHash);
+        require(verificationTime > 0, "Transaction not verified");
+        require(block.timestamp >= verificationTime + (exitDuration / 2), "Transaction still in verification");
+        // TODO: check that verification came passed.
       } else {
         revert("unknown tx type");
       }

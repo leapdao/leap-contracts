@@ -56,6 +56,7 @@
     "openzeppelin-solidity": "=2.1.1",
     "pify": "^4.0.1",
     "scrypt": "^6.0.3",
+    "solEVM-enforcer": "https://github.com/leapdao/solEVM-enforcer#master",
     "truffle-hdwallet-provider": "1.0.2"
   }
 }

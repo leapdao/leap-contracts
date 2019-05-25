@@ -14,7 +14,7 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 200,
+          runs: 1,
         },
         // TODO: the code is supposed to work on constantinople EVM but fails if this is switched on
         evmVersion: 'byzantium',
