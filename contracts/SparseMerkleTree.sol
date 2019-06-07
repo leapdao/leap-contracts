@@ -11,7 +11,7 @@ pragma solidity >=0.4.21 <0.6.0;
 // Based on https://rinkeby.etherscan.io/address/0x881544e0b2e02a79ad10b01eca51660889d5452b#code
 contract SparseMerkleTree {
 
-  uint8 constant DEPTH = 64;
+  uint8 constant DEPTH = 160;
   bytes32[DEPTH + 1] public defaultHashes;
   bytes32 public root;
 
@@ -24,32 +24,32 @@ contract SparseMerkleTree {
     root = defaultHashes[DEPTH];
   }
 
-  function read(uint64 key, bytes32 leaf, bytes memory proof) public view returns (bool) {
+  function read(uint160 key, bytes32 leaf, bytes memory proof) public view returns (bool) {
     bytes32 calculatedRoot = getRoot(leaf, key, proof);
     return (calculatedRoot == root);
   }
 
-  function write(uint64 key, bytes32 prevLeaf, bytes memory proof, bytes32 newLeaf) public {
+  function write(uint160 key, bytes32 prevLeaf, bytes memory proof, bytes32 newLeaf) public {
     bytes32 calculatedRoot = getRoot(prevLeaf, key, proof);
     require(calculatedRoot == root, "update proof not valid");
     root = getRoot(newLeaf, key, proof);
   }
 
-  function del(uint64 key, bytes32 prevLeaf, bytes memory proof) public {
+  function del(uint160 key, bytes32 prevLeaf, bytes memory proof) public {
     bytes32 calculatedRoot = getRoot(prevLeaf, key, proof);
     require(calculatedRoot == root, "update proof not valid");
     root = getRoot(defaultHashes[0], key, proof);
   }
 
-  // first 64 bits of the proof are the 0/1 bits
-  function getRoot(bytes32 leaf, uint64 _index, bytes memory proof) public view returns (bytes32) {
-    require((proof.length - 8) % 32 == 0 && proof.length <= 2056, "invalid proof format");
+  // first 160 bits of the proof are the 0/1 bits
+  function getRoot(bytes32 leaf, uint160 _index, bytes memory proof) public view returns (bytes32) {
+    require((proof.length - 20) % 32 == 0 && proof.length <= 5140, "invalid proof format");
     bytes32 proofElement;
     bytes32 computedHash = leaf;
-    uint16 p = 8;
-    uint64 proofBits;
-    uint64 index = _index;
-    assembly {proofBits := div(mload(add(proof, 32)), exp(256, 24))}
+    uint16 p = 20;
+    uint160 proofBits;
+    uint160 index = _index;
+    assembly {proofBits := div(mload(add(proof, 32)), exp(256, 12))}
 
     for (uint d = 0; d < DEPTH; d++ ) {
       if (proofBits % 2 == 0) { // check if last bit of proofBits is 0

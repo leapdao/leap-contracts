@@ -27,7 +27,7 @@ const merkelize = (hash1, hash2) => {
   return `0x${keccak256(buffer).toString('hex')}`;
 };
 
-function setTrailBit(trail, pos) { 
+function setTrailBit(trail, pos) {
   const bytePos = (trail.length - 1) - Math.floor(pos / 8);
   let val = trail.readUInt8(bytePos);
   val += 1 << (pos % 8); // eslint-disable-line no-bitwise
