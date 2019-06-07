@@ -43,13 +43,13 @@ contract SparseMerkleTree {
 
   // first 160 bits of the proof are the 0/1 bits
   function getRoot(bytes32 leaf, uint160 _index, bytes memory proof) public view returns (bytes32) {
-    require((proof.length - 8) % 32 == 0 && proof.length <= 5128, "invalid proof format");
+    require((proof.length - 20) % 32 == 0 && proof.length <= 5140, "invalid proof format");
     bytes32 proofElement;
     bytes32 computedHash = leaf;
-    uint16 p = 8;
+    uint16 p = 20;
     uint160 proofBits;
     uint160 index = _index;
-    assembly {proofBits := div(mload(add(proof, 32)), exp(256, 24))}
+    assembly {proofBits := div(mload(add(proof, 32)), exp(256, 12))}
 
     for (uint d = 0; d < DEPTH; d++ ) {
       if (proofBits % 2 == 0) { // check if last bit of proofBits is 0
