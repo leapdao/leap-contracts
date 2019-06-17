@@ -86,10 +86,8 @@ contract Bridge is Adminable {
       );
       tipHash = _root;
       lastParentBlock = block.number;
+      emit NewHeight(newHeight, _root);
     }
-    // strictly speaking this event should be called "New Period"
-    // but we don't want to break interfaces for now.
-    emit NewHeight(newHeight, _root);
     // store the period
     Period memory newPeriod = Period({
       height: uint32(newHeight),
