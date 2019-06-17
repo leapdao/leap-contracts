@@ -6,6 +6,8 @@ require('dotenv').config();
 
 const HDWalletProvider = require('truffle-hdwallet-provider');
 
+const { RINKEBY_MNEMONIC, MAINNET_MNEMONIC, INFURA_PROJECT_ID } = process.env;
+
 module.exports = {
   // Configure your compilers
   compilers: {
@@ -31,7 +33,7 @@ module.exports = {
     },
     mainnet: {
       provider: () => new HDWalletProvider(
-        process.env.MAINNET_MNEMONIC, 'https://mainnet.infura.io', 0, 2,
+        MAINNET_MNEMONIC, `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`, 0, 2,
       ),
       network_id: '1',
       // hard gas limit
@@ -40,7 +42,7 @@ module.exports = {
     },
     rinkeby: {
       provider: () => new HDWalletProvider(
-        process.env.RINKEBY_MNEMONIC, 'https://rinkeby.infura.io', 0, 2,
+        RINKEBY_MNEMONIC, `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`, 0, 2,
       ),
       network_id: '4',
       // hard gas limit

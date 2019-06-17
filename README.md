@@ -13,6 +13,11 @@ yarn test
 
 > All the commands support any truffle options like `--network` or `--reset`.
 
+### Deploying on Rinkeby and Mainnet
+
+To deploy on Rinkeby and Mainnet, make sure to specify your Infura project ID and mnemonic in the `.env` file. Alternatively, you can change `truffle-config.js` to use other provider of your choice.
+
+### Contracts customization
 
 Contract may be customized via ENV variables:
 
