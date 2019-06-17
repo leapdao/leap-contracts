@@ -44,7 +44,7 @@ module.exports = {
       ),
       network_id: '4',
       // hard gas limit
-      gas: 5500000,
+      gas: 6500000,
       // 3 Gwei
       gasPrice: 3000000000
     },
