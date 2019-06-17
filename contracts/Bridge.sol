@@ -23,10 +23,10 @@ contract Bridge is Adminable {
   event NewOperator(address operator);
 
   struct Period {
-    uint32 height;  // the height of last block in period
-    uint32 timestamp;
-    uint32 parentBlockNumber;
-    bytes32 parentBlockHash;
+    uint32 height;            // the height of last block in period
+    uint32 timestamp;         // the block.timestamp at submission of period
+    uint32 parentBlockNumber; // the block.number at submission of period
+    bytes32 parentBlockHash;  // the blockhash(block.number -1) at submission of period
   }
 
   bytes32 constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
@@ -87,6 +87,8 @@ contract Bridge is Adminable {
       tipHash = _root;
       lastParentBlock = block.number;
     }
+    // strictly speaking this event should be called "New Period"
+    // but we don't want to break interfaces for now.
     emit NewHeight(newHeight, _root);
     // store the period
     Period memory newPeriod = Period({
