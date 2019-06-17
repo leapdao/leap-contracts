@@ -25,6 +25,8 @@ contract Bridge is Adminable {
   struct Period {
     uint32 height;  // the height of last block in period
     uint32 timestamp;
+    uint32 parentBlockNumber;
+    bytes32 parentBlockHash;
   }
 
   bytes32 constant GENESIS = 0x4920616d207665727920616e6772792c20627574206974207761732066756e21;
@@ -41,7 +43,9 @@ contract Bridge is Adminable {
     // init genesis preiod
     Period memory genesisPeriod = Period({
       height: 1,
-      timestamp: uint32(block.timestamp)
+      timestamp: uint32(block.timestamp),
+      parentBlockNumber: uint32(block.number),
+      parentBlockHash: blockhash(block.number-1)
     });
     tipHash = GENESIS;
     periods[GENESIS] = genesisPeriod;
@@ -82,12 +86,14 @@ contract Bridge is Adminable {
       );
       tipHash = _root;
       lastParentBlock = block.number;
-      emit NewHeight(newHeight, _root);
     }
+    emit NewHeight(newHeight, _root);
     // store the period
     Period memory newPeriod = Period({
       height: uint32(newHeight),
-      timestamp: uint32(block.timestamp)
+      timestamp: uint32(block.timestamp),
+      parentBlockNumber: uint32(block.number),
+      parentBlockHash: blockhash(block.number-1)
     });
     periods[_root] = newPeriod;
   }
