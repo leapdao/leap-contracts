@@ -98,8 +98,7 @@ contract FastExitHandler is ExitHandler {
       _outputIndex,
       out.color,
       out.owner,
-      out.value,
-      out.stateRoot
+      out.value
     );
   }
 

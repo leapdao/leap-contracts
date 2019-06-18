@@ -22,16 +22,12 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
   using PriorityQueue for PriorityQueue.Token;
 
-  /**
-    - tokenData — (optional) NST data
-   */
   event ExitStarted(
     bytes32 indexed txHash,
     uint8 indexed outIndex,
     uint256 indexed color,
     address exitor,
-    uint256 amount,
-    bytes32 tokenData
+    uint256 amount
   );
 
   /**
@@ -164,8 +160,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
       _outputIndex,
       out.color,
       out.owner,
-      out.value,
-      out.stateRoot
+      out.value
     );
   }
 
@@ -208,8 +203,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
       0,
       deposit.color,
       deposit.owner,
-      deposit.amount,
-      "0x"
+      deposit.amount
     );
   }
 
