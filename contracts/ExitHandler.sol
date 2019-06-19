@@ -30,15 +30,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
     uint256 amount
   );
 
-  event ExitStartedV2(
-    bytes32 indexed txHash,
-    uint8 indexed outIndex,
-    uint256 indexed color,
-    address exitor,
-    uint256 amount,
-    bytes32 data
-  );
-
+  /**
+    - tokenData — (optional) NST data
+   */
   struct Exit {
     uint256 amount;
     uint16 color;
@@ -46,6 +40,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
     bool finalized;
     uint32 priorityTimestamp;
     uint256 stake;
+    bytes32 tokenData;
   }
 
   uint256 public exitDuration;
@@ -54,11 +49,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
   uint256 public nstExitCounter;
 
   /**
-   * UTXO → Exit mapping. Contains exits for both NFT and ERC20 colors
+   * UTXO → Exit mapping
    */
   mapping(bytes32 => Exit) public exits;
-  // mapping for NST data
-  mapping(bytes32 => bytes32) public exitsTokenData;
 
   function initializeWithExit(
     Bridge _bridge,
@@ -158,29 +151,17 @@ contract ExitHandler is IExitHandler, DepositHandler {
       amount: out.value,
       finalized: false,
       stake: exitStake,
-      priorityTimestamp: timestamp
+      priorityTimestamp: timestamp,
+      tokenData: out.stateRoot
     });
 
-    if (isNST(out.color)) {
-      exitsTokenData[utxoId] = out.stateRoot;
-
-      emit ExitStartedV2(
-        txHash,
-        _outputIndex,
-        out.color,
-        out.owner,
-        out.value,
-        out.stateRoot
-      );
-    } else {
-      emit ExitStarted(
-        txHash,
-        _outputIndex,
-        out.color,
-        out.owner,
-        out.value
-      );
-    }
+    emit ExitStarted(
+      txHash,
+      _outputIndex,
+      out.color,
+      out.owner,
+      out.value
+    );
   }
 
   function startDepositExit(uint256 _depositId) public payable {
@@ -211,7 +192,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       amount: deposit.amount,
       finalized: false,
       stake: exitStake,
-      priorityTimestamp: uint32(now)
+      priorityTimestamp: uint32(now),
+      tokenData: "0x"
     });
 
     // no need to emit ExitStartedV2
@@ -248,7 +230,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
         if (isNft(currentExit.color)) {
           tokens[currentExit.color].addr.transferFrom(address(this), currentExit.owner, currentExit.amount);
         } else if (isNST(currentExit.color)) {
-          bytes32 tokenData = exitsTokenData[utxoId];
+          bytes32 tokenData = currentExit.tokenData;
           address tokenAddr = address(tokens[currentExit.color].addr);
 
           bool success;

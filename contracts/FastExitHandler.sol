@@ -90,7 +90,8 @@ contract FastExitHandler is ExitHandler {
       amount: out.value,
       finalized: false,
       stake: exitStake,
-      priorityTimestamp: data.timestamp
+      priorityTimestamp: data.timestamp,
+      tokenData: out.stateRoot
     });
     emit ExitStarted(
       data.txHash,
