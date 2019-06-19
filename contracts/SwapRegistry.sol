@@ -77,7 +77,7 @@ contract SwapRegistry is Adminable {
         mstore(0x20, right)
         right := keccak256(0, 0x40)
       }
-      (height ,) = bridge.periods(right);
+      (height ,,,) = bridge.periods(right);
       require(height > maxHeight, "unorderly claim");
       maxHeight = height;
       claimCount += 1;

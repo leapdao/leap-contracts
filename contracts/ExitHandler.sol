@@ -84,11 +84,11 @@ contract ExitHandler is IExitHandler, DepositHandler {
   ) public payable {
     require(msg.value >= exitStake, "Not enough ether sent to pay for exit stake");
     uint32 timestamp;
-    (, timestamp) = bridge.periods(_proof[0]);
+    (, timestamp,,) = bridge.periods(_proof[0]);
     require(timestamp > 0, "The referenced period was not submitted to bridge");
 
     if (_youngestInputProof.length > 0) {
-      (, timestamp) = bridge.periods(_youngestInputProof[0]);
+      (, timestamp,,) = bridge.periods(_youngestInputProof[0]);
       require(timestamp > 0, "The referenced period was not submitted to bridge");
     }
 
@@ -381,7 +381,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
     require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
 
     uint32 youngerInputTimestamp;
-    (,youngerInputTimestamp) = bridge.periods(_youngerInputProof[0]);
+    (,youngerInputTimestamp,,) = bridge.periods(_youngerInputProof[0]);
     require(youngerInputTimestamp > 0, "The referenced period was not submitted to bridge");
 
     require(exits[utxoId].priorityTimestamp < youngerInputTimestamp, "Challenged input should be older");
