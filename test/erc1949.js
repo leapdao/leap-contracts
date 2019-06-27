@@ -9,18 +9,18 @@ contract('ERC1949', (accounts) => {
   let queenId;
   const creator = accounts[0];
   const workerData = '0x0101010101010101010101010101010101010101010101010101010101010101';
-  let breedToken;
+  let delegateToken;
 
   beforeEach(async () => {
-    breedToken = await ERC1949.new();
-    const rsp = await breedToken.mintQueen(creator);
+    delegateToken = await ERC1949.new();
+    const rsp = await delegateToken.mintDelegate(creator);
     queenId = rsp.logs[0].args.tokenId;
   });
 
-  it('should allow breed new worker', async () => {
+  it('should allow delegate new worker', async () => {
     // check queenCounter
     const queenCounter = '0x0000000000000000000000000000000000000000000000000000000000000001';
-    let rsp = await breedToken.readData(queenId);
+    let rsp = await delegateToken.readData(queenId);
     assert.equal(rsp, queenCounter);
 
     // generate workerId
@@ -29,18 +29,18 @@ contract('ERC1949', (accounts) => {
     buffer.writeUInt32BE(1, 60);
     const workerId = `0x${keccak256(buffer).toString('hex')}`;
 
-    // breed and check result
-    rsp = await breedToken.breed(workerId, creator, workerData);
+    // delegate and check result
+    rsp = await delegateToken.breed(workerId, creator, workerData);
     const mintedId = `0x${rsp.logs[1].args.tokenId.toString('hex')}`;
     assert.equal(workerId, mintedId);
 
     // check worker data
-    const data = await breedToken.readData(workerId);
+    const data = await delegateToken.readData(workerId);
     assert.equal(data, workerData);
   });
 
-  it('should fail if breed called by non-owner', async () => {
-    await breedToken.breed(123, creator, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
+  it('should fail if delegate called by non-owner', async () => {
+    await delegateToken.breed(123, creator, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
   });
 
 });
