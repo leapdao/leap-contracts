@@ -239,7 +239,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
           if (!success) {
             tokenAddr.call(
               abi.encodeWithSignature(
-                "breed(uint256,address,bytes32)",
+                "mintDeferred(uint256,address,bytes32)",
                 currentExit.amount, currentExit.owner, tokenData
               )
             );

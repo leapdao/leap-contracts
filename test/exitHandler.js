@@ -257,7 +257,7 @@ contract('ExitHandler', (accounts) => {
       it('Should allow to finalize delayed breeder', async () => {
         // deposit queen
         const breedToken = await ERC1949.new();
-        await breedToken.mintDelegate(exitHandler.address);
+        await breedToken.mint(exitHandler.address, 0);
 
         // register token
         const data = await exitHandler.contract.methods.registerNST(breedToken.address).encodeABI();

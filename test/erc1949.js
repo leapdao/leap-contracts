@@ -13,7 +13,7 @@ contract('ERC1949', (accounts) => {
 
   beforeEach(async () => {
     delegateToken = await ERC1949.new();
-    const rsp = await delegateToken.mintDelegate(creator);
+    const rsp = await delegateToken.mint(creator, 0);
     queenId = rsp.logs[0].args.tokenId;
   });
 
@@ -30,7 +30,7 @@ contract('ERC1949', (accounts) => {
     const workerId = `0x${keccak256(buffer).toString('hex')}`;
 
     // delegate and check result
-    rsp = await delegateToken.breed(workerId, creator, workerData);
+    rsp = await delegateToken.mintDeferred(workerId, creator, workerData);
     const mintedId = `0x${rsp.logs[1].args.tokenId.toString('hex')}`;
     assert.equal(workerId, mintedId);
 
@@ -40,7 +40,7 @@ contract('ERC1949', (accounts) => {
   });
 
   it('should fail if delegate called by non-owner', async () => {
-    await delegateToken.breed(123, creator, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
+    await delegateToken.mintDeferred(123, creator, workerData, {from: accounts[1]}).should.be.rejectedWith(EVMRevert);
   });
 
 });

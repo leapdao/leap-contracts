@@ -2,6 +2,7 @@ pragma solidity 0.5.2;
 
 import "./ERC1948.sol";
 import "./IERC1949.sol";
+import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 /**
  * @dev Implementation of the `IERC1949` interface.
@@ -15,7 +16,7 @@ import "./IERC1949.sol";
  * be enforced through contracts/predicates on the side-/child-chain and are not part
  * of this implementation.
  */
-contract ERC1949 is IERC1949, ERC1948 {
+contract ERC1949 is Ownable, IERC1949, ERC1948 {
   uint256 public delegateCounter = 0;
   mapping(address => uint256) delegateOwners;
 
@@ -29,7 +30,7 @@ contract ERC1949 is IERC1949, ERC1948 {
    * @dev mints a new delegate 
    * @param _to The token to read the data off.
    */
-  function mintDelegate(address _to) public {
+  function mint(address _to, uint256) public onlyOwner {
     delegateCounter += 1;
     uint256 delegateId = uint256(keccak256(abi.encodePacked(address(this), delegateCounter)));
     super._mint(_to, delegateId);
@@ -47,7 +48,7 @@ contract ERC1949 is IERC1949, ERC1948 {
     _;
   }
 
-  function breed(uint256 tokenId, address to, bytes32 tokenData) external onlyDelegateOwner(to) {
+  function mintDeferred(uint256 tokenId, address to, bytes32 tokenData) external onlyDelegateOwner(to) {
     super._mint(to, tokenId);
     emit DataUpdated(tokenId, data[tokenId], tokenData);
     data[tokenId] = tokenData;
