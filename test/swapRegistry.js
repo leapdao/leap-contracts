@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import ethUtil from 'ethereumjs-util';
+import { keccak256 } from 'ethereumjs-util';
 import { Tx } from 'leap-core';
 import { EVMRevert, submitNewPeriodWithTx } from './helpers';
 
@@ -28,7 +28,7 @@ const merkelize = (hash1, hash2) => {
   const buffer = Buffer.alloc(64, 0);
   buffer.write(hash1.replace('0x', ''), 'hex');
   buffer.write(hash2.replace('0x', ''), 32, 'hex');
-  return `0x${ethUtil.keccak256(buffer).toString('hex')}`;
+  return `0x${keccak256(buffer).toString('hex')}`;
 };
 
 const replaceAll = (str, find, replace) => str.replace(new RegExp(find, 'g'), replace.replace('0x', ''));

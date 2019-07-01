@@ -134,6 +134,9 @@ contract('Migration', (accounts) => {
       await exitHandler.startBoughtExit(depositProof, transferProof, outputIndex, 
         inputIndex, signedDataBytes32, {from: bob}).should.be.rejectedWith(EVMRevert);
 
+      console.log('accounts; ', accounts[0]);
+      await exitHandler.withdrawSupply(nativeToken.address);
+
       const bobBalance3 = await nativeToken.balanceOf(bob);
       assert.equal(bobBalance2.toNumber() + 50, bobBalance3.toNumber());
     });

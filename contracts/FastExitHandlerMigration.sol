@@ -37,4 +37,16 @@ contract FastExitHandlerMigration is ExitHandler {
     revert("not implemented");
   }
 
+  modifier onlyMultisig() {
+    // replace this on mainnet: 0xC5cDcD5470AEf35fC33BDDff3f8eCeC027F95B1d
+    require(msg.sender == 0xF3beAC30C498D9E26865F34fCAa57dBB935b0D74, "msg.sender not multisig");
+    _;
+  }
+
+  function withdrawSupply(address _token) public onlyMultisig {
+    require(_token != address(0), "not real address");
+    IERC20 token = IERC20(_token);
+    token.transfer(msg.sender, token.balanceOf(address(this)));
+  }
+
 }

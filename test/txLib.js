@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import utils from "ethereumjs-util";
+import { bufferToHex, hashPersonalMessage } from "ethereumjs-util";
 import BN from 'bn.js';
 import { BigInt, equal } from 'jsbi';
 import { Period, Block, Tx, Input, Output, Outpoint, Type } from 'leap-core';
@@ -325,7 +325,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
+      assert.equal(rsp, bufferToHex( hashPersonalMessage(transfer.sigDataBuf())));
     });
     it('should allow to get sigHash with 2 input and 2 outputs', async () => {
       const transfer = Tx.transfer(
@@ -334,7 +334,7 @@ contract('TxLib', (accounts) => {
       );
       transfer.sign([alicePriv, alicePriv]);
       const rsp = await txLib.getSigHash(transfer.hex()).should.be.fulfilled;
-      assert.equal(rsp, utils.bufferToHex(utils.hashPersonalMessage(transfer.sigDataBuf())));
+      assert.equal(rsp, bufferToHex( hashPersonalMessage(transfer.sigDataBuf())));
     });
   });
 });
