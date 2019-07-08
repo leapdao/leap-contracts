@@ -226,7 +226,6 @@ contract('MinGov', (accounts) => {
   })
 
   it('should allow to proxy SetSlot without goverance delay', async () => {
-
     const operatorLogic = await Operator.new();
     const proxyOp = await AdminableProxy.new(operatorLogic.address, '0x');
     const operator = await Operator.at(proxyOp.address);
@@ -237,6 +236,28 @@ contract('MinGov', (accounts) => {
 
     const slotId = await operator.slotId();
     assert.equal(slotId.toNumber(), 254);
+  })
+
+  it('should allow to register Token without goverance delay', async () => {
+    const vaultLogic = await Vault.new();
+    const proxyOp = await AdminableProxy.new(vaultLogic.address, '0x');
+    const vault = await Vault.at(proxyOp.address);
+    await proxyOp.changeAdmin(gov.address);
+
+    await gov.registerToken(proxyOp.address, accounts[1], 0);
+
+    let tokenCount = await vault.tokenCount();
+    assert.equal(tokenCount.toNumber(), 1);
+
+    await gov.registerToken(proxyOp.address, accounts[1], 1);
+
+    tokenCount = await vault.tokenCount();
+    assert.equal(tokenCount.toNumber(), 2);
+
+    await gov.registerToken(proxyOp.address, accounts[1], 2);
+
+    tokenCount = await vault.tokenCount();
+    assert.equal(tokenCount.toNumber(), 3);
   })
 
 });

@@ -21,4 +21,8 @@ contract VaultMock is Adminable {
   function registerToken(address, bool) public ifAdmin {
     tokenCount++;
   }
+
+  function registerNST(address) public ifAdmin {
+    tokenCount++;
+  }
 }
