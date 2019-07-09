@@ -19,6 +19,7 @@ contract('PoaOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const admin = accounts[3];
+  const CAS = '0xff00000000000000000000000000000000000000000000000000000000000000';
 
   describe('Test', () => {
     let bridge;
@@ -46,13 +47,13 @@ contract('PoaOperator', (accounts) => {
       
     describe('Slot Management', () => {
       it('should prevent submission by empty slot', async () => {
-        await operator.submitPeriod(0, p[0], '0x01', {from: alice}).should.be.rejectedWith(EVMRevert);
+        await operator.submitPeriod(0, p[0], '0x01', '0xff', {from: alice}).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to set slot and submit block', async () => {
         const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
         await proxy.applyProposal(data, {from: admin});
-        await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
+        await operator.submitPeriod(0, p[0], '0x01', '0xff', { from: alice }).should.be.fulfilled;
         p[1] = await bridge.tipHash();
       });
 
@@ -65,10 +66,10 @@ contract('PoaOperator', (accounts) => {
         block.addTx(depositTx);
         const prevPeriodRoot = await bridge.tipHash();
         const period = new Period(prevPeriodRoot, [block]);
-        period.setValidatorData(1, bob);
+        period.setValidatorData(1, bob, CAS);
         const proof = period.proof(depositTx);
 
-        await operator.submitPeriod(1, p[1], period.merkleRoot(), { from: bob }).should.be.fulfilled;
+        await operator.submitPeriod(1, p[1], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
         p[2] = await bridge.tipHash();
         assert.equal(p[2], proof[0]);
       });

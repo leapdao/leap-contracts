@@ -152,12 +152,20 @@ contract PoaOperator is Adminable {
   event Submission(
     bytes32 indexed blocksRoot,
     uint256 indexed slotId,
-    address owner,
+    address indexed owner,
+    bytes32 casRoot,
     bytes32 periodRoot
   );
 
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
+  function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
+    for (uint i = 256; i >= 256 - _epochLength; i--) {
+      count += uint8(_sigs >> i) & 0x01;
+    }
+  }
+
+  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) public {
     require(_slotId < epochLength, "Incorrect slotId");
+    require(countSigs(uint256(_cas), epochLength) > epochLength * 2 / 3);
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender, "not submitted by signerAddr");
     // This is here so that I can submit in the same epoch I auction/logout but not after
@@ -175,7 +183,7 @@ contract PoaOperator is Adminable {
     }
     // cas root
     assembly {
-      mstore(0, 0x0000000000000000000000000000000000000000)
+      mstore(0, _cas)
       mstore(0x20, hashRoot)
       hashRoot := keccak256(0, 0x40)
     }
@@ -206,6 +214,7 @@ contract PoaOperator is Adminable {
       _blocksRoot,
       _slotId,
       slot.owner,
+      _cas,
       hashRoot
     );
   }
