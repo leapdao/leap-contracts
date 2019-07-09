@@ -63,7 +63,7 @@ contract('FastExitHandler', (accounts) => {
       exitHandler = await FastExitHandler.at(proxy.address);
 
       // register first token
-      data = await exitHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await exitHandler.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens

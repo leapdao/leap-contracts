@@ -41,7 +41,7 @@ contract('Vault', (accounts) => {
       vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
       // At this point alice is the owner of bridge and vault and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -53,7 +53,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC20 token', async () => {
         const newToken = await SimpleToken.new();
 
-        const data = await vault.contract.methods.registerToken(newToken.address, false).encodeABI();
+        const data = await vault.contract.methods.registerToken(newToken.address, 0).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         const tokenOneAddr = (await vault.tokens(1))[0];
@@ -63,7 +63,7 @@ contract('Vault', (accounts) => {
       it('Owner can register ERC721 token', async () => {
         const newNFTtoken = await SpaceDustNFT.new();
 
-        const data = await vault.contract.methods.registerToken(newNFTtoken.address, true).encodeABI();
+        const data = await vault.contract.methods.registerToken(newNFTtoken.address, 1).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         // NFTs have their own space
@@ -74,13 +74,13 @@ contract('Vault', (accounts) => {
 
       it('Non-owner can not register token', async () => {
         const newToken = await SimpleToken.new();
-        await vault.registerToken(newToken.address, false, {from: bob}).should.be.rejectedWith(EVMRevert);
+        await vault.registerToken(newToken.address, 0, {from: bob}).should.be.rejectedWith(EVMRevert);
       });
 
       it('Owner can register ERC721 NST', async () => {
         const newNSTtoken = await SpaceDustNFT.new();
 
-        const data = await vault.contract.methods.registerNST(newNSTtoken.address).encodeABI();
+        const data = await vault.contract.methods.registerToken(newNSTtoken.address, 2).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         // NSTs have their own space

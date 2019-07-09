@@ -41,12 +41,17 @@ contract Vault is Adminable {
     return address(tokens[_color].addr);
   }
 
-  function registerToken(address _token, bool _isERC721) public ifAdmin {
+  // token types: 0 = ERC20, 1 = ERC721, 2 = ERC1948
+  function registerToken(address _token, uint256 _type) public ifAdmin {
     // make sure token is not 0x0 and that it has not been registered yet
     require(_token != address(0), "Tried to register 0x0 address");
     require(!tokenColors[_token], "Token already registered");
     uint16 color;
-    if (_isERC721) {
+    if (_type == 0) {
+      require(ERC20(_token).totalSupply() >= 0, "Not an ERC20 token");
+      color = erc20TokenCount;
+      erc20TokenCount += 1;
+    } else if (_type == 1) {
       // max nft count without being an NST is 16384
       // color must be < 49153
       require(nftTokenCount < 0x4000);
@@ -54,9 +59,10 @@ contract Vault is Adminable {
       color = NFT_FIRST_COLOR + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
-      require(ERC20(_token).totalSupply() >= 0, "Not an ERC20 token");
-      color = erc20TokenCount;
-      erc20TokenCount += 1;
+      require(nstTokenCount < 0x3ffe);
+      require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
+      color = NST_FIRST_COLOR + nstTokenCount; // NST color namespace starts from 2^15 + 2^14 + 1
+      nstTokenCount += 1;
     }
     uint256[] memory arr = new uint256[](1);
     tokenColors[_token] = true;
@@ -68,25 +74,6 @@ contract Vault is Adminable {
     emit NewToken(_token, color);
   }
 
-  function registerNST(address _token) public ifAdmin {
-    // make sure token is not 0x0 and that it has not been registered yet
-    require(_token != address(0), "Tried to register 0x0 address");
-    require(!tokenColors[_token], "Token already registered");
-    require(nstTokenCount < 0x3ffe);
-    require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
-
-    uint16 color = NST_FIRST_COLOR + nstTokenCount; // NST color namespace starts from 2^15 + 2^14 + 1
-    nstTokenCount += 1;
-
-    uint256[] memory arr = new uint256[](1);
-    tokenColors[_token] = true;
-    tokens[color] = PriorityQueue.Token({
-      addr: TransferrableToken(_token),
-      heapList: arr,
-      currentSize: 0
-    });
-    emit NewToken(_token, color);
-  }
   // solium-disable-next-line mixedcase
   uint256[49] private ______gap;
 

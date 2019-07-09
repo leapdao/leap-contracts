@@ -106,4 +106,15 @@ contract MinGov is Ownable {
     return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
   }
 
+  // proxy function to manage tokens without governance delay
+  // token types: 0 = ERC20, 1 = ERC721, 2 = ERC1948
+  function registerToken(address payable _subject, address _token, uint256 _type) public onlyOwner {
+    require(
+      AdminableProxy(_subject).applyProposal(
+        abi.encodeWithSignature("registerToken(address,uint256)", _token, _type)
+      ),
+      "registerToken call failed"
+    );
+  }
+
 }

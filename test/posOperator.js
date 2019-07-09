@@ -47,7 +47,7 @@ contract('PosOperator', (accounts) => {
       data = await bridge.contract.methods.setOperator(operator.address).encodeABI();
       await proxyBridge.applyProposal(data, {from: accounts[3]});
       // register first token
-      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxyVault.applyProposal(data, {from: accounts[3]});
       // At this point alice is the owner of bridge and has 10000 tokens
       // Note: all txs in these tests originate from alice unless otherwise specified

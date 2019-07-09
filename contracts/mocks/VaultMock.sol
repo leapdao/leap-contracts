@@ -18,7 +18,7 @@ contract VaultMock is Adminable {
     exitStake = _exitStake;
   }
 
-  function registerToken(address, bool) public ifAdmin {
+  function registerToken(address, uint256) public ifAdmin {
     tokenCount++;
   }
 }

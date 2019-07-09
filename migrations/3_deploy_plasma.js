@@ -85,7 +85,7 @@ module.exports = (deployer, network, accounts) => {
     await bridgeProxy.applyProposal(data, { from: admin });
 
     const vault = await Vault.at(exitHandlerProxy.address);
-    data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+    data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
     await exitHandlerProxy.applyProposal(data, { from: admin });
 
     writeConfig({
