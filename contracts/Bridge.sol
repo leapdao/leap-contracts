@@ -67,6 +67,10 @@ contract Bridge is Adminable {
     parentBlockInterval = _parentBlockInterval;
   }
 
+  function deletePeriod(bytes32 _root) public onlyOperator {
+    delete periods[_root];
+  }
+
   function submitPeriod(
     bytes32 _prevHash,
     bytes32 _root)
