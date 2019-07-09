@@ -100,7 +100,7 @@ contract('MinGov', (accounts) => {
     await proxyVa.changeAdmin(gov.address);
 
     // propose and finalize value change
-    const data = await vault.contract.methods.registerToken(accounts[1], false).encodeABI();
+    const data = await vault.contract.methods.registerToken(accounts[1], 0).encodeABI();
     await gov.propose(vault.address, data);
     await gov.finalize();
 
@@ -109,7 +109,7 @@ contract('MinGov', (accounts) => {
     assert.equal(count, 1);
 
     // propose and finalize value change
-    const data2 = await vault.contract.methods.registerToken(accounts[2], false).encodeABI();
+    const data2 = await vault.contract.methods.registerToken(accounts[2], 0).encodeABI();
     await gov.propose(vault.address, data2);
     await gov.finalize();
 

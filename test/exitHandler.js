@@ -83,7 +83,7 @@ contract('ExitHandler', (accounts) => {
       nftTokenId = receipt.logs[0].args.tokenId;
       nftTokenIdStr = nftTokenId.toString(10);
 
-      const data = await exitHandler.contract.methods.registerToken(nftToken.address, true).encodeABI();
+      const data = await exitHandler.contract.methods.registerToken(nftToken.address, 1).encodeABI();
       receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
       nftColor = Buffer.from(receipt.receipt.rawLogs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
       
@@ -119,7 +119,7 @@ contract('ExitHandler', (accounts) => {
       exitHandler = await ExitHandler.at(proxy.address);
 
       // register first token
-      data = await exitHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await exitHandler.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
       // Bob is the bridge operator and exitHandler and has 0 tokens
@@ -260,7 +260,7 @@ contract('ExitHandler', (accounts) => {
         await breedToken.mintDelegate(exitHandler.address);
 
         // register token
-        const data = await exitHandler.contract.methods.registerNST(breedToken.address).encodeABI();
+        const data = await exitHandler.contract.methods.registerToken(breedToken.address, 2).encodeABI();
         const receipt = await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
         const nstColor = Buffer.from(receipt.receipt.rawLogs[0].data.replace('0x', ''), 'hex').readUInt32BE(28);
 

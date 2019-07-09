@@ -44,7 +44,7 @@ contract('DepositHandler', (accounts) => {
       depositHandler = await DepositHandler.at(proxy.address);
 
       // register first token
-      data = await depositHandler.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await depositHandler.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
 
       // At this point alice is the owner of bridge and depositHandler and has 10000 tokens
@@ -75,7 +75,7 @@ contract('DepositHandler', (accounts) => {
         const { tokenId } = receipt.logs[0].args; // eslint-disable-line no-underscore-dangle
         const NFTcolor = 32769;
 
-        const data = await depositHandler.contract.methods.registerToken(nftToken.address, true).encodeABI();
+        const data = await depositHandler.contract.methods.registerToken(nftToken.address, 1).encodeABI();
         await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
         await nftToken.approve(depositHandler.address, tokenId, {from : bob});
@@ -94,7 +94,7 @@ contract('DepositHandler', (accounts) => {
         const NSTcolor = 49153;
         const storageRoot = `0x${Buffer.alloc(32).toString('hex')}`;
 
-        const data = await depositHandler.contract.methods.registerNST(nstToken1.address).encodeABI();
+        const data = await depositHandler.contract.methods.registerToken(nstToken1.address, 2).encodeABI();
 
         await proxy.applyProposal(data, { from: accounts[2] }).should.be.fulfilled;
         await nstToken1.approve(depositHandler.address, tokenId, { from : bob });
@@ -110,7 +110,7 @@ contract('DepositHandler', (accounts) => {
 
         assert.equal(storedStorageRoot, storageRoot);
 
-        const data2 = await depositHandler.contract.methods.registerNST(nstToken2.address).encodeABI();
+        const data2 = await depositHandler.contract.methods.registerToken(nstToken2.address, 2).encodeABI();
 
         await proxy.applyProposal(data2, { from: accounts[2] }).should.be.fulfilled;
         const rsp = await depositHandler.getTokenAddr(NSTcolor + 1);

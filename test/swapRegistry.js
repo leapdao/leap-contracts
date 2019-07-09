@@ -66,7 +66,7 @@ contract('SwapRegistry', (accounts) => {
       vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
@@ -197,7 +197,7 @@ contract('SwapRegistry', (accounts) => {
       vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       swapRegistry = await SwapRegistry.new();
@@ -252,7 +252,7 @@ contract('SwapRegistry', (accounts) => {
       const vault = await Vault.at(proxy.address);
 
       // register first token
-      data = await vault.contract.methods.registerToken(nativeToken.address, false).encodeABI();
+      data = await vault.contract.methods.registerToken(nativeToken.address, 0).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]}).should.be.fulfilled;
 
       const exchangeBlueprint = await SwapExchange.new();
