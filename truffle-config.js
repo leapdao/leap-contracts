@@ -1,6 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 require('@babel/register')
-require('@babel/polyfill')
+require('core-js/stable')
+require('regenerator-runtime/runtime')
 
 require('dotenv').config();
 
