@@ -173,9 +173,8 @@ contract PoaOperator is Adminable {
     return (_epochLength * 2 / 3) + ((_epochLength * 2 % 3) == 0 ? 0 : 1);
   }
 
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) public {
+  function _submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) internal {
     require(_slotId < epochLength, "Incorrect slotId");
-    require(countSigs(uint256(_cas), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender, "not submitted by signerAddr");
     // This is here so that I can submit in the same epoch I auction/logout but not after
@@ -227,5 +226,14 @@ contract PoaOperator is Adminable {
       _cas,
       hashRoot
     );
+  }
+
+  function submitPeriodWithCas(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) public {
+    require(countSigs(uint256(_cas), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
+    _submitPeriod(_slotId, _prevHash, _blocksRoot, _cas);
+  }
+
+  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
+    _submitPeriod(_slotId, _prevHash, _blocksRoot, 0);
   }
 }
