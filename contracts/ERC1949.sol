@@ -19,12 +19,6 @@ contract ERC1949 is IERC1949, ERC1948 {
   uint256 public delegateCounter = 0;
   mapping(address => uint256) delegateOwners;
 
-  // Token name
-  string public name = "DeferredMinter123";
-
-  // Token symbol
-  string public symbol = "DM1";
-
   /**
    * @dev mints a new delegate 
    * @param _to The token to read the data off.
