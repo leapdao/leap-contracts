@@ -230,8 +230,8 @@ contract('ExitHandler', (accounts) => {
         // challenge exit and make sure exit is removed
         let exit = await exitHandler.exits(one);
         assert.equal(exit[2], alice);
-        
-        await exitHandler.challengeExit([], proof, 0, 0);        
+
+        await exitHandler.challengeExit([], proof, 0, 0, alice);        
         exit = await exitHandler.exits(one);
         // check that exit was deleted
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');
@@ -319,7 +319,12 @@ contract('ExitHandler', (accounts) => {
         // challenge exit and make sure exit is removed
         assert.equal((await exitHandler.exits(utxoId))[2], bob);
         
-        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);
+        // should prevent simple front-runs
+        await exitHandler.challengeExit(
+          spendProof, transferProof, 0, 0, alice, { from: bob }
+        ).should.be.rejectedWith(EVMRevert);
+
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0, alice);
         
         assert.equal((await exitHandler.exits(utxoId))[2], '0x0000000000000000000000000000000000000000');
         assert.equal((await exitHandler.tokens(0))[1], 1);
@@ -379,8 +384,15 @@ contract('ExitHandler', (accounts) => {
         let exit = await exitHandler.exits(utxoId);
         assert.equal(exit[2], alice);
 
+        // should fail on a simple front-run (sender is different than challenger param)
+        await exitHandler.challengeYoungestInput(
+          youngestInputProof, spendProof, exitingOutput, youngestInputId, alice, { from: bob }
+        ).should.be.rejectedWith(EVMRevert);
+        
         // challenge exit with youngest input
-        await exitHandler.challengeYoungestInput(youngestInputProof, spendProof, exitingOutput, youngestInputId);
+        await exitHandler.challengeYoungestInput(
+          youngestInputProof, spendProof, exitingOutput, youngestInputId, alice
+        );
 
         exit = await exitHandler.exits(utxoId);
         assert.equal((await exitHandler.tokens(0))[1], 1);
@@ -422,7 +434,7 @@ contract('ExitHandler', (accounts) => {
         let exit = await exitHandler.exits(utxoId);
         assert.equal(exit[2], bob);
         
-        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);        
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0, alice);        
         exit = await exitHandler.exits(utxoId);
         // check that exit was deleted
         assert.equal(exit[2], '0x0000000000000000000000000000000000000000');

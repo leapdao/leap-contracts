@@ -276,20 +276,22 @@ contract ExitHandler is IExitHandler, DepositHandler {
     bytes32[] memory _proof,
     bytes32[] memory _prevProof,
     uint8 _outputIndex,
-    uint8 _inputIndex
+    uint8 _inputIndex,
+    address challenger
   ) public {
+    require(msg.sender == challenger, "Wrong challenger");
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
     bytes memory txData;
-    (, txHash1, txData) = TxLib.validateProof(offset + 64, _prevProof);
+    (, txHash1, txData) = TxLib.validateProof(offset + 96, _prevProof);
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash1)));
 
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
       // validate spending tx
       bytes32 txHash;
-      (, txHash, txData) = TxLib.validateProof(96, _proof);
+      (, txHash, txData) = TxLib.validateProof(128, _proof);
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
@@ -343,12 +345,14 @@ contract ExitHandler is IExitHandler, DepositHandler {
     bytes32[] memory _youngerInputProof,
     bytes32[] memory _exitingTxProof,
     uint8 _outputIndex,
-    uint8 _inputIndex
+    uint8 _inputIndex,
+    address challenger
   ) public {
+    require(msg.sender == challenger, "Wrong challenger");
     // validate exiting input tx
     bytes32 txHash;
     bytes memory txData;
-    (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 64, _exitingTxProof);
+    (, txHash, txData) = TxLib.validateProof(32 * (_youngerInputProof.length + 2) + 96, _exitingTxProof);
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
 
     // check the exit exists
@@ -357,7 +361,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
 
     // validate younger input tx
-    (,txHash,) = TxLib.validateProof(96, _youngerInputProof);
+    (,txHash,) = TxLib.validateProof(128, _youngerInputProof);
 
     // check younger input is actually an input of exiting tx
     require(txHash == exitingTx.ins[_inputIndex].outpoint.hash, "Given output is not referenced in exiting tx");
