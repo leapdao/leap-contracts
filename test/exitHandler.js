@@ -339,6 +339,50 @@ contract('ExitHandler', (accounts) => {
         
       });
 
+      it('Should allow to challenge exit by spending condition', async () => {
+        const spendTx = Tx.spendCond(
+          [new Input({
+            prevout: new Outpoint(transferTx.hash(), 0),
+            script: '0x123456',
+          })], [new Output(50, charlie)],
+        );
+        spendTx.inputs[0].setMsgData('0xabcdef');
+
+        const period = await submitNewPeriod([ depositTx, transferTx, spendTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const inputProof = period.proof(depositTx);
+
+        // withdraw output
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        
+        const utxoId = exitUtxoId(event);
+        assert.equal(utxoId, spendTx.inputs[0].prevout.getUtxoId());
+
+        // challenge exit and make sure exit is removed
+        assert.equal((await exitHandler.exits(utxoId))[2], bob);
+        
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);
+        
+        assert.equal((await exitHandler.exits(utxoId))[2], '0x0000000000000000000000000000000000000000');
+        assert.equal((await exitHandler.tokens(0))[1], 1);
+        
+        const bal1 = await nativeToken.balanceOf(bob);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(0);
+        
+        const bal2 = await nativeToken.balanceOf(bob);
+        // check transfer didn't happen
+        assert.equal(bal1.toNumber(), bal2.toNumber());
+        // check exit was evicted from PriorityQueue
+        assert.equal((await exitHandler.tokens(0))[1], 0);
+        
+      });
+
       it('Should allow to challenge youngest input for exit', async () => {
         // period1: depositTx, anotherDepositTx
         // period2: tranferTx spending depositTx (priority 1)
