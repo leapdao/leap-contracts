@@ -12,7 +12,7 @@ contract('ERC1949', (accounts) => {
   let delegateToken;
 
   beforeEach(async () => {
-    delegateToken = await ERC1949.new();
+    delegateToken = await ERC1949.new("yo", "YO");
     const rsp = await delegateToken.mintDelegate(creator);
     queenId = rsp.logs[0].args.tokenId;
   });
