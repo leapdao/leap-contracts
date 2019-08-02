@@ -6,7 +6,7 @@
  */
 pragma solidity 0.5.2;
 
-import "../../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Metadata.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Full.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRole.sol";
 
 /**
@@ -14,9 +14,9 @@ import "../../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRo
  * @dev Simple ERC721 token mintable by whitelisted accounts
  */
 
-contract SpaceDustNFT is ERC721Metadata, MinterRole {
+contract SpaceDustNFT is ERC721Full, MinterRole {
 
-  constructor() public ERC721Metadata("SpaceDustNFT", "SDST") MinterRole() {
+  constructor() public ERC721Full("SpaceDustNFT", "SDST") MinterRole() {
   }
 
   function mint(
