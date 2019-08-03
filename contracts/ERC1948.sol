@@ -8,7 +8,8 @@
 
 pragma solidity ^0.5.2;
 
-import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Enumerable.sol";
 import "./IERC1948.sol";
 
 /**
@@ -19,7 +20,7 @@ import "./IERC1948.sol";
  * do not suffice to store the data, an authenticated data structure (hash or
  * merkle tree) shall be used.
  */
-contract ERC1948 is IERC1948, ERC721 {
+contract ERC1948 is IERC1948, ERC721, ERC721Enumerable {
 
   mapping(uint256 => bytes32) data;
 
