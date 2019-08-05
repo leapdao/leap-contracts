@@ -368,7 +368,7 @@ contract('ExitHandler', (accounts) => {
         // challenge exit and make sure exit is removed
         assert.equal((await exitHandler.exits(utxoId))[2], bob);
         
-        await exitHandler.challengeExit(spendProof, transferProof, 0, 0);
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0, alice);
         
         assert.equal((await exitHandler.exits(utxoId))[2], '0x0000000000000000000000000000000000000000');
         assert.equal((await exitHandler.tokens(0))[1], 1);
