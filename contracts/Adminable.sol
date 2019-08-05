@@ -44,7 +44,14 @@ contract Adminable is Initializable {
     return _admin();
   }
 
-    /**
+  function implementation() external view returns (address impl) {
+    bytes32 slot = 0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3;
+    assembly {
+      impl := sload(slot)
+    }
+  }
+
+  /**
    * @return The admin slot.
    */
   function _admin() internal view returns (address adm) {

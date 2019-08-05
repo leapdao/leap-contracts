@@ -14,16 +14,17 @@ const AdminableProxy = artifacts.require('AdminableProxy');
 contract('Bridge', (accounts) => {
 
   describe('Test', () => {
+    let impl;
     let bridge;
     let proxy;
     const parentBlockInterval = 0;
 
     beforeEach(async () => {
-      const bridgeCont = await Bridge.new();
-      let data = bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
-      proxy = await AdminableProxy.new(bridgeCont.address, data, {from: accounts[2]});
+      impl = await Bridge.new();
+      let data = impl.contract.methods.initialize(parentBlockInterval).encodeABI();
+      proxy = await AdminableProxy.new(impl.address, data, {from: accounts[2]});
       bridge = await Bridge.at(proxy.address);
-      data = await bridgeCont.contract.methods.setOperator(accounts[0]).encodeABI();
+      data = await impl.contract.methods.setOperator(accounts[0]).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
     });
 
@@ -50,6 +51,14 @@ contract('Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
     });
+
+    describe('#implementation', () => {
+
+      it('should return address of underlying implementation contract', async() => {
+        const implementation = await bridge.implementation();
+        assert.equal(implementation, impl.address);
+      });
+    });
   });
 
   describe('Governance', () => {
@@ -68,4 +77,5 @@ contract('Bridge', (accounts) => {
       assert.equal(newInterval.toNumber(), 10);
     });
   });
+
 });
