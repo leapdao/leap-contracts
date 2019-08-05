@@ -308,6 +308,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].s
         );
         require(exits[utxoId].owner == signer);
+      } else if (txn.txType == TxLib.TxType.SpendCond) {
+        // just have the pass through
+        // later we will check solEVM Enforcer here.
       } else {
         revert("unknown tx type");
       }
