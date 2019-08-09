@@ -71,10 +71,11 @@ contract PoaOperator is Adminable {
   mapping(uint256 => Slot) public slots;
 
 
-  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength) public initializer {
+  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength, uint256 _chalDuration) public initializer {
     vault = _vault;
     bridge = _bridge;
     epochLength = _epochLength;
+    chalDuration = _chalDuration;
     emit EpochLength(epochLength);
   }
 
@@ -250,7 +251,7 @@ contract PoaOperator is Adminable {
     return (chal.challenger, chal.endTime, chal.slotSigner);
   }
 
-  uint256 constant CHAL_DURATION = 3600; // 1 hour
+  uint256 chalDuration;
   uint256 constant CHAL_STAKE = 100000000000000000; // 0.1 ETH
 
   // casProof lookes like this:
@@ -265,7 +266,7 @@ contract PoaOperator is Adminable {
     // casRoot
     assembly {
       mstore(0, _casBitmap)
-      mstore(0x20, _consensusRoot)
+      mstore(0x20, _validatorRoot)
       periodRoot := keccak256(0, 0x40)
     }
     // periodRoot
@@ -283,15 +284,15 @@ contract PoaOperator is Adminable {
     // check slotId
     require(_slotId < epochLength, "slotId too high");
     // check that sig was actually 1
-    require(uint8(uint256(_casBitmap) >> _slotId) & 0x01 == 1, "challanged sig not claimed");
+    require(uint8(uint256(_casBitmap) >> (256 - _slotId)) & 0x01 == 1, "challanged sig not claimed");
     // check that challenge doesn't exist yet
     require(challenges[periodRoot][_slotId].endTime == 0, "challenge already in progress");
     // don't start challenges on super old periods
-    require(periodTime >= uint32(now - CHAL_DURATION), "period too old");
+    require(periodTime >= uint32(now - chalDuration), "period too old");
     // create challenge object
     challenges[periodRoot][_slotId] = Challenge({
       challenger: msg.sender,
-      endTime: uint32(now + CHAL_DURATION),
+      endTime: uint32(now + chalDuration),
       slotSigner: slots[_slotId].signer
     });
   }
@@ -303,7 +304,7 @@ contract PoaOperator is Adminable {
     uint8 _v,
     bytes32 _r,
     bytes32 _s,
-    bytes32 _msgSenderHash) public {
+    address _msgSender) public {
     bytes32 periodRoot;
     assembly {
       mstore(0, _consensusRoot)
@@ -323,7 +324,7 @@ contract PoaOperator is Adminable {
 
     delete challenges[periodRoot][_slotId];
     // dispense reward
-    require(keccak256(abi.encode(msg.sender)) == _msgSenderHash, "no frontrunning plz");
+    require(msg.sender == _msgSender, "no frontrunning plz");
     msg.sender.transfer(CHAL_STAKE);
   }
 
