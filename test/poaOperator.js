@@ -60,7 +60,7 @@ contract('PoaOperator', (accounts) => {
       it('should allow to set slot and submit period without CAS', async () => {
         const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
         await proxy.applyProposal(data, {from: admin});
-        await operator.submitPeriod(0, p[0], '0x01', '0xff', { from: alice }).should.be.fulfilled;
+        await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
         p[1] = await bridge.tipHash();
       });
 
