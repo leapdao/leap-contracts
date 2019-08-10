@@ -9,7 +9,7 @@
 pragma solidity 0.5.2;
 
 import "./Adminable.sol";
-import "./Vault.sol";
+import "./ExitHandler.sol";
 import "./Bridge.sol";
 
 contract PoaOperator is Adminable {
@@ -61,7 +61,7 @@ contract PoaOperator is Adminable {
     bytes32 newTendermint;
   }
 
-  Vault public vault;
+  ExitHandler public vault;
   Bridge public bridge;
 
   uint256 public epochLength; // length of epoch in periods (32 blocks)
@@ -71,11 +71,16 @@ contract PoaOperator is Adminable {
   mapping(uint256 => Slot) public slots;
 
 
-  function initialize(Bridge _bridge, Vault _vault, uint256 _epochLength, uint256 _chalDuration) public initializer {
+  function initialize(
+    Bridge _bridge,
+    ExitHandler _vault,
+    uint256 _epochLength,
+    uint256 _casChallengeDuration
+  ) public initializer {
     vault = _vault;
     bridge = _bridge;
     epochLength = _epochLength;
-    chalDuration = _chalDuration;
+    casChallengeDuration = _casChallengeDuration;
     emit EpochLength(epochLength);
   }
 
@@ -251,8 +256,11 @@ contract PoaOperator is Adminable {
     return (chal.challenger, chal.endTime, chal.slotSigner);
   }
 
-  uint256 chalDuration;
-  uint256 constant CHAL_STAKE = 100000000000000000; // 0.1 ETH
+  uint256 public casChallengeDuration;
+
+  function setCasChallengeDuration(uint256 _casChallengeDuration) public ifAdmin {
+    casChallengeDuration = _casChallengeDuration;
+  }
 
   // casProof lookes like this:
   // [casBitmap, validatorRoot, consensusRoot]
@@ -275,7 +283,8 @@ contract PoaOperator is Adminable {
       mstore(0x20, periodRoot)
       periodRoot := keccak256(0, 0x40)
     }
-    require(msg.value == CHAL_STAKE, "invalid challenge stake");
+
+    require(msg.value == vault.exitStake(), "invalid challenge stake");
 
     uint256 periodTime;
     (,periodTime,,) = bridge.periods(periodRoot);
@@ -288,11 +297,11 @@ contract PoaOperator is Adminable {
     // check that challenge doesn't exist yet
     require(challenges[periodRoot][_slotId].endTime == 0, "challenge already in progress");
     // don't start challenges on super old periods
-    require(periodTime >= uint32(now - chalDuration), "period too old");
+    require(periodTime >= uint32(now - casChallengeDuration), "period too old");
     // create challenge object
     challenges[periodRoot][_slotId] = Challenge({
       challenger: msg.sender,
-      endTime: uint32(now + chalDuration),
+      endTime: uint32(now + casChallengeDuration),
       slotSigner: slots[_slotId].signer
     });
   }
@@ -325,7 +334,7 @@ contract PoaOperator is Adminable {
     delete challenges[periodRoot][_slotId];
     // dispense reward
     require(msg.sender == _msgSender, "no frontrunning plz");
-    msg.sender.transfer(CHAL_STAKE);
+    msg.sender.transfer(vault.exitStake());
   }
 
   function timeoutCas(bytes32 _period, uint256 _slotId) public {
@@ -335,9 +344,11 @@ contract PoaOperator is Adminable {
     // check time
     require(now >= chal.endTime, "time not expired yet");
     // transfer funds
-    chal.challenger.transfer(CHAL_STAKE);
+    chal.challenger.transfer(vault.exitStake());
     // delete period
     bridge.deletePeriod(_period);
   }
 
+  // solium-disable-next-line mixedcase
+  uint256[18] private ______gap;
 }

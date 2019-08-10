@@ -10,6 +10,7 @@ import { Period, Block, Tx, Input, Outpoint } from 'leap-core';
 import { keccak256 } from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
 
+const time = require('./helpers/time');
 require('./helpers/setup');
 
 const merkelize = (hash1, hash2) => {
@@ -29,6 +30,7 @@ const merkelize = (hash1, hash2) => {
 
 const Bridge = artifacts.require('Bridge');
 const PoaOperator = artifacts.require('PoaOperator');
+const ExitHandler = artifacts.require('ExitHandler');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('PoaOperator', (accounts) => {
@@ -37,12 +39,14 @@ contract('PoaOperator', (accounts) => {
   const admin = accounts[3];
   const CAS = '0xc000000000000000000000000000000000000000000000000000000000000000';
   const ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
-  const CHAL_DURATION = 0;
+  const CHALLENGE_DURATION = 3600;
+  const CHALLENGE_STAKE = '100000000000000000';
 
   describe('Test', () => {
     let bridge;
     let operator;
     let proxy;
+    let exitHandler
     const parentBlockInterval = 0;
     const epochLength = 3;
     const p = [];
@@ -53,8 +57,13 @@ contract('PoaOperator', (accounts) => {
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: admin});
       bridge = await Bridge.at(proxyBridge.address);
 
+      const vaultCont = await ExitHandler.new();
+      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, CHALLENGE_DURATION, CHALLENGE_STAKE).encodeABI();
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: admin});
+      exitHandler = await ExitHandler.at(proxy.address);
+
       const opCont = await PoaOperator.new();
-      data = await opCont.contract.methods.initialize(bridge.address, bridge.address, epochLength, CHAL_DURATION).encodeABI();
+      data = await opCont.contract.methods.initialize(bridge.address, exitHandler.address, epochLength, CHALLENGE_DURATION).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data,  {from: admin});
       operator = await PoaOperator.at(proxy.address);
 
@@ -156,6 +165,10 @@ contract('PoaOperator', (accounts) => {
         const casRoot = merkelize(CAS, validatorRoot);
         const periodRoot = merkelize(consensusRoot, casRoot);
 
+        await operator.timeoutCas(periodRoot, 1).should.be.rejectedWith(EVMRevert);
+
+        const exitTime = (await time.latest()) + CHALLENGE_DURATION;
+        await time.increaseTo(exitTime);
         await operator.timeoutCas(periodRoot, 1);
         challenge = await operator.getChallenge(p[3], 1);
         const rsp = await bridge.periods(periodRoot);

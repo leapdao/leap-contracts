@@ -26,6 +26,7 @@ const DEFAULT_EXIT_STAKE = '0x016345785D8A0000'; // 10^17
 const DEFAULT_EPOCH_LENGTH = 4;
 const DEFAULT_TAX_RATE = 50;  // 5%
 const DEFAULT_PARENT_BLOCK_INTERVAL = 2;
+const DEFAULT_CAS_CHALLENGE_DURATION = 3600;
 
 module.exports = (deployer, network, accounts) => {
   const admin = accounts[1];
@@ -36,6 +37,7 @@ module.exports = (deployer, network, accounts) => {
   const deployedToken = process.env.DEPLOYED_TOKEN;
   const taxRate = process.env.TAX_RATE || DEFAULT_TAX_RATE;
   const poaReward = process.env.POA_REWARD || 0;
+  const casExitChallenge = process.env.CAS_CHALLENGE_DURATION || DEFAULT_CAS_CHALLENGE_DURATION;
 
   let data;
 
@@ -61,7 +63,7 @@ module.exports = (deployer, network, accounts) => {
     const exitHandlerProxy = await deployer.deploy(ExitHandlerProxy, exitHandlerCont.address, data, { from: admin });
 
     const operatorCont = await deployer.deploy(PoaOperator);
-    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength, 3600).encodeABI();
+    data = await operatorCont.contract.methods.initialize(bridgeProxy.address, exitHandlerProxy.address, epochLength, casExitChallenge).encodeABI();
     const operatorProxy = await deployer.deploy(OperatorProxy, operatorCont.address, data, { from: admin });
 
     const registryCont = await deployer.deploy(SwapRegistry);
