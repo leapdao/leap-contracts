@@ -284,7 +284,7 @@ contract PoaOperator is Adminable {
     // check slotId
     require(_slotId < epochLength, "slotId too high");
     // check that sig was actually 1
-    require(uint8(uint256(_casBitmap) >> (256 - _slotId)) & 0x01 == 1, "challanged sig not claimed");
+    require(uint8(uint256(_casBitmap) >> (256 - _slotId)) & 0x01 == 1, "challenged sig not claimed");
     // check that challenge doesn't exist yet
     require(challenges[periodRoot][_slotId].endTime == 0, "challenge already in progress");
     // don't start challenges on super old periods
