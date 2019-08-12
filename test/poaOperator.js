@@ -6,13 +6,31 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import { Period, Block, Tx } from 'leap-core';
+import { Period, Block, Tx, Input, Outpoint } from 'leap-core';
+import { keccak256 } from 'ethereumjs-util';
 import EVMRevert from './helpers/EVMRevert';
 
+const time = require('./helpers/time');
 require('./helpers/setup');
+
+const merkelize = (hash1, hash2) => {
+  const buffer = Buffer.alloc(64, 0);
+  if (typeof hash1 === 'string' || hash1 instanceof String) {
+    buffer.write(hash1.replace('0x', ''), 'hex');
+  } else {
+    hash1.copy(buffer);
+  }
+  if (typeof hash2 === 'string' || hash2 instanceof String) {
+    buffer.write(hash2.replace('0x', ''), 32, 'hex');
+  } else {
+    hash2.copy(buffer, 32);
+  }
+  return `0x${keccak256(buffer).toString('hex')}`;
+};
 
 const Bridge = artifacts.require('Bridge');
 const PoaOperator = artifacts.require('PoaOperator');
+const ExitHandler = artifacts.require('ExitHandler');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
 contract('PoaOperator', (accounts) => {
@@ -20,11 +38,15 @@ contract('PoaOperator', (accounts) => {
   const bob = accounts[1];
   const admin = accounts[3];
   const CAS = '0xc000000000000000000000000000000000000000000000000000000000000000';
+  const ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  const CHALLENGE_DURATION = 3600;
+  const CHALLENGE_STAKE = '100000000000000000';
 
   describe('Test', () => {
     let bridge;
     let operator;
     let proxy;
+    let exitHandler
     const parentBlockInterval = 0;
     const epochLength = 3;
     const p = [];
@@ -35,8 +57,13 @@ contract('PoaOperator', (accounts) => {
       const proxyBridge = await AdminableProxy.new(bridgeCont.address, data,  {from: admin});
       bridge = await Bridge.at(proxyBridge.address);
 
+      const vaultCont = await ExitHandler.new();
+      data = await vaultCont.contract.methods.initializeWithExit(bridge.address, CHALLENGE_DURATION, CHALLENGE_STAKE).encodeABI();
+      proxy = await AdminableProxy.new(vaultCont.address, data, {from: admin});
+      exitHandler = await ExitHandler.at(proxy.address);
+
       const opCont = await PoaOperator.new();
-      data = await opCont.contract.methods.initialize(bridge.address, bridge.address, epochLength).encodeABI();
+      data = await opCont.contract.methods.initialize(bridge.address, exitHandler.address, epochLength, CHALLENGE_DURATION).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data,  {from: admin});
       operator = await PoaOperator.at(proxy.address);
 
@@ -81,6 +108,75 @@ contract('PoaOperator', (accounts) => {
         assert.equal(p[2], proof[0]);
       });
     });
+
+    describe('CryptoEconomic Agregate Signatures', () => {
+      it('should allow to open and reject challenge', async () => {
+        const block = new Block(65);
+        const depositTx = Tx.deposit(0, 2000, alice);
+        block.addTx(depositTx);
+        const prevPeriodRoot = await bridge.tipHash();
+        const period = new Period(prevPeriodRoot, [block]);
+        period.setValidatorData(1, bob, CAS);
+        const proof = period.proof(depositTx);
+
+        await operator.submitPeriodWithCas(1, p[2], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
+        p[3] = await bridge.tipHash();
+        assert.equal(p[3], proof[0]);
+
+        const validatorRoot = merkelize(`0x000000000000000000000001${bob.replace('0x', '')}`, ZERO);
+        const consensusRoot = merkelize(period.merkleRoot(), ZERO);
+
+        await operator.challengeCas(CAS, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
+
+        let challenge = await operator.getChallenge(p[3], 1);
+        assert.equal(challenge[0], accounts[0]);
+        assert.equal(challenge[2], bob);
+
+        const casRoot = merkelize(CAS, validatorRoot);
+        const vote = Tx.periodVote(1, new Input(new Outpoint(consensusRoot, 0)));
+        vote.sign(['0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac']);
+        await operator.respondCas(consensusRoot, casRoot, 1, vote.inputs[0].v, vote.inputs[0].r, vote.inputs[0].s, accounts[0]);
+        challenge = await operator.getChallenge(p[3], 1);
+        assert.equal(challenge[1].toNumber(10), 0);
+      });
+
+      it('should allow to open and timeout challenge', async () => {
+        const block = new Block(97);
+        const depositTx = Tx.deposit(0, 3000, alice);
+        block.addTx(depositTx);
+        const prevPeriodRoot = await bridge.tipHash();
+        const period = new Period(prevPeriodRoot, [block]);
+        period.setValidatorData(1, bob, CAS);
+        const proof = period.proof(depositTx);
+
+        await operator.submitPeriodWithCas(1, p[3], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
+        p[4] = await bridge.tipHash();
+        assert.equal(p[4], proof[0]);
+
+        const validatorRoot = merkelize(`0x000000000000000000000001${bob.replace('0x', '')}`, ZERO);
+        const consensusRoot = merkelize(period.merkleRoot(), ZERO);
+
+        await operator.challengeCas(CAS, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
+
+        let challenge = await operator.getChallenge(p[4], 1);
+        assert.equal(challenge[0], accounts[0]);
+        assert.equal(challenge[2], bob);
+
+        const casRoot = merkelize(CAS, validatorRoot);
+        const periodRoot = merkelize(consensusRoot, casRoot);
+
+        await operator.timeoutCas(periodRoot, 1).should.be.rejectedWith(EVMRevert);
+
+        const exitTime = (await time.latest()) + CHALLENGE_DURATION;
+        await time.increaseTo(exitTime);
+        await operator.timeoutCas(periodRoot, 1);
+        challenge = await operator.getChallenge(p[3], 1);
+        const rsp = await bridge.periods(periodRoot);
+        // check that period deleted
+        assert.equal(rsp[0], 0);
+        assert.equal(challenge[1].toNumber(10), 0);
+      });
+    });
   });
 
 
@@ -90,7 +186,7 @@ contract('PoaOperator', (accounts) => {
 
     it('should allow to change exit params', async () => {
       const opCont = await PoaOperator.new();
-      let data = await opCont.contract.methods.initialize(accounts[0], accounts[0], 2).encodeABI();
+      let data = await opCont.contract.methods.initialize(accounts[0], accounts[0], 2, 3600).encodeABI();
       proxy = await AdminableProxy.new(opCont.address, data, {from: accounts[2]});
       operator = await PoaOperator.at(proxy.address);
 

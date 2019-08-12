@@ -40,7 +40,7 @@ contract('PosOperator', (accounts) => {
       vault = await Vault.at(proxyVault.address);
 
       const opCont = await PosOperator.new();
-      data = await opCont.contract.methods.initialize(bridge.address, vault.address, epochLength).encodeABI();
+      data = await opCont.contract.methods.initialize(bridge.address, vault.address, epochLength, 3600).encodeABI();
       const proxyPos = await AdminableProxy.new(opCont.address, data,  {from: accounts[3]});
       operator = await PosOperator.at(proxyPos.address);
 
