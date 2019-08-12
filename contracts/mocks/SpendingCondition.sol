@@ -9,8 +9,8 @@ contract SpendingCondition {
   function startExit(
     bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex, address _handlerAddr
-  ) public {
+  ) public payable {
     IExitHandler exitHandler = IExitHandler(_handlerAddr);
-    exitHandler.startExit(_youngestInputProof, _proof, _outputIndex, _inputIndex);
+    exitHandler.startExit.value(msg.value)(_youngestInputProof, _proof, _outputIndex, _inputIndex);
   }
 }
