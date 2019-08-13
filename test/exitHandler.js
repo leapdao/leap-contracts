@@ -62,7 +62,7 @@ contract('ExitHandler', (accounts) => {
 
     const parentBlockInterval = 0;
     const exitDuration = 5;
-    const exitStake = 0;    
+    const exitStake = '100000000000000000'; // 0.1 ETH    
 
     const seedTxs = async () => {
       await nativeToken.approve(exitHandler.address, 1000);
@@ -137,7 +137,7 @@ contract('ExitHandler', (accounts) => {
         const outputIndex = 1;
         const inputProof = period.proof(depositTx); // transferTx spends depositTx
         const inputIndex = 0;
-        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
@@ -149,6 +149,32 @@ contract('ExitHandler', (accounts) => {
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
         assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
+      });
+
+      it('Should not allow to exit utxo from deleted period', async () => {
+        const period = await submitNewPeriod([depositTx, transferTx]);
+
+        const transferProof = period.proof(transferTx);
+        const outputIndex = 1;
+        const inputProof = period.proof(depositTx); // transferTx spends depositTx
+        const inputIndex = 0;
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
+
+        // delete period
+        await bridge.deletePeriod(transferProof[0], {from: accounts[1]});
+
+        const aliceBalanceBefore = await nativeToken.balanceOf(alice);
+        const govBalanceBefore = await web3.eth.getBalance(accounts[2]);
+
+        const exitTime = (await time.latest()) + (2 * time.duration.seconds(exitDuration));
+        await time.increaseTo(exitTime);
+
+        await exitHandler.finalizeTopExit(nativeTokenColor);
+
+        const govBalanceAfter = await web3.eth.getBalance(accounts[2]);
+        assert(new BN(govBalanceAfter).gt(new BN(govBalanceBefore)));
+        const aliceBalanceAfter = await nativeToken.balanceOf(alice);
+        assert(aliceBalanceBefore.eq(aliceBalanceAfter));
       });
 
       it('Should allow to exit valid utxo to spending condition', async () => {
@@ -166,7 +192,7 @@ contract('ExitHandler', (accounts) => {
         const outputIndex = 1;
         const inputProof = period.proof(depositTx); // transferTx spends depositTx
         const inputIndex = 0;
-        await condition.startExit(inputProof, transferProof, outputIndex, inputIndex, exitHandler.address);
+        await condition.startExit(inputProof, transferProof, outputIndex, inputIndex, exitHandler.address, {value: exitStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(condition.address);
 
@@ -190,7 +216,7 @@ contract('ExitHandler', (accounts) => {
         const proof = period.proof(depositTx);
         const outputIndex = 0;
         const inputIndex = 0;
-        await exitHandler.startExit([], proof, outputIndex, inputIndex);
+        await exitHandler.startExit([], proof, outputIndex, inputIndex, {value: exitStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
@@ -205,7 +231,7 @@ contract('ExitHandler', (accounts) => {
       });
 
       it('Should allow to exit deposit', async () => {
-        await exitHandler.startDepositExit(1);
+        await exitHandler.startDepositExit(1, {value: exitStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
 
@@ -221,7 +247,7 @@ contract('ExitHandler', (accounts) => {
 
 
       it('Should allow to challenge exiting deposit', async () => {
-        await exitHandler.startDepositExit(1);
+        await exitHandler.startDepositExit(1, {value: exitStake});
 
         const period = await submitNewPeriod([depositTx]);
         const one = '0x0000000000000000000000000000000000000000000000000000000000000001';
@@ -245,7 +271,7 @@ contract('ExitHandler', (accounts) => {
 
         // withdraw output
         assert.equal(await nftToken.ownerOf(nftTokenId), exitHandler.address);
-        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob, value: exitStake});
 
         await exitHandler.finalizeTopExit(nftColor);
 
@@ -279,7 +305,7 @@ contract('ExitHandler', (accounts) => {
         const proof = period.proof(nstTransferTx);
         const inputProof = period.proof(nstDepositTx);
         // withdraw output
-        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, proof, 0, 0, { from: bob, value: exitStake});
         await exitHandler.finalizeTopExit(nstColor);
 
         assert.equal(await breedToken.ownerOf(workerId), bob);
@@ -294,7 +320,7 @@ contract('ExitHandler', (accounts) => {
         const outputIndex = 1;
         const inputProof = period.proof(depositTx);
 
-        await exitHandler.startExit(inputProof, transferProof, outputIndex, 0, { from: bob }).should.be.rejectedWith(EVMRevert);
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, 0, { from: bob, value: exitStake }).should.be.rejectedWith(EVMRevert);
       });
 
       it('Should allow to challenge exit', async () => {
@@ -311,7 +337,7 @@ contract('ExitHandler', (accounts) => {
         const inputProof = period.proof(depositTx);
 
         // withdraw output
-        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob, value: exitStake });
         
         const utxoId = exitUtxoId(event);
         assert.equal(utxoId, spendTx.inputs[0].prevout.getUtxoId());
@@ -360,7 +386,7 @@ contract('ExitHandler', (accounts) => {
         const inputProof = period.proof(depositTx);
 
         // withdraw output
-        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob, value: exitStake });
         
         const utxoId = exitUtxoId(event);
         assert.equal(utxoId, spendTx.inputs[0].prevout.getUtxoId());
@@ -418,7 +444,7 @@ contract('ExitHandler', (accounts) => {
         const exitingOutput = 0;
         const event = await exitHandler.startExit(
           notReallyYoungestInputProof, spendProof, exitingOutput, notReallyYoungestInputId,
-          { from: alice },
+          { from: alice, value: exitStake},
         );
 
         const utxoId = exitUtxoId(event);
@@ -470,7 +496,7 @@ contract('ExitHandler', (accounts) => {
         const inputProof = period.proof(nftDepositTx);
         
         // withdraw output
-        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob });
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob, value: exitStake});
         const utxoId = exitUtxoId(event);
 
         assert.equal(utxoId, spend.inputs[0].prevout.getUtxoId());
@@ -499,7 +525,7 @@ contract('ExitHandler', (accounts) => {
           const inputProof = period.proof(depositTx); // transferTx spends depositTx
           const inputIndex = 0;
 
-          event = await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
+          event = await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
           exits.push(exitUtxoId(event));
         }
         /* eslint-enable */
@@ -533,7 +559,7 @@ contract('ExitHandler', (accounts) => {
           const inputProof = period.proof(depositTx); // transferTx spends depositTx
           const inputIndex = 0;
 
-          await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex);
+          await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
         }
         /* eslint-enable */
 

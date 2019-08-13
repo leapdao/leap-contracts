@@ -27,7 +27,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
     uint8 indexed outIndex,
     uint256 indexed color,
     address exitor,
-    uint256 amount
+    uint256 amount,
+    bytes32 periodRoot
   );
 
   /**
@@ -52,6 +53,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
    * UTXO → Exit mapping
    */
   mapping(bytes32 => Exit) public exits;
+  mapping(bytes32 => bytes32) exitRoots;
 
   function initializeWithExit(
     Bridge _bridge,
@@ -71,6 +73,12 @@ contract ExitHandler is IExitHandler, DepositHandler {
     exitDuration = _exitDuration;
   }
 
+  struct ProofResults {
+    bytes32 txHash;
+    bytes txData;
+    uint64 txPos;
+  }
+
   function startExit(
     bytes32[] memory _youngestInputProof, bytes32[] memory _proof,
     uint8 _outputIndex, uint8 _inputIndex
@@ -86,16 +94,14 @@ contract ExitHandler is IExitHandler, DepositHandler {
     }
 
     // check exiting tx inclusion in the root chain block
-    bytes32 txHash;
-    bytes memory txData;
-    uint64 txPos;
-    (txPos, txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
+    ProofResults memory pr;
+    (pr.txPos, pr.txHash, pr.txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 64, _proof);
 
     // parse exiting tx and check if it is exitable
-    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+    TxLib.Tx memory exitingTx = TxLib.parseTx(pr.txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
 
-    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
+    bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(pr.txHash)));
     uint256 priority;
     if (msg.sender != out.owner) {
       // or caller code hashes to owner
@@ -115,7 +121,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
     if (_youngestInputProof.length > 0) {
       // check youngest input tx inclusion in the root chain block
       bytes32 inputTxHash;
-      (txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
+      (pr.txPos, inputTxHash,) = TxLib.validateProof(96, _youngestInputProof);
       require(
         inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
         "Input from the proof is not referenced in exiting tx"
@@ -128,7 +134,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
         priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
         nstExitCounter++;
       } else {      
-        priority = getERC20ExitPriority(timestamp, utxoId, txPos);
+        priority = getERC20ExitPriority(timestamp, utxoId, pr.txPos);
       }
     } else {
       require(exitingTx.txType == TxLib.TxType.Deposit, "Expected deposit tx");
@@ -139,7 +145,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
         priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
         nstExitCounter++;
       } else {
-        priority = getERC20ExitPriority(timestamp, utxoId, txPos);
+        priority = getERC20ExitPriority(timestamp, utxoId, pr.txPos);
       }
     }
 
@@ -154,13 +160,15 @@ contract ExitHandler is IExitHandler, DepositHandler {
       priorityTimestamp: timestamp,
       tokenData: out.stateRoot
     });
+    exitRoots[utxoId] = _proof[0];
 
     emit ExitStarted(
-      txHash,
+      pr.txHash,
       _outputIndex,
       out.color,
       out.owner,
-      out.value
+      out.value,
+      _proof[0]
     );
   }
 
@@ -203,7 +211,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       0,
       deposit.color,
       deposit.owner,
-      deposit.amount
+      deposit.amount,
+      0
     );
   }
 
@@ -224,6 +233,19 @@ contract ExitHandler is IExitHandler, DepositHandler {
       }
 
       currentExit = exits[utxoId];
+
+      // exits of deleted periods are not payed out but simply deleted
+      if (exitRoots[utxoId] > 0) {
+        uint32 timestamp;
+        (, timestamp,,) = bridge.periods(exitRoots[utxoId]);
+        if (timestamp == 0) {
+          // stake goes to governance contract
+          address(uint160(bridge.admin())).send(currentExit.stake);
+          tokens[currentExit.color].delMin();
+          exits[utxoId].finalized = true;
+          return;
+        }
+      }
 
       if (currentExit.owner != address(0) || currentExit.amount != 0) { // exit was not removed
         // Note: for NFTs, the amount is actually the NFT id (both uint256)
@@ -295,8 +317,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       txn = TxLib.parseTx(txData);
 
       // make sure one is spending the other one
-      require(txHash1 == txn.ins[_inputIndex].outpoint.hash);
-      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos);
+      require(txHash1 == txn.ins[_inputIndex].outpoint.hash, "prevout check failed on hash");
+      require(_outputIndex == txn.ins[_inputIndex].outpoint.pos, "prevout check failed on pos");
 
       // if transfer, make sure signature correct
       if (txn.txType == TxLib.TxType.Transfer) {
@@ -307,8 +329,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
-        require(exits[utxoId].owner == signer);
+        require(exits[utxoId].owner == signer, "signer does not match");
       } else if (txn.txType == TxLib.TxType.SpendCond) {
+        // check that hash of contract matches output address
         // just have the pass through
         // later we will check solEVM Enforcer here.
       } else {
@@ -403,5 +426,5 @@ contract ExitHandler is IExitHandler, DepositHandler {
   }
 
   // solium-disable-next-line mixedcase
-  uint256[49] private ______gap;
+  uint256[48] private ______gap;
 }

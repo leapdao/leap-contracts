@@ -19,6 +19,9 @@ contract FastExitHandler is ExitHandler {
     bytes32 txHash;
     uint64 txPos;
     bytes32 utxoId;
+    bytes32 inputTxHash;
+    uint256 priority;
+    bytes txData;
   }
 
   function startBoughtExit(
@@ -35,11 +38,10 @@ contract FastExitHandler is ExitHandler {
     require(data.timestamp > 0, "The referenced period was not submitted to bridge");
 
     // check exiting tx inclusion in the root chain block
-    bytes memory txData;
-    (data.txPos, data.txHash, txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 96, _proof);
+    (data.txPos, data.txHash, data.txData) = TxLib.validateProof(32 * (_youngestInputProof.length + 2) + 96, _proof);
 
     // parse exiting tx and check if it is exitable
-    TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
+    TxLib.Tx memory exitingTx = TxLib.parseTx(data.txData);
     TxLib.Output memory out = exitingTx.outs[_outputIndex];
     data.utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(data.txHash)));
 
@@ -49,7 +51,7 @@ contract FastExitHandler is ExitHandler {
     require(out.owner == address(this), "Funds were not sent to this contract");
     require(
       ecrecover(
-        TxLib.getSigHash(txData),
+        TxLib.getSigHash(data.txData),
         exitingTx.ins[0].v, exitingTx.ins[0].r, exitingTx.ins[0].s
       ) == signer,
       "Signer was not the previous owner of UTXO"
@@ -64,25 +66,23 @@ contract FastExitHandler is ExitHandler {
     require(!exits[data.utxoId].finalized, "The exit for UTXO has already been finalized");
     require(exitingTx.txType == TxLib.TxType.Transfer, "Can only fast exit transfer tx");
 
-    uint256 priority;
     // check youngest input tx inclusion in the root chain block
-    bytes32 inputTxHash;
-    (data.txPos, inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
+    (data.txPos, data.inputTxHash,) = TxLib.validateProof(128, _youngestInputProof);
     require(
-      inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
+      data.inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
       "Input from the proof is not referenced in exiting tx"
     );
 
     if (isNft(out.color)) {
-      priority = (nftExitCounter << 128) | uint128(uint256(data.utxoId));
+      data.priority = (nftExitCounter << 128) | uint128(uint256(data.utxoId));
       nftExitCounter++;
     } else {
-      priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
+      data.priority = getERC20ExitPriority(data.timestamp, data.utxoId, data.txPos);
     }
 
     tokens[out.color].addr.transferFrom(msg.sender, signer, buyPrice);
 
-    tokens[out.color].insert(priority);
+    tokens[out.color].insert(data.priority);
 
     exits[data.utxoId] = Exit({
       owner: msg.sender,
@@ -98,7 +98,8 @@ contract FastExitHandler is ExitHandler {
       _outputIndex,
       out.color,
       out.owner,
-      out.value
+      out.value,
+      _proof[0]
     );
   }
 
