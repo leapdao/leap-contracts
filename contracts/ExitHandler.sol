@@ -52,8 +52,32 @@ contract ExitHandler is IExitHandler, DepositHandler {
   /**
    * UTXO → Exit mapping
    */
-  mapping(bytes32 => Exit) public exits;
+  mapping(bytes32 => Exit) exitMapping;
   mapping(bytes32 => bytes32) exitRoots;
+
+  function exits(bytes32 _utxoId) public view returns (
+    uint256 amount,
+    uint16 color,
+    address owner,
+    bool finalized,
+    uint32 priorityTimestamp,
+    uint256 stake,
+    bytes32 tokenData,
+    bytes32 periodRoot
+  ) {
+    Exit memory exit = exitMapping[_utxoId];
+    bytes32 periodRoot = exitRoots[_utxoId];
+    return (
+      exit.amount,
+      exit.color,
+      exit.owner,
+      exit.finalized,
+      exit.priorityTimestamp,
+      exit.stake,
+      exit.tokenData,
+      periodRoot
+    );
+  }
 
   function initializeWithExit(
     Bridge _bridge,
@@ -114,8 +138,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
       out.owner = msg.sender;
     }
     require(out.value > 0, "UTXO has no value");
-    require(exits[utxoId].amount == 0, "The exit for UTXO has already been started");
-    require(!exits[utxoId].finalized, "The exit for UTXO has already been finalized");
+    require(exitMapping[utxoId].amount == 0, "The exit for UTXO has already been started");
+    require(!exitMapping[utxoId].finalized, "The exit for UTXO has already been finalized");
 
     
     if (_youngestInputProof.length > 0) {
@@ -151,7 +175,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
     tokens[out.color].insert(priority);
 
-    exits[utxoId] = Exit({
+    exitMapping[utxoId] = Exit({
       owner: out.owner,
       color: out.color,
       amount: out.value,
@@ -178,8 +202,8 @@ contract ExitHandler is IExitHandler, DepositHandler {
     Deposit memory deposit = deposits[uint32(_depositId)];
     require(deposit.owner == msg.sender, "Only deposit owner can start exit");
     require(deposit.amount > 0, "deposit has no value");
-    require(exits[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
-    require(!exits[bytes32(_depositId)].finalized, "The exit for deposit has already been finalized");
+    require(exitMapping[bytes32(_depositId)].amount == 0, "The exit of deposit has already been started");
+    require(!exitMapping[bytes32(_depositId)].finalized, "The exit for deposit has already been finalized");
 
     uint256 priority;
     if (isNft(deposit.color)) {
@@ -194,7 +218,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
     tokens[deposit.color].insert(priority);
 
-    exits[bytes32(_depositId)] = Exit({
+    exitMapping[bytes32(_depositId)] = Exit({
       owner: deposit.owner,
       color: deposit.color,
       amount: deposit.amount,
@@ -232,7 +256,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
         return;
       }
 
-      currentExit = exits[utxoId];
+      currentExit = exitMapping[utxoId];
 
       // exits of deleted periods are not payed out but simply deleted
       if (exitRoots[utxoId] > 0) {
@@ -242,7 +266,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
           // stake goes to governance contract
           address(uint160(bridge.admin())).send(currentExit.stake);
           tokens[currentExit.color].delMin();
-          exits[utxoId].finalized = true;
+          exitMapping[utxoId].finalized = true;
           return;
         }
       }
@@ -279,7 +303,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
       }
 
       tokens[currentExit.color].delMin();
-      exits[utxoId].finalized = true;
+      exitMapping[utxoId].finalized = true;
 
       if (tokens[currentExit.color].currentSize > 0) {
         (utxoId, exitableAt) = getNextExit(_color);
@@ -329,7 +353,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].r,
           txn.ins[_inputIndex].s
         );
-        require(exits[utxoId].owner == signer, "signer does not match");
+        require(exitMapping[utxoId].owner == signer, "signer does not match");
       } else if (txn.txType == TxLib.TxType.SpendCond) {
         // check that hash of contract matches output address
         // just have the pass through
@@ -358,13 +382,13 @@ contract ExitHandler is IExitHandler, DepositHandler {
       }
     }
 
-    require(exits[utxoId].amount > 0, "exit not found");
-    require(!exits[utxoId].finalized, "The exit has already been finalized");
+    require(exitMapping[utxoId].amount > 0, "exit not found");
+    require(!exitMapping[utxoId].finalized, "The exit has already been finalized");
 
     // award stake to challanger
-    msg.sender.transfer(exits[utxoId].stake);
+    msg.sender.transfer(exitMapping[utxoId].stake);
     // delete invalid exit
-    delete exits[utxoId];
+    delete exitMapping[utxoId];
   }
 
   function challengeYoungestInput(
@@ -382,7 +406,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
     bytes32 utxoId = bytes32(uint256(_outputIndex) << 120 | uint120(uint256(txHash)));
 
     // check the exit exists
-    require(exits[utxoId].amount > 0, "There is no exit for this UTXO");
+    require(exitMapping[utxoId].amount > 0, "There is no exit for this UTXO");
 
     TxLib.Tx memory exitingTx = TxLib.parseTx(txData);
 
@@ -396,12 +420,12 @@ contract ExitHandler is IExitHandler, DepositHandler {
     (,youngerInputTimestamp,,) = bridge.periods(_youngerInputProof[0]);
     require(youngerInputTimestamp > 0, "The referenced period was not submitted to bridge");
 
-    require(exits[utxoId].priorityTimestamp < youngerInputTimestamp, "Challenged input should be older");
+    require(exitMapping[utxoId].priorityTimestamp < youngerInputTimestamp, "Challenged input should be older");
 
     // award stake to challanger
-    msg.sender.transfer(exits[utxoId].stake);
+    msg.sender.transfer(exitMapping[utxoId].stake);
     // delete invalid exit
-    delete exits[utxoId];
+    delete exitMapping[utxoId];
   }
 
   function getNextExit(uint16 _color) internal view returns (bytes32 utxoId, uint256 exitableAt) {

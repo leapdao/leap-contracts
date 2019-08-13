@@ -62,8 +62,8 @@ contract FastExitHandler is ExitHandler {
     );
 
     require(out.value > 0, "UTXO has no value");
-    require(exits[data.utxoId].amount == 0, "The exit for UTXO has already been started");
-    require(!exits[data.utxoId].finalized, "The exit for UTXO has already been finalized");
+    require(exitMapping[data.utxoId].amount == 0, "The exit for UTXO has already been started");
+    require(!exitMapping[data.utxoId].finalized, "The exit for UTXO has already been finalized");
     require(exitingTx.txType == TxLib.TxType.Transfer, "Can only fast exit transfer tx");
 
     // check youngest input tx inclusion in the root chain block
@@ -84,7 +84,7 @@ contract FastExitHandler is ExitHandler {
 
     tokens[out.color].insert(data.priority);
 
-    exits[data.utxoId] = Exit({
+    exitMapping[data.utxoId] = Exit({
       owner: msg.sender,
       color: out.color,
       amount: out.value,
