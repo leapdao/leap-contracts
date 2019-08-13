@@ -55,7 +55,13 @@ contract MinGov is Ownable {
     prop.canceled = true;
   }
 
+  function () external payable {}
+
   function withdrawTax(address _token) public onlyOwner {
+    if (_token == address(0)) {
+      address(uint160(owner())).send(address(this).balance);
+      return;
+    }
     IERC20 token = IERC20(_token);
     token.transfer(owner(), token.balanceOf(address(this)));
   }

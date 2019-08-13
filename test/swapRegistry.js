@@ -232,10 +232,19 @@ contract('SwapRegistry', (accounts) => {
       const total = await nativeToken.totalSupply();
       assert.equal(total, web3.utils.toWei('7000000', 'ether'));
 
+      // simulate canceled CAS exits
+      await web3.eth.sendTransaction({ 
+        to: gov.address, from: accounts[1], value: '100000000000000000',
+      });
+
       // withdraw all tax
       await gov.withdrawTax(nativeToken.address);
       const bal = await nativeToken.balanceOf(accounts[0]);
       assert.equal(bal, web3.utils.toWei('7000000', 'ether'));
+      const ethBalBefore = await web3.eth.getBalance(accounts[0]);
+      await gov.withdrawTax('0x0000000000000000000000000000000000000000');
+      const ethBal = await web3.eth.getBalance(accounts[0]);
+      assert(new BN(ethBal).gt(new BN(ethBalBefore)));
     });
   });
 

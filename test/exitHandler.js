@@ -112,8 +112,6 @@ contract('ExitHandler', (accounts) => {
       bridge = await Bridge.at(proxy.address);
       data = await bridge.contract.methods.setOperator(bob).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
-      data = await bridge.contract.methods.setOperator(accounts[1]).encodeABI();
-      await proxy.applyProposal(data, {from: accounts[2]});
 
       const vaultCont = await ExitHandler.new();
       data = await vaultCont.contract.methods.initializeWithExit(bridge.address, exitDuration, exitStake).encodeABI();
