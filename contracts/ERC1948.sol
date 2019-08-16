@@ -9,6 +9,7 @@
 pragma solidity ^0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
+import "../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRole.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Enumerable.sol";
 import "./IERC1948.sol";
 
@@ -20,11 +21,11 @@ import "./IERC1948.sol";
  * do not suffice to store the data, an authenticated data structure (hash or
  * merkle tree) shall be used.
  */
-contract ERC1948 is IERC1948, ERC721, ERC721Enumerable {
+contract ERC1948 is IERC1948, ERC721, ERC721Enumerable, MinterRole {
 
   mapping(uint256 => bytes32) data;
 
-  function mint(address to, uint256 tokenId) public {
+  function mint(address to, uint256 tokenId) public onlyMinter {
     super._mint(to, tokenId);
   }
 

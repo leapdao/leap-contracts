@@ -28,7 +28,7 @@ contract ERC1949 is IERC1949, ERC1948, ERC721Metadata {
    * @dev mints a new delegate
    * @param _to The token to read the data off.
    */
-  function mintDelegate(address _to) public {
+  function mintDelegate(address _to) public onlyMinter {
     delegateCounter += 1;
     uint256 delegateId = uint256(keccak256(abi.encodePacked(address(this), delegateCounter)));
     super._mint(_to, delegateId);
