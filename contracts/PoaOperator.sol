@@ -198,7 +198,7 @@ contract PoaOperator is Adminable {
     }
     // cas root
     assembly {
-      mstore(0, _cas)
+      mstore(0, _casBitmap)
       mstore(0x20, hashRoot)
       hashRoot := keccak256(0, 0x40)
     }
