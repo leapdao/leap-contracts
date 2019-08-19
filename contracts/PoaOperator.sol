@@ -159,7 +159,7 @@ contract PoaOperator is Adminable {
     bytes32 indexed blocksRoot,
     uint256 indexed slotId,
     address indexed owner,
-    bytes32 casRoot,
+    bytes32 casBitmap,
     bytes32 periodRoot
   );
 
@@ -179,7 +179,7 @@ contract PoaOperator is Adminable {
     return (_epochLength * 2 / 3) + ((_epochLength * 2 % 3) == 0 ? 0 : 1);
   }
 
-  function _submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) internal {
+  function _submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _casBitmap) internal {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender, "not submitted by signerAddr");
@@ -198,7 +198,7 @@ contract PoaOperator is Adminable {
     }
     // cas root
     assembly {
-      mstore(0, _cas)
+      mstore(0, _casBitmap)
       mstore(0x20, hashRoot)
       hashRoot := keccak256(0, 0x40)
     }
@@ -229,14 +229,14 @@ contract PoaOperator is Adminable {
       _blocksRoot,
       _slotId,
       slot.owner,
-      _cas,
+      _casBitmap,
       hashRoot
     );
   }
 
-  function submitPeriodWithCas(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _cas) public {
-    require(countSigs(uint256(_cas), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
-    _submitPeriod(_slotId, _prevHash, _blocksRoot, _cas);
+  function submitPeriodWithCas(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _casBitmap) public {
+    require(countSigs(uint256(_casBitmap), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
+    _submitPeriod(_slotId, _prevHash, _blocksRoot, _casBitmap);
   }
 
   function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
