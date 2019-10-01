@@ -8,10 +8,7 @@
 pragma solidity 0.5.2;
 
 import "./IColony.sol";
-
-interface IERC20 {
-    function transferFrom(address from, address to, uint256 value) external returns (bool);
-}
+import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 contract BountyPayout {
 
@@ -46,9 +43,10 @@ contract BountyPayout {
   }
 
  /**
-  * Transfers given token to multiple recipients as specified by _recepients and _splits arrays
+  * Pays out a bounty to the different roles of a bounty
   *
-  * @dev This contract should have enough allowance of _tokenAddr from _payerAddr
+  * @dev This contract should have enough allowance of daiAddr from payerAddr
+  * @dev This colony contract should have enough LEAP in its funding pot
   * @param _gardenerAddr gardener wallet address
   */
   function payout(
@@ -60,7 +58,6 @@ contract BountyPayout {
     uint256 _reviewerDaiAmount,
     bytes32 _bountyId
   ) public onlyPayer {
-    // TODO: requires
 
     IColony colony = IColony(colonyAddr);
     IERC20 dai = IERC20(daiAddr);
