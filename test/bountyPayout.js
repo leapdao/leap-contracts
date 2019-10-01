@@ -14,7 +14,7 @@ contract('BountyPayout', (accounts) => {
   const payer = accounts[0];
   const amount = '100000000000000000000'; // 100 dai
   let dai;
-  let leap = { address: accounts[1] };
+  const leap = { address: accounts[1] };
   let colony;
   let bountyPayout;
 
