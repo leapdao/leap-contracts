@@ -63,17 +63,17 @@ contract BountyPayout {
     IERC20 dai = IERC20(daiAddr);
 
     // handle worker
-    uint256 paymentId = colony.addPayment(0, 0, _gardenerAddr, leapAddr, _gardenerDaiAmount, 0, 0);
+    uint256 paymentId = colony.addPayment(1, 0, _gardenerAddr, leapAddr, _gardenerDaiAmount, 1, 0);
     dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
     emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
 
     // handle worker
-    paymentId = colony.addPayment(0, 0, _workerAddr, leapAddr, _workerDaiAmount, 0, 0);
+    paymentId = colony.addPayment(1, 0, _workerAddr, leapAddr, _workerDaiAmount, 1, 0);
     dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
     emit Payout(_bountyId, PayoutType.Gardener, _workerAddr, _workerDaiAmount, paymentId);
 
     // handle reviewer
-    paymentId = colony.addPayment(0, 0, _reviewerAddr, leapAddr, _reviewerDaiAmount, 0, 0);
+    paymentId = colony.addPayment(1, 0, _reviewerAddr, leapAddr, _reviewerDaiAmount, 1, 0);
     dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
     emit Payout(_bountyId, PayoutType.Gardener, _reviewerAddr, _reviewerDaiAmount, paymentId);
   }
