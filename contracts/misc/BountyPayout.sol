@@ -70,11 +70,11 @@ contract BountyPayout {
     // handle worker
     paymentId = colony.addPayment(1, 0, _workerAddr, leapAddr, _workerDaiAmount, 1, 0);
     dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
-    emit Payout(_bountyId, PayoutType.Gardener, _workerAddr, _workerDaiAmount, paymentId);
+    emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
 
     // handle reviewer
     paymentId = colony.addPayment(1, 0, _reviewerAddr, leapAddr, _reviewerDaiAmount, 1, 0);
     dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
-    emit Payout(_bountyId, PayoutType.Gardener, _reviewerAddr, _reviewerDaiAmount, paymentId);
+    emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
   }
 }
