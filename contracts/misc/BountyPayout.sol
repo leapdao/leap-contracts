@@ -80,12 +80,49 @@ contract BountyPayout {
     return paymentId;
   }
 
+  function _payout(
+    address payable _gardenerAddr,
+    uint256 _gardenerDaiAmount,
+    address payable _workerAddr,
+    uint256 _workerDaiAmount,
+    address payable _reviewerAddr,
+    uint256 _reviewerDaiAmount,
+    bytes32 _bountyId
+  ) internal  {
+
+    IERC20 dai = IERC20(daiAddr);
+
+    // handle worker
+    uint256 paymentId = makePayment(_gardenerAddr, _gardenerDaiAmount);
+    dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
+    emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
+
+    // handle worker
+    if (_workerDaiAmount > 0) {
+      paymentId = makePayment(_workerAddr, _workerDaiAmount);
+      dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
+      emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
+    }
+
+    // handle reviewer
+    if (_reviewerDaiAmount > 0) {
+      paymentId = makePayment(_reviewerAddr, _reviewerDaiAmount);
+      dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
+      emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
+    }
+  }
+
  /**
   * Pays out a bounty to the different roles of a bounty
   *
   * @dev This contract should have enough allowance of daiAddr from payerAddr
   * @dev This colony contract should have enough LEAP in its funding pot
   * @param _gardenerAddr gardener wallet address
+  * @param _gardenerDaiAmount DAI amount to pay gardner
+  * @param _workerAddr worker wallet address
+  * @param _workerDaiAmount DAI amount to pay worker
+  * @param _reviewerAddr reviewer wallet address
+  * @param _reviewerDaiAmount DAI amount to pay reviewer
   */
   function payout(
     address payable _gardenerAddr,
@@ -96,22 +133,50 @@ contract BountyPayout {
     uint256 _reviewerDaiAmount,
     bytes32 _bountyId
   ) public onlyPayer {
+    _payout(
+      _gardenerAddr,
+      _gardenerDaiAmount,
+      _workerAddr,
+      _workerDaiAmount,
+      _reviewerAddr,
+      _reviewerDaiAmount,
+      _bountyId
+    );
+  }
 
-    IERC20 dai = IERC20(daiAddr);
+  function payoutNoWorker(
+    address payable _gardenerAddr,
+    uint256 _gardenerDaiAmount,
+    address payable _reviewerAddr,
+    uint256 _reviewerDaiAmount,
+    bytes32 _bountyId
+  ) public onlyPayer {
+    _payout(
+      _gardenerAddr,
+      _gardenerDaiAmount,
+      _reviewerAddr,
+      0,
+      _reviewerAddr,
+      _reviewerDaiAmount,
+      _bountyId
+    );
+  }
 
-    // handle worker
-    uint256 paymentId = makePayment(_gardenerAddr, _gardenerDaiAmount);
-    dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
-    emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
-
-    // handle worker
-    paymentId = makePayment(_workerAddr, _workerDaiAmount);
-    dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
-    emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
-
-    // handle reviewer
-    paymentId = makePayment(_reviewerAddr, _reviewerDaiAmount);
-    dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
-    emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
+  function payoutNoReviewer(
+    address payable _gardenerAddr,
+    uint256 _gardenerDaiAmount,
+    address payable _workerAddr,
+    uint256 _workerDaiAmount,
+    bytes32 _bountyId
+  ) public onlyPayer {
+    _payout(
+      _gardenerAddr,
+      _gardenerDaiAmount,
+      _workerAddr,
+      _workerDaiAmount,
+      _workerAddr,
+      0,
+      _bountyId
+    );
   }
 }
