@@ -4,13 +4,19 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-
 pragma solidity 0.5.2;
+pragma experimental ABIEncoderV2;
+
 
 import "./IColony.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 contract BountyPayout {
+
+  uint256 constant PERMISSION_DOMAIN_ID = 1;
+  uint256 constant CHILD_SKILL_INDEX = 0;
+  uint256 constant DOMAIN_ID = 1;
+  uint256 constant SKILL_ID = 0;
 
   address public payerAddr;
   address public colonyAddr;
@@ -42,6 +48,38 @@ contract BountyPayout {
     _;
   }
 
+  function makePayment(address payable _worker, uint256 _amount) internal returns (uint256) {
+
+    IColony colony = IColony(colonyAddr);
+    // Add a new payment
+    uint256 paymentId = colony.addPayment(
+      PERMISSION_DOMAIN_ID,
+      CHILD_SKILL_INDEX,
+      _worker,
+      leapAddr,
+      _amount,
+      DOMAIN_ID,
+      SKILL_ID
+    );
+    IColony.Payment memory payment = colony.getPayment(paymentId);
+
+    // Fund the payment
+    colony.moveFundsBetweenPots(
+      1, // Root domain always 1
+      0, // Not used, this extension contract must have funding permission in the root for this function to work
+      CHILD_SKILL_INDEX,
+      1, // Root domain funding pot is always 1
+      payment.fundingPotId,
+      _amount,
+      leapAddr
+    );
+    colony.finalizePayment(PERMISSION_DOMAIN_ID, CHILD_SKILL_INDEX, paymentId);
+
+    // Claim payout on behalf of the recipient
+    colony.claimPayment(paymentId, leapAddr);
+    return paymentId;
+  }
+
  /**
   * Pays out a bounty to the different roles of a bounty
   *
@@ -59,21 +97,20 @@ contract BountyPayout {
     bytes32 _bountyId
   ) public onlyPayer {
 
-    IColony colony = IColony(colonyAddr);
     IERC20 dai = IERC20(daiAddr);
 
     // handle worker
-    uint256 paymentId = colony.addPayment(1, 0, _gardenerAddr, leapAddr, _gardenerDaiAmount, 1, 0);
+    uint256 paymentId = makePayment(_gardenerAddr, _gardenerDaiAmount);
     dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
     emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
 
     // handle worker
-    paymentId = colony.addPayment(1, 0, _workerAddr, leapAddr, _workerDaiAmount, 1, 0);
+    paymentId = makePayment(_workerAddr, _workerDaiAmount);
     dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
     emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
 
     // handle reviewer
-    paymentId = colony.addPayment(1, 0, _reviewerAddr, leapAddr, _reviewerDaiAmount, 1, 0);
+    paymentId = makePayment(_reviewerAddr, _reviewerDaiAmount);
     dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
     emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
   }

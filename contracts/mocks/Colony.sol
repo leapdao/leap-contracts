@@ -4,12 +4,15 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-
 pragma solidity 0.5.2;
+pragma experimental ABIEncoderV2;
+
 
 import "../misc/IColony.sol";
 
 contract Colony is IColony {
+
+  Payment[] payments;
 
   function addPayment(
     uint256 _permissionDomainId,
@@ -19,6 +22,35 @@ contract Colony is IColony {
     uint256 _amount,
     uint256 _domainId,
     uint256 _skillId) external returns (uint256 paymentId) {
-    return 0;
+    uint256[] memory skills;
+    Payment memory payment = Payment(msg.sender, false, 1, 1, skills);
+    paymentId = payments.length++;
+    payments[paymentId] = payment;
+  }
+
+  /// @notice Returns an exiting payment.
+  /// @param _id Payment identifier
+  /// @return payment The Payment data structure
+  function getPayment(uint256 _id) external view returns (Payment memory) {
+    return payments[_id];
+  }
+
+  function moveFundsBetweenPots(
+    uint256 _permissionDomainId,
+    uint256 _fromChildSkillIndex,
+    uint256 _toChildSkillIndex,
+    uint256 _fromPot,
+    uint256 _toPot,
+    uint256 _amount,
+    address _token
+    ) external {
+
+  }
+
+  function finalizePayment(uint256 _permissionDomainId, uint256 _childSkillIndex, uint256 _id) external {
+    payments[_id].finalized = true;
+  }
+
+  function claimPayment(uint256 _id, address _token) external {
   }
 }
