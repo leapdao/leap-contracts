@@ -13,6 +13,7 @@ import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.so
 
 contract BountyPayout {
 
+  uint256 constant DAI_DECIMALS = 10^18;
   uint256 constant PERMISSION_DOMAIN_ID = 1;
   uint256 constant CHILD_SKILL_INDEX = 0;
   uint256 constant DOMAIN_ID = 1;
@@ -92,7 +93,10 @@ contract BountyPayout {
 
     IERC20 dai = IERC20(daiAddr);
 
-    // handle worker
+    // gardener worker
+    // Why is a gardener share required?
+    // Later we will hold a stake for gardeners, which will be handled here.
+    require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
     uint256 paymentId = makePayment(_gardenerAddr, _gardenerDaiAmount);
     dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
     emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
