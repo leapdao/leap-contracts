@@ -191,7 +191,7 @@ contract('PoaOperator', (accounts) => {
       operator = await PoaOperator.at(proxy.address);
 
       // set epochLength
-      data = await operator.contract.methods.setEpochLength(2, false).encodeABI();
+      data = await operator.contract.methods.setEpochLength(2).encodeABI();
       await proxy.applyProposal(data, {from: accounts[2]});
       assert.equal(await operator.epochLength(), 2);
     });

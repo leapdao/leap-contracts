@@ -20,7 +20,7 @@ contract OperatorMock is Adminable {
     minGasPrice = _minGasPrice;
   }
 
-  function setEpochLength(uint256 _epochLength, bool _blah) public ifAdmin {
+  function setEpochLength(uint256 _epochLength) public ifAdmin {
     epochLength = _epochLength;
   }
 
