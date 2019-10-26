@@ -84,7 +84,7 @@ contract PoaOperator is Adminable {
     emit EpochLength(epochLength);
   }
 
-  function setEpochLength(uint256 _epochLength) public ifAdmin {
+  function setEpochLength(uint256 _epochLength, bool _blah) public ifAdmin {
     epochLength = _epochLength;
     emit EpochLength(epochLength);
   }

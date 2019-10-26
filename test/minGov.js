@@ -56,7 +56,7 @@ contract('MinGov', (accounts) => {
     // propose and finalize value changes
     const data1 = await operator.contract.methods.setMinGasPrice(200).encodeABI();
     await gov.propose(operator.address, data1);
-    const data2 = await operator.contract.methods.setEpochLength(32).encodeABI();
+    const data2 = await operator.contract.methods.setEpochLength(32, false).encodeABI();
     await gov.propose(operator.address, data2);
     let size = await gov.size();
     let first = await gov.first();
