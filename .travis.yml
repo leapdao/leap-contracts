@@ -19,3 +19,14 @@ jobs:
         - yarn add codecov solidity-coverage
         - yarn coverage
         - codecov -f coverage/lcov.info
+
+    - stage: tests
+      name: "Integration tests"
+      script:
+        - git clone --single-branch -b master https://github.com/leapdao/integration-tests.git /tmp/tests
+        - |
+          cat > /tmp/tests/configs/build << EOF
+          node_repo=" --single-branch -b master https://github.com/leapdao/leap-node.git"
+          contracts_repo=" `pwd`"
+          EOF
+        - cd /tmp/tests && yarn && yarn build && yarn test
