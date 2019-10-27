@@ -9,9 +9,10 @@ pragma experimental ABIEncoderV2;
 
 
 import "./IColony.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-contract BountyPayout {
+contract BountyPayout is Ownable {
 
   uint256 constant DAI_DECIMALS = 10^18;
   uint256 constant PERMISSION_DOMAIN_ID = 1;
@@ -19,7 +20,6 @@ contract BountyPayout {
   uint256 constant DOMAIN_ID = 1;
   uint256 constant SKILL_ID = 0;
 
-  address public payerAddr;
   address public colonyAddr;
   address public daiAddr;
   address public leapAddr;
@@ -34,22 +34,19 @@ contract BountyPayout {
   );
 
   constructor(
-    address _payerAddr,
     address _colonyAddr,
     address _daiAddr,
     address _leapAddr) public {
-    payerAddr = _payerAddr;
     colonyAddr = _colonyAddr;
     daiAddr = _daiAddr;
     leapAddr = _leapAddr;
   }
 
-  modifier onlyPayer() {
-    require(msg.sender == payerAddr, "Only payer can call");
-    _;
+  function _isRepOnly(uint256 amount) internal returns (bool) {
+    return ((amount & 0x01) == 1);
   }
 
-  function makePayment(address payable _worker, uint256 _amount) internal returns (uint256) {
+  function _makePayment(address payable _worker, uint256 _amount) internal returns (uint256) {
 
     IColony colony = IColony(colonyAddr);
     // Add a new payment
@@ -89,29 +86,34 @@ contract BountyPayout {
     address payable _reviewerAddr,
     uint256 _reviewerDaiAmount,
     bytes32 _bountyId
-  ) internal  {
-
+  ) internal {
     IERC20 dai = IERC20(daiAddr);
 
     // gardener worker
     // Why is a gardener share required?
     // Later we will hold a stake for gardeners, which will be handled here.
     require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
-    uint256 paymentId = makePayment(_gardenerAddr, _gardenerDaiAmount);
-    dai.transferFrom(payerAddr, _gardenerAddr, _gardenerDaiAmount);
+    uint256 paymentId = _makePayment(_gardenerAddr, _gardenerDaiAmount);
+    if (!_isRepOnly(_gardenerDaiAmount)) {
+      dai.transferFrom(msg.sender, _gardenerAddr, _gardenerDaiAmount);
+    }
     emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
 
     // handle worker
     if (_workerDaiAmount > 0) {
-      paymentId = makePayment(_workerAddr, _workerDaiAmount);
-      dai.transferFrom(payerAddr, _workerAddr, _workerDaiAmount);
+      paymentId = _makePayment(_workerAddr, _workerDaiAmount);
+      if (!_isRepOnly(_workerDaiAmount)) {
+        dai.transferFrom(msg.sender, _workerAddr, _workerDaiAmount);
+      }
       emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
     }
 
     // handle reviewer
     if (_reviewerDaiAmount > 0) {
-      paymentId = makePayment(_reviewerAddr, _reviewerDaiAmount);
-      dai.transferFrom(payerAddr, _reviewerAddr, _reviewerDaiAmount);
+      paymentId = _makePayment(_reviewerAddr, _reviewerDaiAmount);
+      if (!_isRepOnly(_reviewerDaiAmount)) {
+        dai.transferFrom(msg.sender, _reviewerAddr, _reviewerDaiAmount);
+      }
       emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
     }
   }
@@ -121,64 +123,54 @@ contract BountyPayout {
   *
   * @dev This contract should have enough allowance of daiAddr from payerAddr
   * @dev This colony contract should have enough LEAP in its funding pot
-  * @param _gardenerAddr gardener wallet address
-  * @param _gardenerDaiAmount DAI amount to pay gardner
-  * @param _workerAddr worker wallet address
-  * @param _workerDaiAmount DAI amount to pay worker
-  * @param _reviewerAddr reviewer wallet address
-  * @param _reviewerDaiAmount DAI amount to pay reviewer
+  * @param _gardener DAI amount to pay gardner and gardener wallet address
+  * @param _worker DAI amount to pay worker and worker wallet address
+  * @param _reviewer DAI amount to pay reviewer and reviewer wallet address
   */
   function payout(
-    address payable _gardenerAddr,
-    uint256 _gardenerDaiAmount,
-    address payable _workerAddr,
-    uint256 _workerDaiAmount,
-    address payable _reviewerAddr,
-    uint256 _reviewerDaiAmount,
+    bytes32 _gardener,
+    bytes32 _worker,
+    bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyPayer {
+  ) public onlyOwner {
     _payout(
-      _gardenerAddr,
-      _gardenerDaiAmount,
-      _workerAddr,
-      _workerDaiAmount,
-      _reviewerAddr,
-      _reviewerDaiAmount,
+      address(bytes20(_gardener)),
+      uint96(uint256(_gardener)),
+      address(bytes20(_worker)),
+      uint96(uint256(_worker)),
+      address(bytes20(_reviewer)),
+      uint96(uint256(_reviewer)),
       _bountyId
     );
   }
 
   function payoutNoWorker(
-    address payable _gardenerAddr,
-    uint256 _gardenerDaiAmount,
-    address payable _reviewerAddr,
-    uint256 _reviewerDaiAmount,
+    bytes32 _gardener,
+    bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyPayer {
+  ) public onlyOwner {
     _payout(
-      _gardenerAddr,
-      _gardenerDaiAmount,
-      _reviewerAddr,
+      address(bytes20(_gardener)),
+      uint96(uint256(_gardener)),
+      address(bytes20(_gardener)),
       0,
-      _reviewerAddr,
-      _reviewerDaiAmount,
+      address(bytes20(_reviewer)),
+      uint96(uint256(_reviewer)),
       _bountyId
     );
   }
 
   function payoutNoReviewer(
-    address payable _gardenerAddr,
-    uint256 _gardenerDaiAmount,
-    address payable _workerAddr,
-    uint256 _workerDaiAmount,
+    bytes32 _gardener,
+    bytes32 _worker,
     bytes32 _bountyId
-  ) public onlyPayer {
+  ) public onlyOwner {
     _payout(
-      _gardenerAddr,
-      _gardenerDaiAmount,
-      _workerAddr,
-      _workerDaiAmount,
-      _workerAddr,
+      address(bytes20(_gardener)),
+      uint96(uint256(_gardener)),
+      address(bytes20(_worker)),
+      uint96(uint256(_worker)),
+      address(bytes20(_gardener)),
       0,
       _bountyId
     );
