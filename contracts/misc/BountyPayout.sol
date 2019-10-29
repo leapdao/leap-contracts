@@ -9,10 +9,10 @@ pragma experimental ABIEncoderV2;
 
 
 import "./IColony.sol";
-import "../../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/access/roles/CapperRole.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-contract BountyPayout is Ownable {
+contract BountyPayout is CapperRole {
 
   uint256 constant DAI_DECIMALS = 10^18;
   uint256 constant PERMISSION_DOMAIN_ID = 1;
@@ -46,7 +46,7 @@ contract BountyPayout is Ownable {
     return ((amount & 0x01) == 1);
   }
 
-  function _makePayment(address payable _worker, uint256 _amount) internal returns (uint256) {
+  function _makeColonyPayment(address payable _worker, uint256 _amount) internal returns (uint256) {
 
     IColony colony = IColony(colonyAddr);
     // Add a new payment
@@ -93,7 +93,7 @@ contract BountyPayout is Ownable {
     // Why is a gardener share required?
     // Later we will hold a stake for gardeners, which will be handled here.
     require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
-    uint256 paymentId = _makePayment(_gardenerAddr, _gardenerDaiAmount);
+    uint256 paymentId = _makeColonyPayment(_gardenerAddr, _gardenerDaiAmount);
     if (!_isRepOnly(_gardenerDaiAmount)) {
       dai.transferFrom(msg.sender, _gardenerAddr, _gardenerDaiAmount);
     }
@@ -101,7 +101,7 @@ contract BountyPayout is Ownable {
 
     // handle worker
     if (_workerDaiAmount > 0) {
-      paymentId = _makePayment(_workerAddr, _workerDaiAmount);
+      paymentId = _makeColonyPayment(_workerAddr, _workerDaiAmount);
       if (!_isRepOnly(_workerDaiAmount)) {
         dai.transferFrom(msg.sender, _workerAddr, _workerDaiAmount);
       }
@@ -110,7 +110,7 @@ contract BountyPayout is Ownable {
 
     // handle reviewer
     if (_reviewerDaiAmount > 0) {
-      paymentId = _makePayment(_reviewerAddr, _reviewerDaiAmount);
+      paymentId = _makeColonyPayment(_reviewerAddr, _reviewerDaiAmount);
       if (!_isRepOnly(_reviewerDaiAmount)) {
         dai.transferFrom(msg.sender, _reviewerAddr, _reviewerDaiAmount);
       }
@@ -132,7 +132,7 @@ contract BountyPayout is Ownable {
     bytes32 _worker,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyOwner {
+  ) public onlyCapper {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -148,7 +148,7 @@ contract BountyPayout is Ownable {
     bytes32 _gardener,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyOwner {
+  ) public onlyCapper {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -164,7 +164,7 @@ contract BountyPayout is Ownable {
     bytes32 _gardener,
     bytes32 _worker,
     bytes32 _bountyId
-  ) public onlyOwner {
+  ) public onlyCapper {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
