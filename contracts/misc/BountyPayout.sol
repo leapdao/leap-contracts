@@ -144,7 +144,7 @@ contract BountyPayout is Ownable {
     );
   }
 
-  function payoutNoWorker(
+  function payoutReviewedDelivery(
     bytes32 _gardener,
     bytes32 _reviewer,
     bytes32 _bountyId
