@@ -9,10 +9,10 @@ pragma experimental ABIEncoderV2;
 
 
 import "./IColony.sol";
-import "../../node_modules/openzeppelin-solidity/contracts/access/roles/CapperRole.sol";
+import "../../node_modules/openzeppelin-solidity/contracts/access/roles/WhitelistedRole.sol";
 import "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-contract BountyPayout is CapperRole {
+contract BountyPayout is WhitelistedRole {
 
   uint256 constant DAI_DECIMALS = 10^18;
   uint256 constant PERMISSION_DOMAIN_ID = 1;
@@ -132,7 +132,7 @@ contract BountyPayout is CapperRole {
     bytes32 _worker,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyCapper {
+  ) public onlyWhitelisted {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -148,7 +148,7 @@ contract BountyPayout is CapperRole {
     bytes32 _gardener,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyCapper {
+  ) public onlyWhitelisted {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -164,7 +164,7 @@ contract BountyPayout is CapperRole {
     bytes32 _gardener,
     bytes32 _worker,
     bytes32 _bountyId
-  ) public onlyCapper {
+  ) public onlyWhitelisted {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),

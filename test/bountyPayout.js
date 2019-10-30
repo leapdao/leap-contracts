@@ -22,6 +22,7 @@ contract('BountyPayout', (accounts) => {
     dai.mint(accounts[0], amount);
     colony = await Colony.new();
     bountyPayout = await BountyPayout.new(colony.address, dai.address, leap.address);
+    await bountyPayout.addWhitelisted(accounts[0]);
   });
 
   it('is payable', async () => {
@@ -51,7 +52,7 @@ contract('BountyPayout', (accounts) => {
   it('is payable for delivery with review', async () => {
     await dai.transfer(accounts[3], amount);
     await dai.approve(bountyPayout.address, amount, {from: accounts[3]});
-    await bountyPayout.addCapper(accounts[3]);
+    await bountyPayout.addWhitelisted(accounts[3]);
     await bountyPayout.payoutReviewedDelivery(
       `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
       `0x${accounts[2].replace('0x', '')}00000003860E639D80640000`, // 65% repOnly
