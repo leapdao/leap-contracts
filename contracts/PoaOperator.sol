@@ -85,6 +85,7 @@ contract PoaOperator is Adminable {
   }
 
   function setEpochLength(uint256 _epochLength) public ifAdmin {
+    require(_epochLength >= largestSlotId + 1, "Epoch length cannot be less then biggest slot");
     epochLength = _epochLength;
     emit EpochLength(epochLength);
   }
@@ -107,6 +108,9 @@ contract PoaOperator is Adminable {
         slot.eventCounter,
         lastCompleteEpoch + 1
       );
+      if (_slotId > largestSlotId) {
+        largestSlotId = _slotId;
+      }
       return;
     }
     // emptying slot
@@ -136,6 +140,10 @@ contract PoaOperator is Adminable {
         slot.tendermint,
         lastCompleteEpoch + 1
       );
+
+      if (_slotId == largestSlotId && _slotId > 0) {
+        largestSlotId = _slotId - 1;
+      }
     }
     slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
@@ -349,6 +357,8 @@ contract PoaOperator is Adminable {
     bridge.deletePeriod(_period);
   }
 
+  uint256 public largestSlotId;
+
   // solium-disable-next-line mixedcase
-  uint256[18] private ______gap;
+  uint256[17] private ______gap;
 }
