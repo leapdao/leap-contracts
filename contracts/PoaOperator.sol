@@ -120,10 +120,6 @@ contract PoaOperator is Adminable {
         slot.eventCounter,
         lastCompleteEpoch + 1
       );
-      uint256 largestSlotId = _getLargestSlot();
-      if (_slotId > largestSlotId) {
-        largestSlotId = _slotId;
-      }
       return;
     }
     // emptying slot
@@ -153,10 +149,6 @@ contract PoaOperator is Adminable {
         slot.tendermint,
         lastCompleteEpoch + 1
       );
-      uint256 largestSlotId = _getLargestSlot();
-      if (_slotId == largestSlotId && _slotId > 0) {
-        largestSlotId = _slotId - 1;
-      }
     }
     slot.owner = slot.newOwner;
     slot.signer = slot.newSigner;
