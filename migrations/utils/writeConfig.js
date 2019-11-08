@@ -24,7 +24,6 @@ function writeConfig({ bridgeProxy, operatorProxy, exitHandlerProxy }, network) 
     "operatorAddr": operatorProxy.address,
     "exitHandlerAddr": exitHandlerProxy.address,
     "rootNetwork": rootNetwork,
-    "rootNetworkId": 5777,
     "network": network,
     "networkId": networkId,
     "peers": [],
