@@ -29,7 +29,7 @@ const merkelize = (hash1, hash2) => {
 };
 
 const Bridge = artifacts.require('Bridge');
-const PoaOperator = artifacts.require('PoaOperator');
+const PoaOperator = artifacts.require('PoaOperatorMock');
 const ExitHandler = artifacts.require('ExitHandler');
 const AdminableProxy = artifacts.require('AdminableProxy');
 
@@ -184,16 +184,38 @@ contract('PoaOperator', (accounts) => {
     let proxy;
     let operator;
 
-    it('should allow to change exit params', async () => {
+    it('should allow to change epoch length', async () => {
       const opCont = await PoaOperator.new();
-      let data = await opCont.contract.methods.initialize(accounts[0], accounts[0], 2, 3600).encodeABI();
-      proxy = await AdminableProxy.new(opCont.address, data, {from: accounts[2]});
+      let data = await opCont.contract.methods.initialize(accounts[0], accounts[0], 1, 3600).encodeABI();
+      proxy = await AdminableProxy.new(opCont.address, data, { from: accounts[2] });
       operator = await PoaOperator.at(proxy.address);
 
-      // set epochLength
+      // set the first slot
+      data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
+      await proxy.applyProposal(data, { from: accounts[2] });
+      assert.equal(await operator.epochLength(), 1);
+
+      // increase epoch length to 2 and set the second slot
       data = await operator.contract.methods.setEpochLength(2).encodeABI();
-      await proxy.applyProposal(data, {from: accounts[2]});
+      await proxy.applyProposal(data, { from: accounts[2] });
+      data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
+      await proxy.applyProposal(data, { from: accounts[2] });
       assert.equal(await operator.epochLength(), 2);
+
+      // dont' allow to reduce epoch length beyond max slotId
+      data = await operator.contract.methods.setEpochLength(1).encodeABI();
+      await proxy.applyProposal(data, { from: accounts[2] });
+      assert.equal(await operator.epochLength(), 2);
+
+      // logout the largest slot and try set epoch length again
+      const zero = '0x0000000000000000000000000000000000000000';
+      data = await operator.contract.methods.setSlot(1, zero, zero).encodeABI();
+      await proxy.applyProposal(data, { from: accounts[2] });
+      await operator.setLastCompleteEpochForTest(2);
+      await operator.activate(1);
+      data = await operator.contract.methods.setEpochLength(1).encodeABI();
+      await proxy.applyProposal(data, { from: accounts[2] });
+      assert.equal(await operator.epochLength(), 1);
     });
   });
 

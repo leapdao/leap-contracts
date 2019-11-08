@@ -84,7 +84,20 @@ contract PoaOperator is Adminable {
     emit EpochLength(epochLength);
   }
 
+  function _isEmpty(Slot memory _slot) internal returns (bool) {
+    return (_slot.signer == address(0));
+  }
+
+  function _getLargestSlot() internal returns (uint256) {
+    uint256 slotId = epochLength;
+    do {
+      slotId--;
+    } while (_isEmpty(slots[slotId]));
+    return slotId;
+  }
+
   function setEpochLength(uint256 _epochLength) public ifAdmin {
+    require(_epochLength >= _getLargestSlot() + 1, "Epoch length cannot be less then biggest slot");
     epochLength = _epochLength;
     emit EpochLength(epochLength);
   }
