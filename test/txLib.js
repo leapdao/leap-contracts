@@ -62,8 +62,8 @@ function checkParse(rsp, txn) {
   // outputs
   for (let i = 0; i < txn.outputs.length; i++) {
     assert(equal(toInt(rsp.outs[i].value), txn.outputs[i].value));
-    assert.equal(toInt(rsp.outs[i].color), txn.outputs[i].color);
-    assert.equal(rsp.outs[i].owner, txn.outputs[i].address);
+    assert.equal(rsp.outs[i].color, txn.outputs[i].color);
+    assert.equal(rsp.outs[i].owner.toLowerCase(), txn.outputs[i].address.toLowerCase());
     assert.equal(rsp.outs[i].stateRoot, txn.outputs[i].isNST() ? txn.outputs[i].data : EMPTY); // storage root
   }
 }
