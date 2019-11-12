@@ -38,14 +38,14 @@ function checkParse(rsp, txn) {
   assert.equal(rsp.txType, txn.type);
   if (txn.type === Type.DEPOSIT) {
     // eslint-disable-next-line no-param-reassign
-    txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
+    txn.inputs = [{prevout: { hash: fromInt(txn.options.depositId), index: 0 }}];
   }
   assert.equal(rsp.ins.length, txn.inputs.length);
   assert.equal(rsp.outs.length, txn.outputs.length);
   // inputs
   for (let i = 0; i < txn.inputs.length; i++) {
     assert.equal(rsp.ins[i].outpoint[0], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
-    assert.equal(toInt(rsp.ins[i].outpoint[1]), i); // output position
+    assert.equal(toInt(rsp.ins[i].outpoint[1]), txn.inputs[i].prevout.index); // output position
     if (txn.type === Type.TRANSFER) {
       assert.equal(rsp.ins[i].r, `0x${txn.inputs[i].r.toString('hex')}`);
       assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
