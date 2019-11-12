@@ -51,12 +51,18 @@ function checkParse(rsp, txn) {
       assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
       assert.equal(rsp.ins[i].v, txn.inputs[i].v);
     } else if (txn.type === Type.SPEND_COND) {
-      assert.equal(rsp.ins[i].msgData, `0x${txn.inputs[i].msgData.toString('hex')}`);
-      assert.equal(rsp.ins[i].script, `0x${txn.inputs[i].script.toString('hex')}`);
+      if (i === 0) {
+        assert.equal(rsp.ins[i].msgData, `0x${txn.inputs[i].msgData.toString('hex')}`);
+        assert.equal(rsp.ins[i].script, `0x${txn.inputs[i].script.toString('hex')}`);
+      } else {
+        assert.equal(rsp.ins[i].r, `0x${txn.inputs[i].r.toString('hex')}`);
+        assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
+        assert.equal(rsp.ins[i].v, txn.inputs[i].v);        
+      }
     } else {
       assert.equal(rsp.ins[i].r, EMPTY);
       assert.equal(rsp.ins[i].s, EMPTY);
-      assert.equal(toInt(rsp.ins[i].v), 0);
+      assert.equal(rsp.ins[i].v, 0);
     }
   }
   // outputs
@@ -269,16 +275,12 @@ contract('TxLib', (accounts) => {
             prevout: new Outpoint(prevTx, 0),
             script: '0x123456',
           }),
-          new Input({
-            prevout: new Outpoint(prevTx, 1),
-            script: '0x7890ab',
-          }),
+          new Input(new Outpoint(prevTx, 1)),
         ],[
           new Output(value / 2, alice, color),
           new Output(value / 2, bob, color),
-        ]);
+        ]).signAll(alicePriv);
         condition.inputs[0].setMsgData('0xabcdef');
-        condition.inputs[1].setMsgData('0xfedcba');
 
         const block = new Block(32);
         block.addTx(condition);
