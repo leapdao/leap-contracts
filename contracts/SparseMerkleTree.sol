@@ -29,7 +29,12 @@ contract SparseMerkleTree {
     return (calculatedRoot == root);
   }
 
-  function write(uint160 key, bytes32 prevLeaf, bytes memory proof, bytes32 newLeaf) public {
+  function write(
+    uint160 key,
+    bytes32 prevLeaf,
+    bytes memory proof,
+    bytes32 newLeaf
+  ) public {
     bytes32 calculatedRoot = getRoot(prevLeaf, key, proof);
     require(calculatedRoot == root, "update proof not valid");
     root = getRoot(newLeaf, key, proof);

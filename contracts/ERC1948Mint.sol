@@ -12,6 +12,13 @@ contract ERC1948Mint is IERC1948, ERC721 {
     _;
   }
 
+  function writeDataByReceipt(uint256 tokenId, bytes32 newData, bytes calldata sig) external {
+    address signer = _ecRecoverPersonal(data[tokenId], newData, sig);
+    require(signer == ownerOf(tokenId), "signer not matching");
+    emit DataUpdated(tokenId, data[tokenId], newData);
+    data[tokenId] = newData;
+  }
+
   function mint(address _to, uint256 _tokenId, bytes32 _newData) public onlyMinter {
     super._mint(_to, _tokenId);
 
@@ -67,13 +74,7 @@ contract ERC1948Mint is IERC1948, ERC721 {
       return address(0);
     }
     bytes32 sigHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n64", _before, _after));
-    return ecrecover(sigHash, v, r, s);
+    return ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow
   }
 
-  function writeDataByReceipt(uint256 tokenId, bytes32 newData, bytes calldata sig) external {
-    address signer = _ecRecoverPersonal(data[tokenId], newData, sig);
-    require(signer == ownerOf(tokenId), "signer not matching");
-    emit DataUpdated(tokenId, data[tokenId], newData);
-    data[tokenId] = newData;
-  }
 }

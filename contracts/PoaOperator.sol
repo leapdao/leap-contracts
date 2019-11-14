@@ -84,18 +84,6 @@ contract PoaOperator is Adminable {
     emit EpochLength(epochLength);
   }
 
-  function _isEmpty(Slot memory _slot) internal returns (bool) {
-    return (_slot.signer == address(0));
-  }
-
-  function _getLargestSlot() internal returns (uint256) {
-    uint256 slotId = epochLength;
-    do {
-      slotId--;
-    } while (_isEmpty(slots[slotId]));
-    return slotId;
-  }
-
   function setEpochLength(uint256 _epochLength) public ifAdmin {
     require(_epochLength >= _getLargestSlot() + 1, "Epoch length cannot be less then biggest slot");
     epochLength = _epochLength;
@@ -176,6 +164,145 @@ contract PoaOperator is Adminable {
     bytes32 periodRoot
   );
 
+  function submitPeriodWithCas(
+    uint256 _slotId,
+    bytes32 _prevHash,
+    bytes32 _blocksRoot,
+    bytes32 _casBitmap
+  ) public {
+    require(countSigs(uint256(_casBitmap), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
+    _submitPeriod(_slotId, _prevHash, _blocksRoot, _casBitmap); // solium-disable-line arg-overflow
+  }
+
+  function submitPeriod(
+    uint256 _slotId,
+    bytes32 _prevHash,
+    bytes32 _blocksRoot
+  ) public {
+    _submitPeriod(_slotId, _prevHash, _blocksRoot, 0); // solium-disable-line arg-overflow
+  }
+
+  struct Challenge {
+    address payable challenger;
+    uint32 endTime;
+    address slotSigner;
+  }
+
+  mapping(bytes32 => mapping(uint256 => Challenge)) challenges;
+
+  function getChallenge(bytes32 _period, uint256 _slotId) public view returns (address, uint256, address) {
+    Challenge memory chal = challenges[_period][_slotId];
+    return (chal.challenger, chal.endTime, chal.slotSigner);
+  }
+
+  uint256 public casChallengeDuration;
+
+  function setCasChallengeDuration(uint256 _casChallengeDuration) public ifAdmin {
+    casChallengeDuration = _casChallengeDuration;
+  }
+
+  // casProof lookes like this:
+  // [casBitmap, validatorRoot, consensusRoot]
+  function challengeCas(
+    bytes32 _casBitmap,
+    bytes32 _validatorRoot,
+    bytes32 _consensusRoot,
+    uint256 _slotId
+  ) public payable {
+
+    bytes32 periodRoot;
+    // casRoot
+    assembly {
+      mstore(0, _casBitmap)
+      mstore(0x20, _validatorRoot)
+      periodRoot := keccak256(0, 0x40)
+    }
+    // periodRoot
+    assembly {
+      mstore(0, _consensusRoot)
+      mstore(0x20, periodRoot)
+      periodRoot := keccak256(0, 0x40)
+    }
+
+    require(msg.value == vault.exitStake(), "invalid challenge stake");
+
+    uint256 periodTime;
+    (,periodTime,,) = bridge.periods(periodRoot);
+    // check periodRoot
+    require(periodTime > 0, "period does not exist");
+    // check slotId
+    require(_slotId < epochLength, "slotId too high");
+    // check that sig was actually 1
+    require(uint8(uint256(_casBitmap) >> (256 - _slotId)) & 0x01 == 1, "challenged sig not claimed");
+    // check that challenge doesn't exist yet
+    require(challenges[periodRoot][_slotId].endTime == 0, "challenge already in progress");
+    // don't start challenges on super old periods
+    require(periodTime >= uint32(now - casChallengeDuration), "period too old");
+    // create challenge object
+    challenges[periodRoot][_slotId] = Challenge({
+      challenger: msg.sender,
+      endTime: uint32(now + casChallengeDuration),
+      slotSigner: slots[_slotId].signer
+    });
+  }
+
+  function respondCas(
+    bytes32 _consensusRoot,
+    bytes32 _casRoot,
+    uint256 _slotId,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s,
+    address _msgSender
+  ) public {
+    bytes32 periodRoot;
+    assembly {
+      mstore(0, _consensusRoot)
+      mstore(0x20, _casRoot)
+      periodRoot := keccak256(0, 0x40)
+    }
+    // check that challenge exists
+    require(challenges[periodRoot][_slotId].endTime != 0, "challenge does not exist");
+    // formally correct, but not desired
+    // require(now < challenges[_period][_slotId].endTime, "already expired");
+    // check that signature matches
+    require(
+      // solium-disable-next-line arg-overflow
+      ecrecover(_consensusRoot, _v, _r, _s) == challenges[periodRoot][_slotId].slotSigner,
+      "signature does not match"
+    );
+    // delete period Root
+
+    delete challenges[periodRoot][_slotId];
+    // dispense reward
+    require(msg.sender == _msgSender, "no frontrunning plz");
+    msg.sender.transfer(vault.exitStake());
+  }
+
+  function timeoutCas(bytes32 _period, uint256 _slotId) public {
+    Challenge memory chal = challenges[_period][_slotId];
+    // check that challenge exists
+    require(chal.endTime > 0, "challenge does not exist");
+    // check time
+    require(now >= chal.endTime, "time not expired yet");
+    // transfer funds
+    chal.challenger.transfer(vault.exitStake());
+    // delete period
+    bridge.deletePeriod(_period);
+  }
+
+  function _isEmpty(Slot memory _slot) internal returns (bool) {
+    return (_slot.signer == address(0));
+  }
+
+  function _getLargestSlot() internal returns (uint256) {
+    uint256 slotId = epochLength;
+    do {
+      slotId--;
+    } while (_isEmpty(slots[slotId]));
+    return slotId;
+  }
+
   function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
     for (uint i = 256; i >= 256 - _epochLength; i--) {
       count += uint8(_sigs >> i) & 0x01;
@@ -192,7 +319,12 @@ contract PoaOperator is Adminable {
     return (_epochLength * 2 / 3) + ((_epochLength * 2 % 3) == 0 ? 0 : 1);
   }
 
-  function _submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _casBitmap) internal {
+  function _submitPeriod(
+    uint256 _slotId,
+    bytes32 _prevHash,
+    bytes32 _blocksRoot,
+    bytes32 _casBitmap
+  ) internal {
     require(_slotId < epochLength, "Incorrect slotId");
     Slot storage slot = slots[_slotId];
     require(slot.signer == msg.sender, "not submitted by signerAddr");
@@ -245,121 +377,6 @@ contract PoaOperator is Adminable {
       _casBitmap,
       hashRoot
     );
-  }
-
-  function submitPeriodWithCas(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot, bytes32 _casBitmap) public {
-    require(countSigs(uint256(_casBitmap), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
-    _submitPeriod(_slotId, _prevHash, _blocksRoot, _casBitmap);
-  }
-
-  function submitPeriod(uint256 _slotId, bytes32 _prevHash, bytes32 _blocksRoot) public {
-    _submitPeriod(_slotId, _prevHash, _blocksRoot, 0);
-  }
-
-  struct Challenge {
-    address payable challenger;
-    uint32 endTime;
-    address slotSigner;
-  }
-
-  mapping(bytes32 => mapping(uint256 => Challenge)) challenges;
-
-  function getChallenge(bytes32 _period, uint256 _slotId) public view returns (address, uint256, address) {
-    Challenge memory chal = challenges[_period][_slotId];
-    return (chal.challenger, chal.endTime, chal.slotSigner);
-  }
-
-  uint256 public casChallengeDuration;
-
-  function setCasChallengeDuration(uint256 _casChallengeDuration) public ifAdmin {
-    casChallengeDuration = _casChallengeDuration;
-  }
-
-  // casProof lookes like this:
-  // [casBitmap, validatorRoot, consensusRoot]
-  function challengeCas(
-    bytes32 _casBitmap,
-    bytes32 _validatorRoot, 
-    bytes32 _consensusRoot,
-    uint256 _slotId) public payable {
-
-    bytes32 periodRoot;
-    // casRoot
-    assembly {
-      mstore(0, _casBitmap)
-      mstore(0x20, _validatorRoot)
-      periodRoot := keccak256(0, 0x40)
-    }
-    // periodRoot
-    assembly {
-      mstore(0, _consensusRoot)
-      mstore(0x20, periodRoot)
-      periodRoot := keccak256(0, 0x40)
-    }
-
-    require(msg.value == vault.exitStake(), "invalid challenge stake");
-
-    uint256 periodTime;
-    (,periodTime,,) = bridge.periods(periodRoot);
-    // check periodRoot
-    require(periodTime > 0, "period does not exist");
-    // check slotId
-    require(_slotId < epochLength, "slotId too high");
-    // check that sig was actually 1
-    require(uint8(uint256(_casBitmap) >> (256 - _slotId)) & 0x01 == 1, "challenged sig not claimed");
-    // check that challenge doesn't exist yet
-    require(challenges[periodRoot][_slotId].endTime == 0, "challenge already in progress");
-    // don't start challenges on super old periods
-    require(periodTime >= uint32(now - casChallengeDuration), "period too old");
-    // create challenge object
-    challenges[periodRoot][_slotId] = Challenge({
-      challenger: msg.sender,
-      endTime: uint32(now + casChallengeDuration),
-      slotSigner: slots[_slotId].signer
-    });
-  }
-
-  function respondCas(
-    bytes32 _consensusRoot,
-    bytes32 _casRoot,
-    uint256 _slotId,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s,
-    address _msgSender) public {
-    bytes32 periodRoot;
-    assembly {
-      mstore(0, _consensusRoot)
-      mstore(0x20, _casRoot)
-      periodRoot := keccak256(0, 0x40)
-    }
-    // check that challenge exists
-    require(challenges[periodRoot][_slotId].endTime != 0, "challenge does not exist");
-    // formally correct, but not desired
-    // require(now < challenges[_period][_slotId].endTime, "already expired");
-    // check that signature matches
-    require(
-      ecrecover(_consensusRoot, _v, _r, _s) == challenges[periodRoot][_slotId].slotSigner,
-      "signature does not match"
-    );
-    // delete period Root
-
-    delete challenges[periodRoot][_slotId];
-    // dispense reward
-    require(msg.sender == _msgSender, "no frontrunning plz");
-    msg.sender.transfer(vault.exitStake());
-  }
-
-  function timeoutCas(bytes32 _period, uint256 _slotId) public {
-    Challenge memory chal = challenges[_period][_slotId];
-    // check that challenge exists
-    require(chal.endTime > 0, "challenge does not exist");
-    // check time
-    require(now >= chal.endTime, "time not expired yet");
-    // transfer funds
-    chal.challenger.transfer(vault.exitStake());
-    // delete period
-    bridge.deletePeriod(_period);
   }
 
   // solium-disable-next-line mixedcase

@@ -13,13 +13,15 @@ import "../Bridge.sol";
 
 /**
  * @title BridgeProxy
- * @dev Proxy for Bridge contract upgradeability. Should be used to 
+ * @dev Proxy for Bridge contract upgradeability. Should be used to
  * communicate with Bridge contract
  */
 contract BridgeProxy is AdminableProxy {
 
-  constructor(Bridge _implementation, bytes memory _data) 
-    AdminableProxy(address(_implementation), _data) public payable {
+  constructor(
+    Bridge _implementation,
+    bytes memory _data
+  ) AdminableProxy(address(_implementation), _data) public payable {
   }
 
 }

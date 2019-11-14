@@ -25,15 +25,6 @@ contract ERC1948 is IERC1948, ERC721, ERC721Enumerable, MinterRole {
 
   mapping(uint256 => bytes32) data;
 
-  function mint(address to, uint256 tokenId) public onlyMinter {
-    super._mint(to, tokenId);
-  }
-
-  function burn(uint256 tokenId) public {
-    super._burn(ownerOf(tokenId), tokenId);
-    delete(data[tokenId]);
-  }
-
   /**
    * @dev See `IERC1948.readData`.
    *
@@ -59,6 +50,21 @@ contract ERC1948 is IERC1948, ERC721, ERC721Enumerable, MinterRole {
     data[tokenId] = newData;
   }
 
+  function writeDataByReceipt(uint256 tokenId, bytes32 newData, bytes calldata sig) external {
+    address signer = _ecRecoverPersonal(data[tokenId], newData, sig);
+    require(signer == ownerOf(tokenId), "signer not matching");
+    emit DataUpdated(tokenId, data[tokenId], newData);
+    data[tokenId] = newData;
+  }
+
+  function mint(address to, uint256 tokenId) public onlyMinter {
+    super._mint(to, tokenId);
+  }
+
+  function burn(uint256 tokenId) public {
+    super._burn(ownerOf(tokenId), tokenId);
+    delete(data[tokenId]);
+  }
 
   function _ecRecoverPersonal(bytes32 _before, bytes32 _after, bytes memory signature) internal pure returns (address) {
     // Check the signature length
@@ -97,14 +103,7 @@ contract ERC1948 is IERC1948, ERC721, ERC721Enumerable, MinterRole {
       return address(0);
     }
     bytes32 sigHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n64", _before, _after));
-    return ecrecover(sigHash, v, r, s);
-  }
-
-  function writeDataByReceipt(uint256 tokenId, bytes32 newData, bytes calldata sig) external {
-    address signer = _ecRecoverPersonal(data[tokenId], newData, sig);
-    require(signer == ownerOf(tokenId), "signer not matching");
-    emit DataUpdated(tokenId, data[tokenId], newData);
-    data[tokenId] = newData;
+    return ecrecover(sigHash, v, r, s); // solium-disable-line arg-overflow
   }
 
 }

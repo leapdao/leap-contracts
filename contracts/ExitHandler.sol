@@ -141,7 +141,6 @@ contract ExitHandler is IExitHandler, DepositHandler {
     require(exitMapping[utxoId].amount == 0, "The exit for UTXO has already been started");
     require(!exitMapping[utxoId].finalized, "The exit for UTXO has already been finalized");
 
-    
     if (_youngestInputProof.length > 0) {
       // check youngest input tx inclusion in the root chain block
       bytes32 inputTxHash;
@@ -150,14 +149,14 @@ contract ExitHandler is IExitHandler, DepositHandler {
         inputTxHash == exitingTx.ins[_inputIndex].outpoint.hash,
         "Input from the proof is not referenced in exiting tx"
       );
-      
+
       if (isNft(out.color)) {
         priority = (nftExitCounter << 128) | uint128(uint256(utxoId));
         nftExitCounter++;
       } else if (isNST(out.color)) {
         priority = (nstExitCounter << 128) | uint128(uint256(utxoId));
         nstExitCounter++;
-      } else {      
+      } else {
         priority = getERC20ExitPriority(timestamp, utxoId, pr.txPos);
       }
     } else {
@@ -250,7 +249,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
     require(tokens[_color].currentSize > 0, "Queue empty for color.");
 
-    for (uint i = 0; i<20; i++) {
+    for (uint i = 0; i < 20; i++) {
       // if queue is empty or top exit cannot be exited yet, stop
       if (exitableAt > block.timestamp) {
         return;
@@ -354,7 +353,7 @@ contract ExitHandler is IExitHandler, DepositHandler {
           txn.ins[_inputIndex].s
         );
         require(exitMapping[utxoId].owner == signer, "signer does not match");
-      } else if (txn.txType == TxLib.TxType.SpendCond) {
+      } else if (txn.txType == TxLib.TxType.SpendCond) { // solium-disable-line whitespace
         // check that hash of contract matches output address
         // just have the pass through
         // later we will check solEVM Enforcer here.

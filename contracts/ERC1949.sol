@@ -24,6 +24,12 @@ contract ERC1949 is IERC1949, ERC1948, ERC721Metadata {
     // solhint-disable-previous-line no-empty-blocks
   }
 
+  function breed(uint256 tokenId, address to, bytes32 tokenData) external onlyDelegateOwner(to) {
+    super._mint(to, tokenId);
+    emit DataUpdated(tokenId, data[tokenId], tokenData);
+    data[tokenId] = tokenData;
+  }
+
   /**
    * @dev mints a new delegate
    * @param _to The token to read the data off.
@@ -44,12 +50,6 @@ contract ERC1949 is IERC1949, ERC1948, ERC721Metadata {
       "sender not queen owner nor approved"
     );
     _;
-  }
-
-  function breed(uint256 tokenId, address to, bytes32 tokenData) external onlyDelegateOwner(to) {
-    super._mint(to, tokenId);
-    emit DataUpdated(tokenId, data[tokenId], tokenData);
-    data[tokenId] = tokenData;
   }
 
 }

@@ -4,21 +4,16 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-
 pragma solidity 0.5.2;
-
 library TxLib {
-
   uint constant internal WORD_SIZE = 32;
   uint constant internal ONES = ~uint(0);
   enum TxType { None0, None1, Deposit, Transfer, None4, None5,
   None6, None7, None8, None9, None10, None11, None12, SpendCond }
-
   struct Outpoint {
     bytes32 hash;
     uint8 pos;
   }
-
   struct Input {
     Outpoint outpoint;
     bytes32 r;
@@ -27,20 +22,17 @@ library TxLib {
     bytes script;
     bytes msgData;
   }
-
   struct Output {
     uint256 value;
     uint16 color;
     address owner;
     bytes32 stateRoot;
   }
-
   struct Tx {
     TxType txType;
     Input[] ins;
     Output[] outs;
   }
-
   function parseInput(
     TxType _type, bytes memory _txData, uint256 _pos, uint256 offset, Input[] memory _ins
   ) internal pure returns (uint256 newOffset) {
@@ -69,31 +61,29 @@ library TxLib {
     if (_type == TxType.SpendCond) {
       uint16 len;
       assembly {
-        len := mload(add(add(offset, 35), _txData)) 
+        len := mload(add(add(offset, 35), _txData))
       }
       // read msgData
-      data = new bytes(len);  
+      data = new bytes(len);
       uint src;
       uint dest;
-      assembly {  
-        src := add(add(add(offset, 35), 0x20), _txData) 
-        dest := add(data, 0x20) 
-      }
-      memcopy(src, dest, len);  
-      input.msgData = data;  
-      newOffset = offset + 37 + len;
-
       assembly {
-        len := mload(add(newOffset, _txData)) 
+        src := add(add(add(offset, 35), 0x20), _txData)
+        dest := add(data, 0x20)
       }
-
+      memcopy(src, dest, len);
+      input.msgData = data;
+      newOffset = offset + 37 + len;
+      assembly {
+        len := mload(add(newOffset, _txData))
+      }
       // read script
       data = new bytes(len);
-      assembly {  
-        src := add(add(add(newOffset, 0), 0x20), _txData) 
-        dest := add(data, 0x20) 
+      assembly {
+        src := add(add(add(newOffset, 0), 0x20), _txData)
+        dest := add(data, 0x20)
       }
-      memcopy(src, dest, len);  
+      memcopy(src, dest, len);
       input.script = data;
       newOffset = newOffset + len;
     }
@@ -113,7 +103,6 @@ library TxLib {
     }
     _ins[_pos] = input;
   }
-
   // Copies 'len' bytes from 'srcPtr' to 'destPtr'.
   // NOTE: This function does not check if memory is allocated, it only copies the bytes.
   function memcopy(uint srcPtr, uint destPtr, uint len) internal pure {
@@ -134,7 +123,6 @@ library TxLib {
       mstore(nDest, or(and(mload(nSrc), mask), and(mload(nDest), not(mask))))
     }
   }
-
   function parseOutput(
     bytes memory _txData, uint256 _pos, uint256 offset, Output[] memory _outs
   ) internal pure returns (uint256) {
@@ -142,17 +130,13 @@ library TxLib {
     uint16 color;
     address owner;
     bytes32 data;
-
     assembly {
       offset := add(offset, 32)
       value := mload(add(offset, _txData))
-
       offset := add(offset, 2)
       color := and(mload(add(offset, _txData)), 0xffff)
-
       offset := add(offset, 20)
       owner := mload(add(offset, _txData))
-
       // NST - data
       // (2 ** 15) + (2 ** 14);
       if gt(color, 49152) {
@@ -160,13 +144,10 @@ library TxLib {
         data := mload(add(offset, _txData))
       }
     }
-
     Output memory output = Output(value, color, owner, data);  // solium-disable-line arg-overflow
     _outs[_pos] = output;
-
     return offset;
   }
-
   function parseTx(bytes memory _txData) internal pure returns (Tx memory txn) {
     // read type
     TxType txType;
@@ -206,7 +187,6 @@ library TxLib {
     }
     txn = Tx(txType, ins, outs);
   }
-
   function getSigHash(bytes memory _txData) internal pure returns (bytes32 sigHash) {
     uint256 a;
     assembly {
@@ -244,10 +224,8 @@ library TxLib {
           mstore(add(sigData, i), mload(add(_txData, i)))
         }
     }
-
     return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", uint2str(_txData.length), sigData));
   }
-
   // solium-disable-next-line security/no-assign-params
   function getMerkleRoot(
     bytes32 _leaf, uint256 _index, uint256 _offset, bytes32[] memory _proof
@@ -272,14 +250,12 @@ library TxLib {
     }
     return _leaf;
   }
-
   //validate that transaction is included to the period (merkle proof)
   function validateProof(
     uint256 _cdOffset, bytes32[] memory _proof
   ) internal pure returns (uint64 txPos, bytes32 txHash, bytes memory txData) {
     uint256 offset = uint8(uint256(_proof[1] >> 248));
     uint256 txLength = uint16(uint256(_proof[1] >> 224));
-
     txData = new bytes(txLength);
     assembly {
       calldatacopy(add(txData, 0x20), add(68, add(offset, _cdOffset)), txLength)
@@ -287,14 +263,13 @@ library TxLib {
     txHash = keccak256(txData);
     txPos = uint64(uint256(_proof[1] >> 160));
     bytes32 root = getMerkleRoot(
-      txHash, 
-      txPos, 
+      txHash,
+      txPos,
       uint8(uint256(_proof[1] >> 240)),
       _proof
-    ); 
+    );
     require(root == _proof[0]);
   }
-
   function recoverTxSigner(uint256 offset, bytes32[] memory _proof) internal pure returns (address dest) {
     uint16 txLength = uint16(uint256(_proof[1] >> 224));
     bytes memory txData = new bytes(txLength);
@@ -310,7 +285,6 @@ library TxLib {
     }
     dest = ecrecover(getSigHash(txData), v, r, s); // solium-disable-line arg-overflow
   }
-
   // https://github.com/oraclize/ethereum-api/blob/master/oraclizeAPI_0.5.sol#L886
   // solium-disable-next-line security/no-assign-params
   function uint2str(uint _i) internal pure returns (string memory _uintAsString) {

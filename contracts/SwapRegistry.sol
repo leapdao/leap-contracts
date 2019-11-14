@@ -24,7 +24,7 @@ contract SwapRegistry is Adminable {
   uint256 constant maxTax = 1000; // 100%
   uint256 taxRate; // as perMil (1000 == 100%, 1 == 0.1%)
   uint256 constant inflationFactor = 10 ** 15;
-  uint256 constant maxInflation = 2637549827; // the x from (1 + x*10^-18)^(30 * 24 * 363) = 2  
+  uint256 constant maxInflation = 2637549827; // the x from (1 + x*10^-18)^(30 * 24 * 363) = 2
   uint256 inflationRate; // between 0 and maxInflation/inflationFactor
   uint256 constant poaSupplyTarget = 7000000 * 10 ** 18;
   uint256 poaReward;
@@ -86,7 +86,7 @@ contract SwapRegistry is Adminable {
     ERC20Mintable token = ERC20Mintable(vault.getTokenAddr(0));
     uint256 total = token.totalSupply();
     uint256 staked = token.balanceOf(bridge.operator());
-    
+
     // calculate reward according to:
     // https://ethresear.ch/t/riss-reflexive-inflation-through-staked-supply/3633
     uint256 reward = total.mul(inflationRate).div(inflationFactor);

@@ -36,6 +36,8 @@ contract MinGov is Ownable {
     size = 0;
   }
 
+  function () external payable {}
+
   function propose(address _subject, bytes memory _msgData) public onlyOwner {
     require(size < 5);
     proposals[first + size] = Proposal(
@@ -54,8 +56,6 @@ contract MinGov is Ownable {
     require(prop.canceled == false);
     prop.canceled = true;
   }
-
-  function () external payable {}
 
   function withdrawTax(address _token) public onlyOwner {
     if (_token == address(0)) {
@@ -108,10 +108,6 @@ contract MinGov is Ownable {
     require(AdminableProxy(subject).applyProposal(msgData), "setSlot call failed");
   }
 
-  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
-    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
-  }
-
   // proxy function to manage tokens without governance delay
   // token types: 0 = ERC20, 1 = ERC721, 2 = ERC1948
   function registerToken(address payable _subject, address _token, uint256 _type) public onlyOwner {
@@ -121,6 +117,10 @@ contract MinGov is Ownable {
       ),
       "registerToken call failed"
     );
+  }
+
+  function getSig(bytes memory _msgData) internal pure returns (bytes4) {
+    return bytes4(_msgData[3]) >> 24 | bytes4(_msgData[2]) >> 16 | bytes4(_msgData[1]) >> 8 | bytes4(_msgData[0]);
   }
 
 }
