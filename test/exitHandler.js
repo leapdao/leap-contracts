@@ -71,7 +71,7 @@ contract('ExitHandler', (accounts) => {
       depositTx = Tx.deposit(depositId, depositAmount.toNumber(), alice);
       transferTx = Tx.transfer(
         [new Input(new Outpoint(depositTx.hash(), 0))],
-        [new Output(50, bob), new Output(50, alice)]
+        [new Output(50, bob), new Output(40, alice), new Output(10, alice)]
       ).sign([alicePriv]);
     };
 
@@ -131,12 +131,37 @@ contract('ExitHandler', (accounts) => {
 
     describe('Start exit', async () => {
       it('Should allow to exit valid utxo', async () => {
-        const period = await submitNewPeriod([depositTx, transferTx]);
+        const period1 = await submitNewPeriod([depositTx, transferTx]);
+        
+        const youngerTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 1))],
+          [new Output(30, alice), new Output(10, alice)]
+        ).sign([alicePriv]);
 
-        const transferProof = period.proof(transferTx);
-        const outputIndex = 1;
-        const inputProof = period.proof(depositTx); // transferTx spends depositTx
-        const inputIndex = 0;
+        const period2 = await submitNewPeriod([youngerTx]);
+
+        const evenYoungerTx = Tx.transfer(
+          [
+            new Input(new Outpoint(transferTx.hash(), 2)),
+            new Input(new Outpoint(youngerTx.hash(), 0))
+          ],
+          [new Output(20, bob), new Output(20, alice)]
+        ).sign([alicePriv, alicePriv]);
+
+        const period3 = await submitNewPeriod([evenYoungerTx]);
+        
+        // exit with younger input 0
+        let transferProof = period2.proof(youngerTx);
+        let inputProof = period1.proof(transferTx);
+        let inputIndex = 0;
+        let outputIndex = 1;
+        await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
+        
+        // exit with younger input 1
+        transferProof = period3.proof(evenYoungerTx);
+        inputProof = period2.proof(youngerTx);
+        inputIndex = 1;
+        outputIndex = 1;
         await exitHandler.startExit(inputProof, transferProof, outputIndex, inputIndex, {value: exitStake});
 
         const aliceBalanceBefore = await nativeToken.balanceOf(alice);
@@ -148,7 +173,7 @@ contract('ExitHandler', (accounts) => {
 
         const aliceBalanceAfter = await nativeToken.balanceOf(alice);
 
-        assert(aliceBalanceBefore.add(new BN(50)).eq(aliceBalanceAfter));
+        assert(aliceBalanceBefore.add(new BN(30)).eq(aliceBalanceAfter));
       });
 
       it('Should not allow to exit utxo from deleted period', async () => {

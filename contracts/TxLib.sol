@@ -192,7 +192,9 @@ library TxLib {
     Input[] memory ins = new Input[](a);
     uint256 offset = 2;
     for (uint i = 0; i < ins.length; i++) {
-      offset = parseInput(txType, _txData, i, offset, ins); // solium-disable-line arg-overflow
+      offset = parseInput(
+        i == 0 ? txType: TxType.Transfer, _txData, i, offset, ins // solium-disable-line arg-overflow
+      ); 
     }
     assembly {
         a := mload(add(0x21, _txData))

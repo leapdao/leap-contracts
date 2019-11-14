@@ -38,32 +38,38 @@ function checkParse(rsp, txn) {
   assert.equal(rsp.txType, txn.type);
   if (txn.type === Type.DEPOSIT) {
     // eslint-disable-next-line no-param-reassign
-    txn.inputs = [{prevout: {hash: fromInt(txn.options.depositId)}}];
+    txn.inputs = [{prevout: { hash: fromInt(txn.options.depositId), index: 0 }}];
   }
   assert.equal(rsp.ins.length, txn.inputs.length);
   assert.equal(rsp.outs.length, txn.outputs.length);
   // inputs
   for (let i = 0; i < txn.inputs.length; i++) {
     assert.equal(rsp.ins[i].outpoint[0], `0x${txn.inputs[i].prevout.hash.toString('hex')}`);
-    assert.equal(toInt(rsp.ins[i].outpoint[1]), i); // output position
+    assert.equal(toInt(rsp.ins[i].outpoint[1]), txn.inputs[i].prevout.index); // output position
     if (txn.type === Type.TRANSFER) {
       assert.equal(rsp.ins[i].r, `0x${txn.inputs[i].r.toString('hex')}`);
       assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
       assert.equal(rsp.ins[i].v, txn.inputs[i].v);
     } else if (txn.type === Type.SPEND_COND) {
-      assert.equal(rsp.ins[i].msgData, `0x${txn.inputs[i].msgData.toString('hex')}`);
-      assert.equal(rsp.ins[i].script, `0x${txn.inputs[i].script.toString('hex')}`);
+      if (i === 0) {
+        assert.equal(rsp.ins[i].msgData, `0x${txn.inputs[i].msgData.toString('hex')}`);
+        assert.equal(rsp.ins[i].script, `0x${txn.inputs[i].script.toString('hex')}`);
+      } else {
+        assert.equal(rsp.ins[i].r, `0x${txn.inputs[i].r.toString('hex')}`);
+        assert.equal(rsp.ins[i].s, `0x${txn.inputs[i].s.toString('hex')}`);
+        assert.equal(rsp.ins[i].v, txn.inputs[i].v);        
+      }
     } else {
       assert.equal(rsp.ins[i].r, EMPTY);
       assert.equal(rsp.ins[i].s, EMPTY);
-      assert.equal(toInt(rsp.ins[i].v), 0);
+      assert.equal(rsp.ins[i].v, 0);
     }
   }
   // outputs
   for (let i = 0; i < txn.outputs.length; i++) {
     assert(equal(toInt(rsp.outs[i].value), txn.outputs[i].value));
-    assert.equal(toInt(rsp.outs[i].color), txn.outputs[i].color);
-    assert.equal(rsp.outs[i].owner, txn.outputs[i].address);
+    assert.equal(rsp.outs[i].color, txn.outputs[i].color);
+    assert.equal(rsp.outs[i].owner.toLowerCase(), txn.outputs[i].address.toLowerCase());
     assert.equal(rsp.outs[i].stateRoot, txn.outputs[i].isNST() ? txn.outputs[i].data : EMPTY); // storage root
   }
 }
@@ -269,16 +275,12 @@ contract('TxLib', (accounts) => {
             prevout: new Outpoint(prevTx, 0),
             script: '0x123456',
           }),
-          new Input({
-            prevout: new Outpoint(prevTx, 1),
-            script: '0x7890ab',
-          }),
+          new Input(new Outpoint(prevTx, 1)),
         ],[
           new Output(value / 2, alice, color),
           new Output(value / 2, bob, color),
-        ]);
+        ]).signAll(alicePriv);
         condition.inputs[0].setMsgData('0xabcdef');
-        condition.inputs[1].setMsgData('0xfedcba');
 
         const block = new Block(32);
         block.addTx(condition);
