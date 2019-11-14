@@ -13,13 +13,15 @@ import "../PosOperator.sol";
 
 /**
  * @title OperatorProxy
- * @dev Proxy for PosOperator/PoaOperator contract upgradeability. Should be used to 
+ * @dev Proxy for PosOperator/PoaOperator contract upgradeability. Should be used to
  * communicate with PosOperator/PoaOperator contract
  */
 contract OperatorProxy is AdminableProxy {
 
-  constructor(PosOperator _implementation, bytes memory _data) 
-    AdminableProxy(address(_implementation), _data) public payable {
+  constructor(
+    PosOperator _implementation,
+    bytes memory _data
+  ) AdminableProxy(address(_implementation), _data) public payable {
   }
 
 }

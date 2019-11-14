@@ -35,7 +35,7 @@ contract Vault is Adminable {
 
   function initialize(Bridge _bridge) public initializer {
     bridge = _bridge;
-  } 
+  }
 
   function getTokenAddr(uint16 _color) public view returns (address) {
     return address(tokens[_color].addr);

@@ -53,5 +53,5 @@ contract Initializable {
   }
 
   // Reserved storage space to allow for layout changes in the future.
-  uint256[50] private ______gap;
+  uint256[50] private ______gap; // solium-disable-line mixedcase
 }

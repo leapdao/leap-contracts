@@ -7,7 +7,7 @@
  */
 
 pragma solidity 0.5.2;
-pragma experimental ABIEncoderV2;
+pragma experimental ABIEncoderV2; // solium-disable-line no-experimental
 import "../TxLib.sol";
 
 /**

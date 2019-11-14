@@ -20,9 +20,9 @@ contract SpaceDustNFT is ERC721Full, MinterRole {
   }
 
   function mint(
-    address _to, 
-    uint32 _size, 
-    bool _isGlowing, 
+    address _to,
+    uint32 _size,
+    bool _isGlowing,
     uint8 _color
   ) public onlyMinter {
     require(_size > 0);

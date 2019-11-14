@@ -5,7 +5,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 pragma solidity 0.5.2;
-pragma experimental ABIEncoderV2;
+pragma experimental ABIEncoderV2; // solium-disable-line no-experimental
 
 
 import "../misc/IColony.sol";
@@ -23,6 +23,7 @@ contract Colony is IColony {
     uint256 _domainId,
     uint256 _skillId) external returns (uint256 paymentId) {
     uint256[] memory skills;
+    // solium-disable-next-line arg-overflow
     Payment memory payment = Payment(msg.sender, false, 1, 1, skills);
     paymentId = payments.length++;
     payments[paymentId] = payment;

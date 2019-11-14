@@ -17,7 +17,7 @@ contract ERC1949Breed is ERC1948Mint {
     require(counter < 4294967296, "queenId too high");  // 2 ^ 32 = 4294967296
     writeData(_queenId, bytes32(counter + 1));
     uint256 newId = uint256(keccak256(abi.encodePacked(_queenId, counter)));
-    
+
     super._mint(_to, newId);
     emit DataUpdated(newId, data[newId], _workerData);
     data[newId] = _workerData;

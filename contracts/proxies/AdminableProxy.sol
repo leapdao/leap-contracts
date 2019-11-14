@@ -24,8 +24,10 @@ contract AdminableProxy is AdminUpgradeabilityProxy {
   /**
    * Contract constructor.
    */
-  constructor(address _implementation, bytes memory _data) 
-  AdminUpgradeabilityProxy(_implementation, _data) public payable {
+  constructor(
+    address _implementation,
+    bytes memory _data
+  ) AdminUpgradeabilityProxy(_implementation, _data) public payable {
   }
 
   /**

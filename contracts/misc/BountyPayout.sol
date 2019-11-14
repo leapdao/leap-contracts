@@ -5,7 +5,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 pragma solidity 0.5.2;
-pragma experimental ABIEncoderV2;
+pragma experimental ABIEncoderV2; // solium-disable-line no-experimental
 
 
 import "./IColony.sol";
@@ -42,83 +42,7 @@ contract BountyPayout is WhitelistedRole {
     leapAddr = _leapAddr;
   }
 
-  function _isRepOnly(uint256 amount) internal returns (bool) {
-    return ((amount & 0x01) == 1);
-  }
-
-  function _makeColonyPayment(address payable _worker, uint256 _amount) internal returns (uint256) {
-
-    IColony colony = IColony(colonyAddr);
-    // Add a new payment
-    uint256 paymentId = colony.addPayment(
-      PERMISSION_DOMAIN_ID,
-      CHILD_SKILL_INDEX,
-      _worker,
-      leapAddr,
-      _amount,
-      DOMAIN_ID,
-      SKILL_ID
-    );
-    IColony.Payment memory payment = colony.getPayment(paymentId);
-
-    // Fund the payment
-    colony.moveFundsBetweenPots(
-      1, // Root domain always 1
-      0, // Not used, this extension contract must have funding permission in the root for this function to work
-      CHILD_SKILL_INDEX,
-      1, // Root domain funding pot is always 1
-      payment.fundingPotId,
-      _amount,
-      leapAddr
-    );
-    colony.finalizePayment(PERMISSION_DOMAIN_ID, CHILD_SKILL_INDEX, paymentId);
-
-    // Claim payout on behalf of the recipient
-    colony.claimPayment(paymentId, leapAddr);
-    return paymentId;
-  }
-
-  function _payout(
-    address payable _gardenerAddr,
-    uint256 _gardenerDaiAmount,
-    address payable _workerAddr,
-    uint256 _workerDaiAmount,
-    address payable _reviewerAddr,
-    uint256 _reviewerDaiAmount,
-    bytes32 _bountyId
-  ) internal {
-    IERC20 dai = IERC20(daiAddr);
-
-    // gardener worker
-    // Why is a gardener share required?
-    // Later we will hold a stake for gardeners, which will be handled here.
-    require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
-    uint256 paymentId = _makeColonyPayment(_gardenerAddr, _gardenerDaiAmount);
-    if (!_isRepOnly(_gardenerDaiAmount)) {
-      dai.transferFrom(msg.sender, _gardenerAddr, _gardenerDaiAmount);
-    }
-    emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
-
-    // handle worker
-    if (_workerDaiAmount > 0) {
-      paymentId = _makeColonyPayment(_workerAddr, _workerDaiAmount);
-      if (!_isRepOnly(_workerDaiAmount)) {
-        dai.transferFrom(msg.sender, _workerAddr, _workerDaiAmount);
-      }
-      emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
-    }
-
-    // handle reviewer
-    if (_reviewerDaiAmount > 0) {
-      paymentId = _makeColonyPayment(_reviewerAddr, _reviewerDaiAmount);
-      if (!_isRepOnly(_reviewerDaiAmount)) {
-        dai.transferFrom(msg.sender, _reviewerAddr, _reviewerDaiAmount);
-      }
-      emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
-    }
-  }
-
- /**
+  /**
   * Pays out a bounty to the different roles of a bounty
   *
   * @dev This contract should have enough allowance of daiAddr from payerAddr
@@ -175,4 +99,87 @@ contract BountyPayout is WhitelistedRole {
       _bountyId
     );
   }
+
+  function _isRepOnly(uint256 amount) internal returns (bool) {
+    return ((amount & 0x01) == 1);
+  }
+
+  function _makeColonyPayment(
+    address payable _worker,
+    uint256 _amount
+  ) internal returns (uint256) {
+
+    IColony colony = IColony(colonyAddr);
+    // Add a new payment
+    uint256 paymentId = colony.addPayment(
+      PERMISSION_DOMAIN_ID,
+      CHILD_SKILL_INDEX,
+      _worker,
+      leapAddr,
+      _amount,
+      DOMAIN_ID,
+      SKILL_ID
+    );
+    IColony.Payment memory payment = colony.getPayment(paymentId);
+
+    // Fund the payment
+    colony.moveFundsBetweenPots(
+      1, // Root domain always 1
+      0, // Not used, this extension contract must have funding permission in the root for this function to work
+      CHILD_SKILL_INDEX,
+      1, // Root domain funding pot is always 1
+      payment.fundingPotId,
+      _amount,
+      leapAddr
+    );
+    colony.finalizePayment(PERMISSION_DOMAIN_ID, CHILD_SKILL_INDEX, paymentId);
+
+    // Claim payout on behalf of the recipient
+    colony.claimPayment(paymentId, leapAddr);
+    return paymentId;
+  }
+
+  function _payout(
+    address payable _gardenerAddr,
+    uint256 _gardenerDaiAmount,
+    address payable _workerAddr,
+    uint256 _workerDaiAmount,
+    address payable _reviewerAddr,
+    uint256 _reviewerDaiAmount,
+    bytes32 _bountyId
+  ) internal {
+    IERC20 dai = IERC20(daiAddr);
+
+    // gardener worker
+    // Why is a gardener share required?
+    // Later we will hold a stake for gardeners, which will be handled here.
+    require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
+    uint256 paymentId = _makeColonyPayment(_gardenerAddr, _gardenerDaiAmount);
+    if (!_isRepOnly(_gardenerDaiAmount)) {
+      dai.transferFrom(msg.sender, _gardenerAddr, _gardenerDaiAmount);
+    }
+    // solium-disable-next-line arg-overflow
+    emit Payout(_bountyId, PayoutType.Gardener, _gardenerAddr, _gardenerDaiAmount, paymentId);
+
+    // handle worker
+    if (_workerDaiAmount > 0) {
+      paymentId = _makeColonyPayment(_workerAddr, _workerDaiAmount);
+      if (!_isRepOnly(_workerDaiAmount)) {
+        dai.transferFrom(msg.sender, _workerAddr, _workerDaiAmount);
+      }
+      // solium-disable-next-line arg-overflow
+      emit Payout(_bountyId, PayoutType.Worker, _workerAddr, _workerDaiAmount, paymentId);
+    }
+
+    // handle reviewer
+    if (_reviewerDaiAmount > 0) {
+      paymentId = _makeColonyPayment(_reviewerAddr, _reviewerDaiAmount);
+      if (!_isRepOnly(_reviewerDaiAmount)) {
+        dai.transferFrom(msg.sender, _reviewerAddr, _reviewerDaiAmount);
+      }
+      // solium-disable-next-line arg-overflow
+      emit Payout(_bountyId, PayoutType.Reviewer, _reviewerAddr, _reviewerDaiAmount, paymentId);
+    }
+  }
+
 }
