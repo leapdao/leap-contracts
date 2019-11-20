@@ -22,7 +22,7 @@ contract PosOperator is PoaOperator {
     address _signerAddr,
     bytes32 _tenderAddr
   ) public {
-    require(_slotId < epochLength, "slot not open");
+    require(_slotId < epochLength, "slot not available");
     Slot storage slot = slots[_slotId];
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
