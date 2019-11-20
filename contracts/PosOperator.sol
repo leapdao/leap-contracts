@@ -22,11 +22,11 @@ contract PosOperator is PoaOperator {
     address _signerAddr,
     bytes32 _tenderAddr
   ) public {
-    require(_slotId < epochLength);
+    require(_slotId < epochLength, "slot not open");
     Slot storage slot = slots[_slotId];
     // take care of logout
     if (_value == 0 && slot.newStake == 0 && slot.signer == _signerAddr) {
-      require(slot.owner == tx.origin);
+      require(slot.owner == tx.origin, "only owner can logout");
       slot.activationEpoch = uint32(lastCompleteEpoch.add(3));
       slot.eventCounter++;
       emit ValidatorLogout(
@@ -45,7 +45,7 @@ contract PosOperator is PoaOperator {
       required = slot.newStake;
     }
     required = required.mul(105).div(100);
-    require(required < _value);
+    require(required < _value, "bet too low");
 
     // new purchase or update
     if (slot.stake == 0 || (slot.owner == tx.origin && slot.newStake == 0)) {
@@ -97,9 +97,9 @@ contract PosOperator is PoaOperator {
   // solium-enable security/no-tx-origin
 
   function activate(uint256 _slotId) public {
-    require(_slotId < epochLength);
+    require(_slotId < epochLength, "slot not available");
     Slot storage slot = slots[_slotId];
-    require(lastCompleteEpoch + 1 >= slot.activationEpoch);
+    require(lastCompleteEpoch + 1 >= slot.activationEpoch, "activation epoch not reached yet");
     if (slot.stake > 0) {
       ERC20(vault.getTokenAddr(0)).transfer(slot.owner, slot.stake);
       emit ValidatorLeave(

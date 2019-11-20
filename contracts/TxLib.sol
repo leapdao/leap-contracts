@@ -194,7 +194,7 @@ library TxLib {
     }
     a = a >> 248;
     // if not transfer, sighash is just tx hash
-    require(a == 3);
+    require(a == 3, "not transfer type");
     // read ins
     assembly {
         a := mload(add(0x21, _txData))
@@ -268,7 +268,7 @@ library TxLib {
       uint8(uint256(_proof[1] >> 240)),
       _proof
     );
-    require(root == _proof[0]);
+    require(root == _proof[0], "invalid proof");
   }
   function recoverTxSigner(uint256 offset, bytes32[] memory _proof) internal pure returns (address dest) {
     uint16 txLength = uint16(uint256(_proof[1] >> 224));

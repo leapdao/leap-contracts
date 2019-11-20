@@ -25,7 +25,7 @@ contract SpaceDustNFT is ERC721Full, MinterRole {
     bool _isGlowing,
     uint8 _color
   ) public onlyMinter {
-    require(_size > 0);
+    require(_size > 0, "size is required parameter");
     uint256 nftId = now << 41 | _size << 9 | _color << 1 | (_isGlowing ? 1 : 0);
     super._mint(_to, nftId);
   }

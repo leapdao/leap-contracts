@@ -54,12 +54,12 @@ contract Vault is Adminable {
     } else if (_type == 1) {
       // max nft count without being an NST is 16384
       // color must be < 49153
-      require(nftTokenCount < 0x4000);
+      require(nftTokenCount < 0x4000, "NFT color out of bounds");
       require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
       color = NFT_FIRST_COLOR + nftTokenCount; // NFT color namespace starts from 2^15 + 1
       nftTokenCount += 1;
     } else {
-      require(nstTokenCount < 0x3ffe);
+      require(nstTokenCount < 0x3ffe, "NST color out of bounds");
       require(TransferrableToken(_token).supportsInterface(0x80ac58cd) == true, "Not an ERC721 token");
       color = NST_FIRST_COLOR + nstTokenCount; // NST color namespace starts from 2^15 + 2^14 + 1
       nstTokenCount += 1;

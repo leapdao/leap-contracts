@@ -102,7 +102,7 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
     _upgradeTo(newImplementation);
     bool rv;
     (rv,) = newImplementation.delegatecall(data);
-    require(rv);
+    require(rv, "delegate call failed");
   }
 
   /**

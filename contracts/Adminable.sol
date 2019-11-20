@@ -36,7 +36,7 @@ contract Adminable is Initializable {
    * If it is, it will run the function. Otherwise, fails.
    */
   modifier ifAdmin() {
-    require(msg.sender == _admin());
+    require(msg.sender == _admin(), "sender not admin");
     _;
   }
 
