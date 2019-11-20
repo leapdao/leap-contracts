@@ -40,7 +40,7 @@ contract UpgradeabilityProxy is Proxy {
     if (_data.length > 0) {
       bool rv;
       (rv,) = _implementation.delegatecall(_data);
-      require(rv);
+      require(rv, "delegate call failed");
     }
   }
 

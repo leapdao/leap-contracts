@@ -39,7 +39,7 @@ contract MinGov is Ownable {
   function () external payable {}
 
   function propose(address _subject, bytes memory _msgData) public onlyOwner {
-    require(size < 5);
+    require(size < 5, "only 5 proposals possible");
     proposals[first + size] = Proposal(
       _subject,
       uint32(now),
@@ -52,8 +52,8 @@ contract MinGov is Ownable {
 
   function cancel(uint256 _proposalId) public onlyOwner() {
     Proposal storage prop = proposals[_proposalId];
-    require(prop.created > 0);
-    require(prop.canceled == false);
+    require(prop.created > 0, "non-existing proposal not cancelable");
+    require(prop.canceled == false, "proposal already canceled");
     prop.canceled = true;
   }
 

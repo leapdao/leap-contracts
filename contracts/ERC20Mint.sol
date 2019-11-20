@@ -4,7 +4,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 contract ERC20Mint is ERC20 {
   modifier onlyMinter() {
-    require(msg.sender == 0x0000000000000000000000000000000000000001);
+    require(msg.sender == 0x0000000000000000000000000000000000000001, "minter not runtime");
     _;
   }
 
