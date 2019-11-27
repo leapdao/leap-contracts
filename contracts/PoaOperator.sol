@@ -291,6 +291,45 @@ contract PoaOperator is Adminable {
     bridge.deletePeriod(_period);
   }
 
+  struct BeatChallenge {
+    address payable challenger;
+    uint32 endTime;
+  }
+
+  mapping(address => BeatChallenge) beatChallenges;
+
+  function challengeHeartbeat(
+    bytes32 _periodHash,
+    uint256 _slotId
+  ) public payable {
+    require(msg.value == vault.exitStake(), "invalid challenge stake");
+
+    uint256 periodTime;
+    (,periodTime,,) = bridge.periods(periodRoot);
+    // check periodRoot
+    require(periodTime > 0, "period does not exist");
+    // check slotId
+    require(_slotId < epochLength, "slotId too high");
+
+    address signer = slots[_slotId].signer;
+    // don't start challenges before signer was in slot
+    // todo: find a way to prove this
+    // - either limit age by challenge duration
+    // - or prove a sibmitted period that is older
+
+    // check that challenge doesn't exist yet
+    require(beatChallenges[signer].endTime == 0, "challenge already in progress");
+
+    // create challenge object
+    beatChallenges[signer] = Challenge({
+      challenger: msg.sender,
+      endTime: uint32(now + casChallengeDuration),
+    });
+  }
+
+
+
+
   function _isEmpty(Slot memory _slot) internal returns (bool) {
     return (_slot.signer == address(0));
   }
