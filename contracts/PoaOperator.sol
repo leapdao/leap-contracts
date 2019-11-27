@@ -294,10 +294,14 @@ contract PoaOperator is Adminable {
   struct BeatChallenge {
     address payable challenger;
     uint32 endTime;
+    bytes32 periodHash;
   }
 
   mapping(address => BeatChallenge) beatChallenges;
 
+
+  // challenges that a specific slot has not spent any heartbeat UTXOs
+  // in the 5 periods before the given periodHash.
   function challengeBeat(
     bytes32 _periodHash,
     uint256 _slotId
@@ -339,6 +343,8 @@ contract PoaOperator is Adminable {
     bytes txData;
     uint64 txPos;
     (txPos, txHash, txData) = TxLib.validateProof(32, _proof);
+
+    // TODO: check that this is a heartbeat UTXO
 
     bytes32 sigHash = TxLib.getSigHash(txData);
     address signer = ecrecover(
