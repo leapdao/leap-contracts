@@ -298,7 +298,7 @@ contract PoaOperator is Adminable {
 
   mapping(address => BeatChallenge) beatChallenges;
 
-  function challengeHeartbeat(
+  function challengeBeat(
     bytes32 _periodHash,
     uint256 _slotId
   ) public payable {
@@ -327,7 +327,48 @@ contract PoaOperator is Adminable {
     });
   }
 
+  function respondBeat(
+    bytes32[] memory _proof,
+    uint256 _slotId
+  ) public {
+    (, timestamp,,) = bridge.periods(_proof[0]);
+    require(timestamp > 0, "The referenced period was not submitted to bridge");
 
+    // check exiting tx inclusion in the root chain block
+    bytes32 txHash;
+    bytes txData;
+    uint64 txPos;
+    (txPos, txHash, txData) = TxLib.validateProof(32, _proof);
+
+    bytes32 sigHash = TxLib.getSigHash(txData);
+    address signer = ecrecover(
+      sigHash,
+      txn.ins[_inputIndex].v,
+      txn.ins[_inputIndex].r,
+      txn.ins[_inputIndex].s
+    );
+
+    // TODO: check that period has max distance endTime
+
+    // check transaction belonged to signer
+    require(signer == slots[_slotId].signer);
+
+    // todo: payout stake to signer
+  }
+
+  function timeoutBeat(uint256 _slotId) public {
+    address signer = slots[_slotId].signer;
+    BeatChallenge memory chal = beatChallenges[signer];
+    // check that challenge exists
+    require(chal.endTime > 0, "challenge does not exist");
+    // check time
+    require(now >= chal.endTime, "time not expired yet");
+    // transfer funds
+    chal.challenger.transfer(vault.exitStake());
+    // empty slot
+    setSlot(_slotId, address(0), 0);
+    // todo: later slash stake here
+  }
 
 
   function _isEmpty(Slot memory _slot) internal returns (bool) {
