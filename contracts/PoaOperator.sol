@@ -301,33 +301,35 @@ contract PoaOperator is Adminable {
 
 
   // challenges that a specific slot has not spent any heartbeat UTXOs
-  // in the 5 periods before the given periodHash.
+  // TODO: figure out what happens in slot rotation
   function challengeBeat(
-    bytes32 _periodHash,
     uint256 _slotId
   ) public payable {
+    // check the stake
     require(msg.value == vault.exitStake(), "invalid challenge stake");
 
     uint256 periodTime;
-    (,periodTime,,) = bridge.periods(periodRoot);
-    // check periodRoot
-    require(periodTime > 0, "period does not exist");
+    (,periodTime,,) = bridge.periods(bridge.tipHash());
     // check slotId
     require(_slotId < epochLength, "slotId too high");
 
+    // challenger claims that there is no hearbeat included 
+    // between periodTime - casChallDur and periodTime
+
     address signer = slots[_slotId].signer;
-    // don't start challenges before signer was in slot
-    // todo: find a way to prove this
+    // todo: make sure signer was signer for entire duration (no slot rotation)
     // - either limit age by challenge duration
     // - or prove a sibmitted period that is older
 
     // check that challenge doesn't exist yet
     require(beatChallenges[signer].endTime == 0, "challenge already in progress");
+    // figure out if overwriting is a problem (challenging yourself)
 
     // create challenge object
     beatChallenges[signer] = Challenge({
       challenger: msg.sender,
       endTime: uint32(now + casChallengeDuration),
+      periodHash: periodRoot
     });
   }
 
