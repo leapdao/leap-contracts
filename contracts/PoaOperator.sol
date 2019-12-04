@@ -67,9 +67,6 @@ contract PoaOperator is Adminable {
   uint256 public epochLength; // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
   uint256 public lastEpochBlockHeight;
-  
-  uint256 public minimumPulse; // max amount of periods one can go without a heartbeat
-  uint16 public heartbeatColor;
 
   mapping(uint256 => Slot) public slots;
 
@@ -317,6 +314,8 @@ contract PoaOperator is Adminable {
     bytes32 openPeriodHash;
   }
 
+  uint256 public minimumPulse; // max amount of periods one can go without a heartbeat
+  uint16 public heartbeatColor;
   mapping(address => BeatChallenge) public beatChallenges;
   
   // challenger claims that there is no hearbeat included between (periodTime - brainDamageDuration) and periodTime
@@ -514,5 +513,5 @@ contract PoaOperator is Adminable {
   }
 
   // solium-disable-next-line mixedcase
-  uint256[18] private ______gap;
+  uint256[15] private ______gap;
 }
