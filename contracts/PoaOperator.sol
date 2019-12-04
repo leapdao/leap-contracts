@@ -133,7 +133,7 @@ contract PoaOperator is Adminable {
         address(0),
         slot.eventCounter,
         lastCompleteEpoch + 3
-        );
+      );
       return;
     }
   }
@@ -230,15 +230,15 @@ contract PoaOperator is Adminable {
     // casRoot
     assembly {
       mstore(0, _casBitmap)
-	mstore(0x20, _validatorRoot)
-	periodRoot := keccak256(0, 0x40)
-      }
+      mstore(0x20, _validatorRoot)
+      periodRoot := keccak256(0, 0x40)
+    }
     // periodRoot
     assembly {
       mstore(0, _consensusRoot)
-	mstore(0x20, periodRoot)
-	periodRoot := keccak256(0, 0x40)
-      }
+      mstore(0x20, periodRoot)
+      periodRoot := keccak256(0, 0x40)
+    }
 
     require(msg.value == vault.exitStake(), "invalid challenge stake");
 
@@ -286,7 +286,7 @@ contract PoaOperator is Adminable {
       // solium-disable-next-line arg-overflow
       ecrecover(_consensusRoot, _v, _r, _s) == challenges[periodRoot][_slotId].slotSigner,
       "signature does not match"
-      );
+    );
     // delete period Root
 
     delete challenges[periodRoot][_slotId];
