@@ -18,34 +18,34 @@ contract PoaOperator is Adminable {
   event EpochLength(uint256 epochLength);
 
   event ValidatorJoin(
-		      address indexed signerAddr,
-		      uint256 indexed slotId,
-		      bytes32 indexed tenderAddr,
-		      uint256 eventCounter,
-		      uint256 epoch
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    uint256 eventCounter,
+    uint256 epoch
   );
 
   event ValidatorLogout(
-			address indexed signerAddr,
-			uint256 indexed slotId,
-			bytes32 indexed tenderAddr,
-			address newSigner,
-			uint256 eventCounter,
-			uint256 epoch
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    address newSigner,
+    uint256 eventCounter,
+    uint256 epoch
   );
 
   event ValidatorLeave(
-		       address indexed signerAddr,
-		       uint256 indexed slotId,
-		       bytes32 indexed tenderAddr,
-		       uint256 epoch
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    uint256 epoch
   );
 
   event ValidatorUpdate(
-			address indexed signerAddr,
-			uint256 indexed slotId,
-			bytes32 indexed tenderAddr,
-			uint256 eventCounter
+    address indexed signerAddr,
+    uint256 indexed slotId,
+    bytes32 indexed tenderAddr,
+    uint256 eventCounter
   );
 
   struct Slot {
