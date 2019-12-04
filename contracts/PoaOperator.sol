@@ -18,34 +18,34 @@ contract PoaOperator is Adminable {
   event EpochLength(uint256 epochLength);
 
   event ValidatorJoin(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 eventCounter,
-    uint256 epoch
+		      address indexed signerAddr,
+		      uint256 indexed slotId,
+		      bytes32 indexed tenderAddr,
+		      uint256 eventCounter,
+		      uint256 epoch
   );
 
   event ValidatorLogout(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    address newSigner,
-    uint256 eventCounter,
-    uint256 epoch
+			address indexed signerAddr,
+			uint256 indexed slotId,
+			bytes32 indexed tenderAddr,
+			address newSigner,
+			uint256 eventCounter,
+			uint256 epoch
   );
 
   event ValidatorLeave(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 epoch
+		       address indexed signerAddr,
+		       uint256 indexed slotId,
+		       bytes32 indexed tenderAddr,
+		       uint256 epoch
   );
 
   event ValidatorUpdate(
-    address indexed signerAddr,
-    uint256 indexed slotId,
-    bytes32 indexed tenderAddr,
-    uint256 eventCounter
+			address indexed signerAddr,
+			uint256 indexed slotId,
+			bytes32 indexed tenderAddr,
+			uint256 eventCounter
   );
 
   struct Slot {
@@ -67,6 +67,9 @@ contract PoaOperator is Adminable {
   uint256 public epochLength; // length of epoch in periods (32 blocks)
   uint256 public lastCompleteEpoch; // height at which last epoch was completed
   uint256 public lastEpochBlockHeight;
+  
+  uint256 public minimumPulse; // max amount of periods one can go without a heartbeat
+  uint16 public heartbeatColor;
 
   mapping(uint256 => Slot) public slots;
 
@@ -84,6 +87,11 @@ contract PoaOperator is Adminable {
     emit EpochLength(epochLength);
   }
 
+  function setHeartbeatParams(uint256 _minimumPulse, uint16 _heartbeatColor) public ifAdmin {
+    minimumPulse = _minimumPulse;
+    heartbeatColor = _heartbeatColor;
+  }
+
   function setEpochLength(uint256 _epochLength) public ifAdmin {
     require(_epochLength >= _getLargestSlot() + 1, "Epoch length cannot be less then biggest slot");
     epochLength = _epochLength;
@@ -91,6 +99,10 @@ contract PoaOperator is Adminable {
   }
 
   function setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) public ifAdmin {
+    _setSlot(_slotId, _signerAddr, _tenderAddr);
+  }
+
+  function _setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) internal  {
     require(_slotId < epochLength, "out of range slotId");
     Slot storage slot = slots[_slotId];
 
@@ -121,7 +133,7 @@ contract PoaOperator is Adminable {
         address(0),
         slot.eventCounter,
         lastCompleteEpoch + 3
-      );
+        );
       return;
     }
   }
@@ -154,6 +166,10 @@ contract PoaOperator is Adminable {
         lastCompleteEpoch + 1
       );
     }
+  }
+
+  function isSlotActive(Slot memory  _slot) internal pure returns (bool) {
+    return (_slot.signer != address(0) && _slot.activationEpoch == 0);
   }
 
   event Submission(
@@ -214,15 +230,15 @@ contract PoaOperator is Adminable {
     // casRoot
     assembly {
       mstore(0, _casBitmap)
-      mstore(0x20, _validatorRoot)
-      periodRoot := keccak256(0, 0x40)
-    }
+	mstore(0x20, _validatorRoot)
+	periodRoot := keccak256(0, 0x40)
+      }
     // periodRoot
     assembly {
       mstore(0, _consensusRoot)
-      mstore(0x20, periodRoot)
-      periodRoot := keccak256(0, 0x40)
-    }
+	mstore(0x20, periodRoot)
+	periodRoot := keccak256(0, 0x40)
+      }
 
     require(msg.value == vault.exitStake(), "invalid challenge stake");
 
@@ -270,7 +286,7 @@ contract PoaOperator is Adminable {
       // solium-disable-next-line arg-overflow
       ecrecover(_consensusRoot, _v, _r, _s) == challenges[periodRoot][_slotId].slotSigner,
       "signature does not match"
-    );
+      );
     // delete period Root
 
     delete challenges[periodRoot][_slotId];
@@ -291,90 +307,120 @@ contract PoaOperator is Adminable {
     bridge.deletePeriod(_period);
   }
 
+  // openTime could be derived from openPeriodHash's timestamp, but one has
+  // to determine what happens in the case that there was a long  (~ timeoutTime) time since
+  // the last submitted period, than it is possible to  open and timeout a challenge straight
+  // away
   struct BeatChallenge {
     address payable challenger;
-    uint32 endTime;
-    bytes32 periodHash;
+    uint256 openTime;
+    bytes32 openPeriodHash;
   }
 
-  mapping(address => BeatChallenge) beatChallenges;
-
-
-  // challenges that a specific slot has not spent any heartbeat UTXOs
+  mapping(address => BeatChallenge) public beatChallenges;
+  
+  // challenger claims that there is no hearbeat included between (periodTime - brainDamageDuration) and periodTime
   // TODO: figure out what happens in slot rotation
+  // TODO: must be sure that the surrent slot signer was also signer at (periodTime - brainDamageDuration)
   function challengeBeat(
     uint256 _slotId
   ) public payable {
     // check the stake
     require(msg.value == vault.exitStake(), "invalid challenge stake");
-
-    uint256 periodTime;
-    (,periodTime,,) = bridge.periods(bridge.tipHash());
-    // check slotId
+    
+    // check slot exists
     require(_slotId < epochLength, "slotId too high");
 
-    // challenger claims that there is no hearbeat included 
-    // between periodTime - casChallDur and periodTime
+    // get the offending slot
+    Slot memory slot = slots[_slotId];
+    require(isSlotActive(slot), "Slot must be active");
 
-    address signer = slots[_slotId].signer;
-    // todo: make sure signer was signer for entire duration (no slot rotation)
-    // - either limit age by challenge duration
-    // - or prove a sibmitted period that is older
-
+    bytes32 tip = bridge.tipHash();
+    
     // check that challenge doesn't exist yet
-    require(beatChallenges[signer].endTime == 0, "challenge already in progress");
-    // figure out if overwriting is a problem (challenging yourself)
+    // TODO: the slot signer can challenge himself, blocking further challenges for challengeTimeout duration. What are the implications of this?
+    require(beatChallenges[slot.signer].openTime == 0, "challenge already in progress");
 
     // create challenge object
-    beatChallenges[signer] = Challenge({
+    // TODO: only one challenge per address possible, potential problem if an address holds multiple slots 
+    beatChallenges[slot.signer] = BeatChallenge({
       challenger: msg.sender,
-      endTime: uint32(now + casChallengeDuration),
-      periodHash: periodRoot
+      openTime: now,
+      openPeriodHash: tip
     });
   }
 
+  // In case of an invalid challenge, can submit a proof of heartbeat
+  // TODO: Is the signer we challenged still in control of the Slot? Depends on timeout-time (currently casChallangeDuration) at the least.
   function respondBeat(
-    bytes32[] memory _proof,
+    bytes32[] memory _inclusionProof,
+    bytes32[] memory _walkProof,
+    uint256 _length,
     uint256 _slotId
   ) public {
-    (, timestamp,,) = bridge.periods(_proof[0]);
-    require(timestamp > 0, "The referenced period was not submitted to bridge");
+   
+    address slotSigner = slots[_slotId].signer;
+    BeatChallenge memory chall = beatChallenges[slotSigner];
 
-    // check exiting tx inclusion in the root chain block
-    bytes32 txHash;
-    bytes txData;
-    uint64 txPos;
-    (txPos, txHash, txData) = TxLib.validateProof(32, _proof);
-
-    // TODO: check that this is a heartbeat UTXO
-
-    bytes32 sigHash = TxLib.getSigHash(txData);
-    address signer = ecrecover(
-      sigHash,
-      txn.ins[_inputIndex].v,
-      txn.ins[_inputIndex].r,
-      txn.ins[_inputIndex].s
+    require(chall.openTime > 0, "No active challenge for this slot.");
+    require(_walkProof[0] == chall.openPeriodHash, "Walk proof must start with the openPeriod");
+    require(_length <= minimumPulse, "Walk proof goes back in time too far");
+    require(
+      _verifyWalk(_walkProof, _length) == _inclusionProof[0],
+      "Inclusion proof does not reference the same period as walk"
     );
 
-    // TODO: check that period has max distance endTime
-
-    // check transaction belonged to signer
-    require(signer == slots[_slotId].signer);
-
-    // todo: payout stake to signer
+    bytes32 txHash;
+    bytes memory txData;
+    uint64 txPos;
+    (txPos, txHash, txData) = TxLib.validateProof(96, _inclusionProof);
+    bytes32 sigHash = TxLib.getSigHash(txData);
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    
+    address txSigner = ecrecover(
+      sigHash,
+      txn.ins[0].v,
+      txn.ins[0].r,
+      txn.ins[0].s
+    );
+    uint16 txColor = txn.outs[0].color;
+ 
+    require(slotSigner == txSigner, "Heartbeat transation does not belong to slot signer");
+    require(txColor == heartbeatColor, "The transaction is not the correct color");
+    
+    delete beatChallenges[slotSigner];
+    msg.sender.transfer(vault.exitStake());
   }
 
+  // veryfies that _proof[length-1] is the periodHash of the period _length back from period at proof[0] and returns that period
+  // TODO: actually implement this
+  function _verifyWalk(
+    bytes32[] memory _proof,
+    uint256 _length
+  ) internal returns (bytes32) {
+    return _proof[0];
+  }
+
+  // Challenge time has passed. No counter-example was given. The validator is ruled to have been offline and gets removed.
+  // TODO: Is the signer we challenged still in control of the Slot? Depends on timeout-time (currently casChallangeDuration) at the least.
   function timeoutBeat(uint256 _slotId) public {
     address signer = slots[_slotId].signer;
     BeatChallenge memory chal = beatChallenges[signer];
+    
     // check that challenge exists
-    require(chal.endTime > 0, "challenge does not exist");
+    require(chal.openTime > 0, "challenge does not exist");
     // check time
-    require(now >= chal.endTime, "time not expired yet");
-    // transfer funds
+    require(now >= chal.openTime + casChallengeDuration, "time not expired yet");
+
+    // refund challenge stake
     chal.challenger.transfer(vault.exitStake());
+
     // empty slot
-    setSlot(_slotId, address(0), 0);
+    _setSlot(_slotId, address(0), 0);
+
+    // Delete the challenge
+    delete beatChallenges[signer];
+
     // todo: later slash stake here
   }
 
