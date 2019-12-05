@@ -398,6 +398,7 @@ contract PoaOperator is Adminable {
   // - they reference one another
   // - the distance between start and end is _length
   // TODO: actually implement this
+  // THIS FUNCTION IS ONLY SAFE IF minimumPulse IS SET TO 0!
   function _verifyWalk(
     bytes32[] memory _proof,
     uint256 _length
