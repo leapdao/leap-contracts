@@ -111,7 +111,7 @@ contract('PoaOperator Heartbeats', (accounts) => {
 
 	    const walkProof = [proof[0]];
 	    // challenge proof
-	    await operator.respondBeat(proof, walkProof, 0, 0);
+	    await operator.respondBeat(proof, walkProof, 0);
 
 	    const timeoutTime = (await time.latest()) + CHALLENGE_DURATION;
             await time.increaseTo(timeoutTime);

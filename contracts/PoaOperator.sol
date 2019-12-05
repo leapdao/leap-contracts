@@ -354,7 +354,6 @@ contract PoaOperator is Adminable {
   function respondBeat(
     bytes32[] memory _inclusionProof,
     bytes32[] memory _walkProof,
-    uint256 _length,
     uint256 _slotId
   ) public {
    
@@ -362,15 +361,16 @@ contract PoaOperator is Adminable {
     BeatChallenge memory chall = beatChallenges[slotSigner];
 
     require(chall.openTime > 0, "No active challenge for this slot.");
-    require(_walkProof[0] == _inclusionProof[0], "Walk proof must start with the period that includes the heartbeat");
-    require(_walkProof[_walkProof.length - 1] == chall.openPeriodHash, "Walk proof must end with the openPeriod");
-    require(_length <= minimumPulse, "Walk proof goes back in time too far");
-    require(_verifyWalk(_walkProof, _length), "Invalid walk");
+    // THIS IS CURRENTLY ONLY SAFE IF MINIMUM_PULSE IS SET TO 0!
+    (bytes32 walkStart, bytes32 walkEnd, uint256 walkLength) = _verifyWalk(_walkProof);
+    require(walkLength <= minimumPulse, "Walk goes back in time too far");
+    require(walkStart == _inclusionProof[0], "Walk must start with the period that includes the heartbeat");
+    require(walkEnd == chall.openPeriodHash, "Walk must end with the openPeriod");
 
     bytes32 txHash;
     bytes memory txData;
     uint64 txPos;
-    (txPos, txHash, txData) = TxLib.validateProof(96, _inclusionProof);
+    (txPos, txHash, txData) = TxLib.validateProof(64, _inclusionProof);
     bytes32 sigHash = TxLib.getSigHash(txData);
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     
@@ -393,17 +393,13 @@ contract PoaOperator is Adminable {
     txSigner.transfer(vault.exitStake());
   }
 
-  // walks on periods from _proof[0] to _proof[length - 1] and verifies:
+  // walks on periods in the proof and verifies:
   // - they were included in the bridge
   // - they reference one another
-  // - the distance between start and end is _length
+  // also returns start and end period and the length of the walk
   // TODO: actually implement this
-  // THIS FUNCTION IS ONLY SAFE IF minimumPulse IS SET TO 0!
-  function _verifyWalk(
-    bytes32[] memory _proof,
-    uint256 _length
-  ) internal returns (bool) {
-    return true;
+  function _verifyWalk(bytes32[] memory _proof) internal returns (bytes32, bytes32, uint256) {
+    return (_proof[0], _proof[0], 0);
   }
 
   // Challenge time has passed. No counter-example was given. The validator is ruled to have been offline and gets removed.
