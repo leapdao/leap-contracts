@@ -84,6 +84,11 @@ contract PoaOperator is Adminable {
     emit EpochLength(epochLength);
   }
 
+  function setHeartbeatParams(uint256 _minimumPulse, uint16 _heartbeatColor) public ifAdmin {
+    minimumPulse = _minimumPulse;
+    heartbeatColor = _heartbeatColor;
+  }
+
   function setEpochLength(uint256 _epochLength) public ifAdmin {
     require(_epochLength >= _getLargestSlot() + 1, "Epoch length cannot be less then biggest slot");
     epochLength = _epochLength;
@@ -91,6 +96,10 @@ contract PoaOperator is Adminable {
   }
 
   function setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) public ifAdmin {
+    _setSlot(_slotId, _signerAddr, _tenderAddr);
+  }
+
+  function _setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) internal  {
     require(_slotId < epochLength, "out of range slotId");
     Slot storage slot = slots[_slotId];
 
@@ -154,6 +163,10 @@ contract PoaOperator is Adminable {
         lastCompleteEpoch + 1
       );
     }
+  }
+
+  function isSlotActive(Slot memory  _slot) internal pure returns (bool) {
+    return (_slot.signer != address(0) && _slot.activationEpoch == 0);
   }
 
   event Submission(
@@ -291,6 +304,128 @@ contract PoaOperator is Adminable {
     bridge.deletePeriod(_period);
   }
 
+  // openTime could be derived from openPeriodHash's timestamp, but one has
+  // to determine what happens in the case that there was a long  (~ timeoutTime) time since
+  // the last submitted period, than it is possible to  open and timeout a challenge straight
+  // away
+  struct BeatChallenge {
+    address payable challenger;
+    uint256 openTime;
+    bytes32 openPeriodHash;
+  }
+
+  uint256 public minimumPulse; // max amount of periods one can go without a heartbeat
+  uint16 public heartbeatColor;
+  mapping(address => BeatChallenge) public beatChallenges;
+  
+  // challenger claims that there is no hearbeat included in the previous minimumPulse periods
+  // TODO: figure out what happens in slot rotation
+  // TODO: must be sure that the surrent slot signer was also signer at minimumPulse periods ago
+  function challengeBeat(
+    uint256 _slotId
+  ) public payable {
+    // check the stake
+    require(msg.value == vault.exitStake(), "invalid challenge stake");
+    
+    // check slot exists
+    require(_slotId < epochLength, "slotId too high");
+
+    // get the offending slot
+    Slot memory slot = slots[_slotId];
+    require(isSlotActive(slot), "Slot must be active");
+
+    bytes32 tip = bridge.tipHash();
+    
+    // check that challenge doesn't exist yet
+    // TODO: the slot signer can challenge himself, blocking further challenges for challengeTimeout duration. What are the implications of this?
+    require(beatChallenges[slot.signer].openTime == 0, "challenge already in progress");
+
+    // create challenge object
+    // TODO: only one challenge per address possible, potential problem if an address holds multiple slots 
+    beatChallenges[slot.signer] = BeatChallenge({
+      challenger: msg.sender,
+      openTime: now,
+      openPeriodHash: tip
+    });
+  }
+
+  // In case of an invalid challenge, can submit a proof of heartbeat
+  // TODO: Is the signer we challenged still in control of the Slot? Depends on timeout-time (currently casChallangeDuration) at the least.
+  function respondBeat(
+    bytes32[] memory _inclusionProof,
+    bytes32[] memory _walkProof,
+    uint256 _slotId
+  ) public {
+   
+    address slotSigner = slots[_slotId].signer;
+    BeatChallenge memory chall = beatChallenges[slotSigner];
+
+    require(chall.openTime > 0, "No active challenge for this slot.");
+    // THIS IS CURRENTLY ONLY SAFE IF MINIMUM_PULSE IS SET TO 0!
+    (bytes32 walkStart, bytes32 walkEnd, uint256 walkLength) = _verifyWalk(_walkProof);
+    require(walkLength <= minimumPulse, "Walk goes back in time too far");
+    require(walkStart == _inclusionProof[0], "Walk must start with the period that includes the heartbeat");
+    require(walkEnd == chall.openPeriodHash, "Walk must end with the openPeriod");
+
+    bytes32 txHash;
+    bytes memory txData;
+    uint64 txPos;
+    (txPos, txHash, txData) = TxLib.validateProof(64, _inclusionProof);
+    bytes32 sigHash = TxLib.getSigHash(txData);
+    TxLib.Tx memory txn = TxLib.parseTx(txData);
+    
+    address payable txSigner = address(
+      uint160(
+        ecrecover(
+          sigHash,
+          txn.ins[0].v,
+          txn.ins[0].r,
+          txn.ins[0].s
+        )
+      )
+    );
+    uint16 txColor = txn.outs[0].color;
+ 
+    require(slotSigner == txSigner, "Heartbeat transation does not belong to slot signer");
+    require(txColor == heartbeatColor, "The transaction is not the correct color");
+    
+    delete beatChallenges[slotSigner];
+    txSigner.transfer(vault.exitStake());
+  }
+
+  // walks on periods in the proof and verifies:
+  // - they were included in the bridge
+  // - they reference one another
+  // also returns start and end period and the length of the walk
+  // TODO: actually implement this
+  function _verifyWalk(bytes32[] memory _proof) internal returns (bytes32, bytes32, uint256) {
+    return (_proof[0], _proof[0], 0);
+  }
+
+  // Challenge time has passed. No counter-example was given. The validator is ruled to have been offline and gets removed.
+  // TODO: Is the signer we challenged still in control of the Slot? Depends on timeout-time (currently casChallangeDuration) at the least.
+  function timeoutBeat(uint256 _slotId) public {
+    address signer = slots[_slotId].signer;
+    BeatChallenge memory chal = beatChallenges[signer];
+    
+    // check that challenge exists
+    require(chal.openTime > 0, "challenge does not exist");
+    // check time
+    require(now >= chal.openTime + casChallengeDuration, "time not expired yet");
+
+    // refund challenge stake
+    chal.challenger.transfer(vault.exitStake());
+
+    // empty slot
+    _setSlot(_slotId, address(0), 0);
+
+    // Delete the challenge
+    delete beatChallenges[signer];
+
+    // todo: later slash stake here
+  }
+
+
   function _isEmpty(Slot memory _slot) internal returns (bool) {
     return (_slot.signer == address(0));
   }
@@ -380,5 +515,5 @@ contract PoaOperator is Adminable {
   }
 
   // solium-disable-next-line mixedcase
-  uint256[18] private ______gap;
+  uint256[15] private ______gap;
 }
