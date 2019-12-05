@@ -318,9 +318,9 @@ contract PoaOperator is Adminable {
   uint16 public heartbeatColor;
   mapping(address => BeatChallenge) public beatChallenges;
   
-  // challenger claims that there is no hearbeat included between (periodTime - brainDamageDuration) and periodTime
+  // challenger claims that there is no hearbeat included in the previous minimumPulse periods
   // TODO: figure out what happens in slot rotation
-  // TODO: must be sure that the surrent slot signer was also signer at (periodTime - brainDamageDuration)
+  // TODO: must be sure that the surrent slot signer was also signer at minimumPulse periods ago
   function challengeBeat(
     uint256 _slotId
   ) public payable {
@@ -362,12 +362,10 @@ contract PoaOperator is Adminable {
     BeatChallenge memory chall = beatChallenges[slotSigner];
 
     require(chall.openTime > 0, "No active challenge for this slot.");
-    require(_walkProof[0] == chall.openPeriodHash, "Walk proof must start with the openPeriod");
+    require(_walkProof[0] == _inclusionProof[0], "Walk proof must start with the period that includes the heartbeat");
+    require(_walkProof[_walkProof.length - 1] == chall.openPeriodHash, "Walk proof must end with the openPeriod");
     require(_length <= minimumPulse, "Walk proof goes back in time too far");
-    require(
-      _verifyWalk(_walkProof, _length) == _inclusionProof[0],
-      "Inclusion proof does not reference the same period as walk"
-    );
+    require(_verifyWalk(_walkProof, _length), "Invalid walk");
 
     bytes32 txHash;
     bytes memory txData;
@@ -376,11 +374,15 @@ contract PoaOperator is Adminable {
     bytes32 sigHash = TxLib.getSigHash(txData);
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     
-    address txSigner = ecrecover(
-      sigHash,
-      txn.ins[0].v,
-      txn.ins[0].r,
-      txn.ins[0].s
+    address payable txSigner = address(
+      uint160(
+        ecrecover(
+          sigHash,
+          txn.ins[0].v,
+          txn.ins[0].r,
+          txn.ins[0].s
+        )
+      )
     );
     uint16 txColor = txn.outs[0].color;
  
@@ -388,16 +390,19 @@ contract PoaOperator is Adminable {
     require(txColor == heartbeatColor, "The transaction is not the correct color");
     
     delete beatChallenges[slotSigner];
-    msg.sender.transfer(vault.exitStake());
+    txSigner.transfer(vault.exitStake());
   }
 
-  // veryfies that _proof[length-1] is the periodHash of the period _length back from period at proof[0] and returns that period
+  // walks on periods from _proof[0] to _proof[length - 1] and verifies:
+  // - they were included in the bridge
+  // - they reference one another
+  // - the distance between start and end is _length
   // TODO: actually implement this
   function _verifyWalk(
     bytes32[] memory _proof,
     uint256 _length
-  ) internal returns (bytes32) {
-    return _proof[0];
+  ) internal returns (bool) {
+    return true;
   }
 
   // Challenge time has passed. No counter-example was given. The validator is ruled to have been offline and gets removed.
