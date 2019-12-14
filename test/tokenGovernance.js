@@ -18,6 +18,7 @@ contract('TokenGovernance', (accounts) => {
   let proxy;
   const proposalHash = '0x1122334411223344112233441122334411223344112233441122334411223344';
   const proposalStake = '5000000000000000000000';
+  const totalSupply = '10000000000000000000000';
   const parentBlockInterval = 0;
   const alice = accounts[0];
   const bob = accounts[1];
@@ -26,7 +27,7 @@ contract('TokenGovernance', (accounts) => {
 
   before(async () => {
     leapToken = await NativeToken.new("Leap Token", "Leap", 18);
-    leapToken.mint(accounts[0], proposalStake);
+    leapToken.mint(accounts[0], totalSupply);
 
     const bridgeCont = await Bridge.new();
     let data = await bridgeCont.contract.methods.initialize(parentBlockInterval).encodeABI();
@@ -63,20 +64,42 @@ contract('TokenGovernance', (accounts) => {
 
     // allow gov contract to pull funds
     leapToken.approve(gov.address, proposalStake);
+    const balBefore = await leapToken.balanceOf(alice);
     // register proposal
     await gov.registerProposal(proposalHash);
+    let bal = await leapToken.balanceOf(gov.address);
+    assert.equal(bal, proposalStake);
     // read proposal
     let rsp = await gov.proposals(proposalHash);
     assert(rsp.openTime > 0);
 
     // check that same proposal can not be rigestered twice
-    leapToken.mint(accounts[0], proposalStake);
     leapToken.approve(gov.address, proposalStake);
     await gov.registerProposal(proposalHash).should.be.rejectedWith(EVMRevert);
 
+    // cast vote
+    await gov.castVote(proposalHash, inputProof, 0, false);
+    rsp = await gov.proposals(proposalHash);
+    assert.equal(rsp.noVotes, amount);
+
+    // recast vote
     await gov.castVote(proposalHash, inputProof, 0, true);
     rsp = await gov.proposals(proposalHash);
     assert.equal(rsp.yesVotes, amount);
+    assert.equal(rsp.noVotes, 0);
+
+    // finalize and count
+    await gov.finalizeProposal(proposalHash);
+    rsp = await gov.proposals(proposalHash);
+    assert.equal(rsp.yesVotes, amount);
+    assert.equal(rsp.noVotes, 0);
+    assert.equal(rsp.finalized, true);
+    // token governance should have returned the stake
+    bal = await leapToken.balanceOf(gov.address);
+    assert.equal(bal, 0);
+    // alice should have same amount like before opening the vote
+    bal = await leapToken.balanceOf(alice);
+    assert.equal(bal.toString(), balBefore.toString());
   });
 
 });
