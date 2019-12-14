@@ -35,7 +35,7 @@ contract TokenGovernance {
   mapping(bytes32 => Proposal) public proposals;
 
   event ProposalRegistered(bytes32 indexed proposalHash, address indexed initiator);
-  event VoiceCasted(bytes32 indexed proposalHash, address indexed subject, uint256 weight);
+  event VoiceCasted(bytes32 indexed proposalHash, address indexed subject, uint256 weight, bytes32 txHash);
   event VoiceChallenged(bytes32 indexed proposalHash, address indexed subject, address challenger);
   event ProposalFinalized(bytes32 indexed proposalHash, bool isApproved);
 
@@ -102,10 +102,10 @@ contract TokenGovernance {
       proposals[_proposalHash].votes[msg.sender] = int256(out.value) * -1;
     }
     proposals[_proposalHash].usedTxns[txHash] = msg.sender;
-    emit VoiceCasted(_proposalHash, msg.sender, out.value);
+    emit VoiceCasted(_proposalHash, msg.sender, out.value, txHash);
   }
 
-  function challengeUTXO(bytes32 _proposalHash, bytes32[] memory _proof, uint8 _inputIndex, address _signer) public {
+  function challengeUTXO(bytes32 _proposalHash, bytes32[] memory _proof, uint8 _inputIndex) public {
     uint32 timestamp;
     (, timestamp,,) = bridge.periods(_proof[0]);
     require(timestamp > 0, "The referenced period was not submitted to bridge");
@@ -113,8 +113,7 @@ contract TokenGovernance {
     
     bytes memory txData;
     bytes32 txHash;
-    (, txHash, txData) = TxLib.validateProof(96, _proof);
-
+    (, txHash, txData) = TxLib.validateProof(64, _proof);
     // parse tx
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     // checking that the transactions has been used in a vote
@@ -123,7 +122,7 @@ contract TokenGovernance {
     require(signer != address(0), "prevout check failed on hash");
 
     // substract vote
-    _revertVote(proposals[_proposalHash], txHash);
+    _revertVote(proposals[_proposalHash], txn.ins[_inputIndex].outpoint.hash);
     emit VoiceChallenged(_proposalHash, signer, msg.sender);
   }
 
