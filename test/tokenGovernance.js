@@ -79,7 +79,7 @@ contract('TokenGovernance', (accounts) => {
     let rsp = await gov.proposals(proposalHash);
     assert(rsp.openTime > 0);
 
-    // check that same proposal can not be rigestered twice
+    // check that same proposal can not be registered twice
     leapToken.approve(gov.address, proposalStake);
     await gov.registerProposal(proposalHash).should.be.rejectedWith(EVMRevert);
 
