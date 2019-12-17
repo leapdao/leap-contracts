@@ -27,7 +27,7 @@ contract('TokenGovernance', (accounts) => {
   const alicePriv = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
   const bob = accounts[1];
   const mvgAddress = accounts[2];
-  const voiceAmount = 34567000000;
+  const voiceAmount = '2000000000000000000';
 
   const submitNewPeriod = txs => submitNewPeriodWithTx(txs, bridge, { from: bob });
 
@@ -94,7 +94,8 @@ contract('TokenGovernance', (accounts) => {
     assert.equal(rsp.yesVotes, voiceAmount);
     assert.equal(rsp.noVotes, 0);
 
-    // finalize and count
+    // wait, finalize and count
+    await time.increaseTo((await time.latest()) + 60 * 60 * 24 * 7 + 1);
     await gov.finalizeProposal(proposalHash);
     rsp = await gov.proposals(proposalHash);
     assert.equal(rsp.yesVotes, voiceAmount);
@@ -135,7 +136,8 @@ contract('TokenGovernance', (accounts) => {
     let rsp = await gov.proposals(anotherProposalHash);
     assert.equal(rsp.noVotes, voiceAmount);
 
-    // finalize and count
+    // wait, finalize and count
+    await time.increaseTo((await time.latest()) + 60 * 60 * 24 * 7 + 1);
     await gov.finalizeProposal(anotherProposalHash);
     rsp = await gov.proposals(anotherProposalHash);
     assert.equal(rsp.noVotes, voiceAmount);
@@ -156,7 +158,7 @@ contract('TokenGovernance', (accounts) => {
     leapToken.approve(gov.address, proposalStake);
     // register proposal
     await gov.registerProposal(anotherProposalHash);
-    let bal = await leapToken.balanceOf(gov.address);
+    const bal = await leapToken.balanceOf(gov.address);
     assert.equal(bal, proposalStake);
 
     // increase time

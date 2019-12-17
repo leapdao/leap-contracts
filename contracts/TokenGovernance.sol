@@ -9,13 +9,16 @@
 pragma solidity 0.5.2;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./Bridge.sol";
 import "./Vault.sol";
 import "./TxLib.sol";
 
 contract TokenGovernance {
+  using SafeMath for uint256;
 
   uint256 constant PROPOSAL_STAKE = 5000000000000000000000;
+  uint256 constant DUST_THRESHOLD = 1000000000000000000;
   uint32 constant PROPOSAL_TIME = 604800; // 60 * 60 * 24 * 7 = 7 days
   address public mvgAddress;
   IERC20 public leapToken;
@@ -52,9 +55,9 @@ contract TokenGovernance {
     int256 votes = proposal.votes[signer];
     delete proposal.votes[signer];
     if (votes > 0) {
-      proposal.yesVotes -= uint256(votes);
+      proposal.yesVotes = proposal.yesVotes.sub(uint256(votes));
     } else {
-      proposal.noVotes -= uint256(votes * -1);
+      proposal.noVotes = proposal.noVotes.sub(uint256(votes * -1));
     }
   }
 
@@ -85,20 +88,18 @@ contract TokenGovernance {
     // parse tx and check if it is usable for voting
     TxLib.Tx memory tx = TxLib.parseTx(txData);
     TxLib.Output memory out = tx.outs[_outputIndex];
-    require(out.value > 0, "UTXO has no value");
+    require(out.value >= DUST_THRESHOLD, "UTXO is below dust threshold");
     require(out.owner == msg.sender, "msg.sender not owner of utxo");
-    // TODO: fix
     require(address(leapToken) == vault.getTokenAddr(out.color), "not Leap UTXO");
 
     if (proposals[_proposalHash].votes[msg.sender] != 0) {
-      // TODO: clean up previous vote
       _revertVote(proposals[_proposalHash], txHash);
     }
     if (isYes) {
-      proposals[_proposalHash].yesVotes += out.value;
+      proposals[_proposalHash].yesVotes = proposal.yesVotes.add(out.value);
       proposals[_proposalHash].votes[msg.sender] = int256(out.value);
     } else {
-      proposals[_proposalHash].noVotes += out.value;
+      proposals[_proposalHash].noVotes = proposal.noVotes.add(out.value);
       proposals[_proposalHash].votes[msg.sender] = int256(out.value) * -1;
     }
     proposals[_proposalHash].usedTxns[txHash] = msg.sender;
@@ -112,8 +113,7 @@ contract TokenGovernance {
     require(timestamp <= proposals[_proposalHash].openTime, "The transaction was submitted after the vote open time");
     
     bytes memory txData;
-    bytes32 txHash;
-    (, txHash, txData) = TxLib.validateProof(64, _proof);
+    (,, txData) = TxLib.validateProof(64, _proof);
     // parse tx
     TxLib.Tx memory txn = TxLib.parseTx(txData);
     // checking that the transactions has been used in a vote
@@ -131,7 +131,7 @@ contract TokenGovernance {
     require(proposal.finalized == false, "already finalized");
     require(proposal.openTime > 0, "proposal does not exist");
     // disable to simplify testing
-    // require(proposal.openTime + PROPOSAL_TIME < uint32(now), "proposal time not exceeded");
+    require(proposal.openTime + PROPOSAL_TIME < uint32(now), "proposal time not exceeded");
     // can't delete full mappings
     // delete proposals[_proposalHash].votes;
     // delete proposals[_proposalHash].usedTxns;
