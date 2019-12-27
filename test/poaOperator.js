@@ -74,18 +74,89 @@ contract('PoaOperator', (accounts) => {
       
     describe('Slot Management', () => {
       it('should prevent submission by empty slot', async () => {
-        await operator.submitPeriodWithCas(0, p[0], '0x01', '0xff', {from: alice}).should.be.rejectedWith(EVMRevert);
+        const consensusRoot = '0x01';
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, '0xff', {from: alice}).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should allow to set slot and submit period with CAS', async () => {
+      it('should allow to set slot but prevent submission with CAS bitmap of 0/3', async () => {
         const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
         await proxy.applyProposal(data, {from: admin});
-        await operator.submitPeriodWithCas(0, p[0], '0x01', CAS, { from: alice }).should.be.fulfilled;
+        const consensusRoot = '0x01';
+        const casBitmap = '0x00'; // no bits set: 0000 0000
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should prevent submission with CAS bitmap of 1/3', async () => {
+        const consensusRoot = '0x01';
+        const casBitmap = '0x80'; // first bit set: 1000 0000
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should prevent submission with CAS bitmap of 2/3', async () => {
+        const consensusRoot = '0x01';
+        const casBitmap = '0xc0'; // first 2 bits set: 1100 0000
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow submission with CAS bitmap of 3/3', async () => {
+        const consensusRoot = '0x01';
+        const casBitmap = '0xe0'; // first 3 bits set: 1110 0000
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
         p[1] = await bridge.tipHash();
       });
 
+      it('should allow to set slot but prevent submission with CAS bitmap of 2/4', async () => {
+        const data = await operator.contract.methods.setEpochLength(4).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        const consensusRoot = '0x02';
+        const casBitmap = '0xc0'; // two bits set: 1100 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow submission with CAS bitmap of 3/4', async () => {
+        const consensusRoot = '0x02';
+        const casBitmap = '0xe0'; // three bits set: 1110 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
+      });
+
+      it('should prevent submission with CAS bitmap of 4/4', async () => {
+        const consensusRoot = '0x02';
+        const casBitmap = '0xf0'; // all bits set: 1111 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to set slot but prevent submission with CAS bitmap of 170/255', async () => {
+        const data = await operator.contract.methods.setEpochLength(256).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        const consensusRoot = '0x03';
+        const casBitmap = '0xffffffffffffffffffffffffffffffffffffffffffc000000000000000000000'; // 170 bits set
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow submission with CAS bitmap of 171/255', async () => {
+        const consensusRoot = '0x03';
+        const casBitmap = '0xffffffffffffffffffffffffffffffffffffffffffe000000000000000000000'; // 171 bits set
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
+        p[2] = await bridge.tipHash();
+      });
+
+      it('should allow submission with CAS bitmap of random 171/255', async () => {
+        const consensusRoot = '0x04';
+        const casBitmap = '0x00ffff00ffffffff00ffffffffffff0fffffffffffe000ff0000ff0000f000ff'; // 171 bits set
+        await operator.submitPeriodWithCas(0, p[2], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
+        p[3] = await bridge.tipHash();
+      });
+
+      it('should prevent submission with CAS bitmap of 172/255', async () => {
+        const consensusRoot = '0x03';
+        const casBitmap = '0xfffffffffffffffffffffffffffffffffffffffffff000000000000000000000'; // 172 bits set
+        await operator.submitPeriodWithCas(0, p[2], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
       it('should allow to set slot and submit period without CAS', async () => {
-        const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
+        let data = await operator.contract.methods.setEpochLength(3).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
         await proxy.applyProposal(data, {from: admin});
         await operator.submitPeriod(0, p[0], '0x01', { from: alice }).should.be.fulfilled;
         p[1] = await bridge.tipHash();

@@ -425,6 +425,9 @@ contract PoaOperator is Adminable {
     // todo: later slash stake here
   }
 
+  function extCountSigs(uint256 _sigs) public view returns (uint256) {
+    return countSigs(_sigs, epochLength);
+  }
 
   function _isEmpty(Slot memory _slot) internal returns (bool) {
     return (_slot.signer == address(0));
@@ -439,9 +442,11 @@ contract PoaOperator is Adminable {
   }
 
   function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
-    for (uint i = 256; i >= 256 - _epochLength; i--) {
+    uint256 i = 256;
+    do {
+      i--;
       count += uint8(_sigs >> i) & 0x01;
-    }
+    } while (i > 256 - _epochLength);
   }
 
   // an exact amount of sigs is needed, so that if one is proven to be invalid,
