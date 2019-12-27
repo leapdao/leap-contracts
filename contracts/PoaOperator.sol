@@ -425,10 +425,6 @@ contract PoaOperator is Adminable {
     // todo: later slash stake here
   }
 
-  function extCountSigs(uint256 _sigs) public view returns (uint256) {
-    return countSigs(_sigs, epochLength);
-  }
-
   function _isEmpty(Slot memory _slot) internal returns (bool) {
     return (_slot.signer == address(0));
   }
