@@ -425,7 +425,6 @@ contract PoaOperator is Adminable {
     // todo: later slash stake here
   }
 
-
   function _isEmpty(Slot memory _slot) internal returns (bool) {
     return (_slot.signer == address(0));
   }
@@ -439,19 +438,18 @@ contract PoaOperator is Adminable {
   }
 
   function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
-    for (uint i = 256; i >= 256 - _epochLength; i--) {
+    uint256 i = 256;
+    do {
+      i--;
       count += uint8(_sigs >> i) & 0x01;
-    }
+    } while (i > 256 - _epochLength);
   }
 
   // an exact amount of sigs is needed, so that if one is proven to be invalid,
   // then the amount of signatures drops below the 2/3 quorum => period is deleted
   function neededSigs(uint256 _epochLength) internal pure returns (uint256 needed) {
-    // if the number of slots has a remainder, add 1
-    //   example: 5, remainder 1, => 3 + 1
-    // if the number of slots has no remainder, use it
-    //   example: 9, remainder 0, => 6 + 0
-    return (_epochLength * 2 / 3) + ((_epochLength * 2 % 3) == 0 ? 0 : 1);
+    // calculate n = 3f + 1
+    return (_epochLength * 2 / 3) + 1;
   }
 
   function _submitPeriod(
