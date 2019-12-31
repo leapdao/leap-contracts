@@ -16,4 +16,8 @@ contract PoaOperatorMock is PoaOperator {
     lastCompleteEpoch = _lastCompleteEpoch;
   }
 
+  function setActiveSlotsMap(uint256 _activeSlots) public {
+    takenSlots = _activeSlots;
+  }
+
 }

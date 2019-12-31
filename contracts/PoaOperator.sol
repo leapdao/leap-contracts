@@ -99,6 +99,14 @@ contract PoaOperator is Adminable {
     _setSlot(_slotId, _signerAddr, _tenderAddr);
   }
 
+  function setTakenSlotBitmap(uint256 _before, uint256 _pos, bool isActive) internal pure returns (uint256) {
+    if (isActive) {
+      return _before | (0x01 << (255 - _pos));
+    } else {
+      return _before & (uint256(-2) << (255 - _pos));
+    }
+  }
+
   function _setSlot(uint256 _slotId, address _signerAddr, bytes32 _tenderAddr) internal  {
     require(_slotId < epochLength, "out of range slotId");
     Slot storage slot = slots[_slotId];
@@ -110,6 +118,7 @@ contract PoaOperator is Adminable {
       slot.tendermint = _tenderAddr;
       slot.activationEpoch = 0;
       slot.eventCounter++;
+      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, true);
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -123,6 +132,7 @@ contract PoaOperator is Adminable {
     if (_signerAddr == address(0) && _tenderAddr == 0) {
       slot.activationEpoch = uint32(lastCompleteEpoch + 3);
       slot.eventCounter++;
+      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, false);
       emit ValidatorLogout(
         slot.signer,
         _slotId,
@@ -155,6 +165,7 @@ contract PoaOperator is Adminable {
     slot.newTendermint = 0x0;
     slot.eventCounter++;
     if (slot.signer != address(0)) {
+      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, true);
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -183,7 +194,7 @@ contract PoaOperator is Adminable {
     bytes32 _blocksRoot,
     bytes32 _casBitmap
   ) public {
-    require(countSigs(uint256(_casBitmap), epochLength) == neededSigs(epochLength), "incorrect number of sigs");
+    require(_checkSigs(uint256(_casBitmap), takenSlots, epochLength), "incorrect number of sigs");
     _submitPeriod(_slotId, _prevHash, _blocksRoot, _casBitmap); // solium-disable-line arg-overflow
   }
 
@@ -317,6 +328,7 @@ contract PoaOperator is Adminable {
   uint256 public minimumPulse; // max amount of periods one can go without a heartbeat
   uint16 public heartbeatColor;
   mapping(address => BeatChallenge) public beatChallenges;
+  uint256 public takenSlots;
   
   // challenger claims that there is no hearbeat included in the previous minimumPulse periods
   // TODO: figure out what happens in slot rotation
@@ -437,19 +449,19 @@ contract PoaOperator is Adminable {
     return slotId;
   }
 
-  function countSigs(uint256 _sigs, uint256 _epochLength) internal pure returns (uint256 count) {
-    uint256 i = 256;
-    do {
-      i--;
-      count += uint8(_sigs >> i) & 0x01;
-    } while (i > 256 - _epochLength);
-  }
-
   // an exact amount of sigs is needed, so that if one is proven to be invalid,
   // then the amount of signatures drops below the 2/3 quorum => period is deleted
-  function neededSigs(uint256 _epochLength) internal pure returns (uint256 needed) {
+  function _checkSigs(uint256 _sigs, uint256 _activeSlots, uint256 _epochLength) internal pure returns (bool) {
+    uint256 i = 256;
+    uint256 active = 0;
+    uint256 found = 0;
+    do {
+      i--;
+      found += uint8(_sigs >> i) & 0x01;
+      active += uint8(_activeSlots >> i) & 0x01;
+    } while (i > 256 - _epochLength);
     // calculate n = 3f + 1
-    return (_epochLength * 2 / 3) + 1;
+    return ((active * 2 / 3) + 1 == found);
   }
 
   function _submitPeriod(
@@ -513,5 +525,5 @@ contract PoaOperator is Adminable {
   }
 
   // solium-disable-next-line mixedcase
-  uint256[15] private ______gap;
+  uint256[14] private ______gap;
 }
