@@ -103,10 +103,10 @@ contract PoaOperator is Adminable {
     if (isActive) {
       return _before | (0x01 << (255 - _pos));
     } else {
-      // if the bit is on, turn it off through XOR
-      if (_before | (0x01 << (255 - _pos)) > 0) {
-        return _before ^ (0x01 << (255 - _pos));
-      }
+      // 1. (0x01 << (255 - _pos) — sets the bit e.g. (0x000100)
+      // 2. ~... — inverts the number so the bit is off (e.g. 0x111011)
+      // 3. .. & .. — clears the bit in _before
+      return _before & ~(0x01 << (255 - _pos));
     }
   }
 
