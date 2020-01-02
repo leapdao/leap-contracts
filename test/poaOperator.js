@@ -37,6 +37,7 @@ contract('PoaOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const admin = accounts[3];
+  const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
   const ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const CHALLENGE_DURATION = 3600;
   const CHALLENGE_STAKE = '100000000000000000';
@@ -141,7 +142,9 @@ contract('PoaOperator', (accounts) => {
       });
 
       it('should allow to set slot but prevent submission with CAS bitmap of 170/255', async () => {
-        const data = await operator.contract.methods.setEpochLength(256).encodeABI();
+        let data = await operator.contract.methods.setEpochLength(256).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        data = await operator.contract.methods.setSlot(253, admin, admin).encodeABI();
         await proxy.applyProposal(data, {from: admin});
         await operator.setActiveSlotsMap('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
         const consensusRoot = '0x03';
@@ -168,6 +171,15 @@ contract('PoaOperator', (accounts) => {
         const consensusRoot = '0x04';
         const casBitmap = '0xfffffffffffffffffffffffffffffffffffffffffff000000000000000000000'; // 172 bits set
         await operator.submitPeriodWithCas(0, p[3], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to logout last slot', async () => {
+        const data = await operator.contract.methods.setSlot(253, ZERO_ADDR, ZERO_ADDR).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        await operator.setLastCompleteEpochForTest(2);
+        await operator.activate(1);
+        const slotBits = await operator.takenSlots();
+        assert.equal(slotBits.toJSON(), 'fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb');
       });
 
       it('should allow to set slot and submit period without CAS', async () => {
@@ -296,9 +308,12 @@ contract('PoaOperator', (accounts) => {
       assert.equal(await operator.epochLength(), 2);
 
       // logout the largest slot and try set epoch length again
-      const zero = '0x0000000000000000000000000000000000000000';
-      data = await operator.contract.methods.setSlot(1, zero, zero).encodeABI();
+      let slotBits = await operator.takenSlots();
+      assert.equal(slotBits.toJSON(), 'c000000000000000000000000000000000000000000000000000000000000000');
+      data = await operator.contract.methods.setSlot(1, ZERO_ADDR, ZERO_ADDR).encodeABI();
       await proxy.applyProposal(data, { from: accounts[2] });
+      slotBits = await operator.takenSlots();
+      assert.equal(slotBits.toJSON(), '8000000000000000000000000000000000000000000000000000000000000000');
       await operator.setLastCompleteEpochForTest(2);
       await operator.activate(1);
       data = await operator.contract.methods.setEpochLength(1).encodeABI();
