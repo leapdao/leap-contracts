@@ -85,7 +85,7 @@ contract('PoaOperator', (accounts) => {
         await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should prevent submission with CAS bitmap of 1/1', async () => {
+      it('should allow submission with CAS bitmap of 1/1', async () => {
         const consensusRoot = '0x01';
         const casBitmap = '0x80'; // first bit set: 1000 0000
         await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
