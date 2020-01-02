@@ -103,6 +103,7 @@ contract PoaOperator is Adminable {
     if (isActive) {
       return _before | (0x01 << (255 - _pos));
     } else {
+      // uint256(-2) is 0xFFFFF....FFE (the very last bit off)
       return _before & (uint256(-2) << (255 - _pos));
     }
   }
