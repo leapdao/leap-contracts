@@ -37,7 +37,7 @@ contract('PoaOperator', (accounts) => {
   const alice = accounts[0];
   const bob = accounts[1];
   const admin = accounts[3];
-  const CAS = '0xe000000000000000000000000000000000000000000000000000000000000000';
+  const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
   const ZERO = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const CHALLENGE_DURATION = 3600;
   const CHALLENGE_STAKE = '100000000000000000';
@@ -78,7 +78,7 @@ contract('PoaOperator', (accounts) => {
         await operator.submitPeriodWithCas(0, p[0], consensusRoot, '0xff', {from: alice}).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should allow to set slot but prevent submission with CAS bitmap of 0/3', async () => {
+      it('should allow to set slot but prevent submission with CAS bitmap of 0/1', async () => {
         const data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
         await proxy.applyProposal(data, {from: admin});
         const consensusRoot = '0x01';
@@ -86,50 +86,70 @@ contract('PoaOperator', (accounts) => {
         await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should prevent submission with CAS bitmap of 1/3', async () => {
+      it('should allow submission with CAS bitmap of 1/1', async () => {
         const consensusRoot = '0x01';
         const casBitmap = '0x80'; // first bit set: 1000 0000
-        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
+        p[1] = await bridge.tipHash();
       });
 
-      it('should prevent submission with CAS bitmap of 2/3', async () => {
+      it('should prevent submission with CAS bitmap of 2/1', async () => {
         const consensusRoot = '0x01';
         const casBitmap = '0xc0'; // first 2 bits set: 1100 0000
         await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should allow submission with CAS bitmap of 3/3', async () => {
-        const consensusRoot = '0x01';
-        const casBitmap = '0xe0'; // first 3 bits set: 1110 0000
-        await operator.submitPeriodWithCas(0, p[0], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
-        p[1] = await bridge.tipHash();
-      });
-
-      it('should allow to set slot but prevent submission with CAS bitmap of 2/4', async () => {
-        const data = await operator.contract.methods.setEpochLength(4).encodeABI();
+      it('should allow to set slot but prevent submission with CAS bitmap of 1/2', async () => {
+        let data = await operator.contract.methods.setEpochLength(4).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        data = await operator.contract.methods.setSlot(2, bob, bob).encodeABI();
         await proxy.applyProposal(data, {from: admin});
         const consensusRoot = '0x02';
-        const casBitmap = '0xc0'; // two bits set: 1100 0000
+        const casBitmap = '0x80'; // first bit set: 1000 0000
         await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
-      it('should allow submission with CAS bitmap of 3/4', async () => {
+      it('should allow submission with CAS bitmap of 2/2', async () => {
         const consensusRoot = '0x02';
-        const casBitmap = '0xe0'; // three bits set: 1110 0000
+        const casBitmap = '0xc0'; // first 2 bits set: 1100 0000
         await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
       });
 
-      it('should prevent submission with CAS bitmap of 4/4', async () => {
+      it('should prevent submission with CAS bitmap of 3/2', async () => {
+        const consensusRoot = '0x03';
+        const casBitmap = '0xe0'; // 3 bits set: 1110 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to set slot but prevent submission with CAS bitmap of 2/3', async () => {
+        const data = await operator.contract.methods.setSlot(3, admin, admin).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        const consensusRoot = '0x03';
+        const casBitmap = '0xc0'; // first 2 bits set: 1100 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow submission with CAS bitmap of 3/3', async () => {
+        const consensusRoot = '0x03';
+        const casBitmap = '0xe0'; // 3 bits set: 1110 0000
+        await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.fulfilled;
+      });
+
+      it('should prevent submission with CAS bitmap of 4/3', async () => {
         const consensusRoot = '0x02';
         const casBitmap = '0xf0'; // all bits set: 1111 0000
         await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
       it('should allow to set slot but prevent submission with CAS bitmap of 170/255', async () => {
-        const data = await operator.contract.methods.setEpochLength(256).encodeABI();
+        let data = await operator.contract.methods.setEpochLength(256).encodeABI();
         await proxy.applyProposal(data, {from: admin});
+        data = await operator.contract.methods.setSlot(253, admin, admin).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        await operator.setActiveSlotsMap('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
         const consensusRoot = '0x03';
         const casBitmap = '0xffffffffffffffffffffffffffffffffffffffffffc000000000000000000000'; // 170 bits set
+        p[1] = await bridge.tipHash();
         await operator.submitPeriodWithCas(0, p[1], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
       });
 
@@ -148,12 +168,22 @@ contract('PoaOperator', (accounts) => {
       });
 
       it('should prevent submission with CAS bitmap of 172/255', async () => {
-        const consensusRoot = '0x03';
+        const consensusRoot = '0x04';
         const casBitmap = '0xfffffffffffffffffffffffffffffffffffffffffff000000000000000000000'; // 172 bits set
-        await operator.submitPeriodWithCas(0, p[2], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+        await operator.submitPeriodWithCas(0, p[3], consensusRoot, casBitmap, { from: alice }).should.be.rejectedWith(EVMRevert);
+      });
+
+      it('should allow to logout last slot', async () => {
+        const data = await operator.contract.methods.setSlot(253, ZERO_ADDR, ZERO_ADDR).encodeABI();
+        await proxy.applyProposal(data, {from: admin});
+        await operator.setLastCompleteEpochForTest(2);
+        await operator.activate(1);
+        const slotBits = await operator.takenSlots();
+        assert.equal(slotBits.toJSON(), 'fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb');
       });
 
       it('should allow to set slot and submit period without CAS', async () => {
+        await operator.setActiveSlotsMap('0x00');
         let data = await operator.contract.methods.setEpochLength(3).encodeABI();
         await proxy.applyProposal(data, {from: admin});
         data = await operator.contract.methods.setSlot(0, alice, alice).encodeABI();
@@ -165,16 +195,15 @@ contract('PoaOperator', (accounts) => {
       it('period proof should match contract', async () => {
         const data = await operator.contract.methods.setSlot(1, bob, bob).encodeABI();
         await proxy.applyProposal(data, {from: admin});
-
         const block = new Block(33);
         const depositTx = Tx.deposit(0, 1000, alice);
         block.addTx(depositTx);
         const prevPeriodRoot = await bridge.tipHash();
         const period = new Period(prevPeriodRoot, [block]);
-        period.setValidatorData(1, bob, CAS);
+        const casBitmap = '0x80'; // first bit set: 1000 0000
+        period.setValidatorData(1, bob, casBitmap);
         const proof = period.proof(depositTx);
-
-        await operator.submitPeriodWithCas(1, p[1], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
+        await operator.submitPeriodWithCas(1, p[1], period.merkleRoot(), casBitmap, { from: bob }).should.be.fulfilled;
         p[2] = await bridge.tipHash();
         assert.equal(p[2], proof[0]);
       });
@@ -187,23 +216,23 @@ contract('PoaOperator', (accounts) => {
         block.addTx(depositTx);
         const prevPeriodRoot = await bridge.tipHash();
         const period = new Period(prevPeriodRoot, [block]);
-        period.setValidatorData(1, bob, CAS);
+        const casBitmap = '0x80'; // first bit set: 1000 0000
+        period.setValidatorData(1, bob, casBitmap);
         const proof = period.proof(depositTx);
-
-        await operator.submitPeriodWithCas(1, p[2], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
+        await operator.submitPeriodWithCas(1, p[2], period.merkleRoot(), casBitmap, { from: bob }).should.be.fulfilled;
         p[3] = await bridge.tipHash();
         assert.equal(p[3], proof[0]);
 
         const validatorRoot = merkelize(`0x000000000000000000000001${bob.replace('0x', '')}`, ZERO);
         const consensusRoot = merkelize(period.merkleRoot(), ZERO);
 
-        await operator.challengeCas(CAS, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
+        await operator.challengeCas(casBitmap, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
 
         let challenge = await operator.getChallenge(p[3], 1);
         assert.equal(challenge[0], accounts[0]);
         assert.equal(challenge[2], bob);
 
-        const casRoot = merkelize(CAS, validatorRoot);
+        const casRoot = merkelize(casBitmap, validatorRoot);
         const vote = Tx.periodVote(1, new Input(new Outpoint(consensusRoot, 0)));
         vote.sign(['0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac']);
         await operator.respondCas(consensusRoot, casRoot, 1, vote.inputs[0].v, vote.inputs[0].r, vote.inputs[0].s, accounts[0]);
@@ -217,23 +246,23 @@ contract('PoaOperator', (accounts) => {
         block.addTx(depositTx);
         const prevPeriodRoot = await bridge.tipHash();
         const period = new Period(prevPeriodRoot, [block]);
-        period.setValidatorData(1, bob, CAS);
+        const casBitmap = '0x80'; // first bit set: 1000 0000
+        period.setValidatorData(1, bob, casBitmap);
         const proof = period.proof(depositTx);
-
-        await operator.submitPeriodWithCas(1, p[3], period.merkleRoot(), CAS, { from: bob }).should.be.fulfilled;
+        await operator.submitPeriodWithCas(1, p[3], period.merkleRoot(), casBitmap, { from: bob }).should.be.fulfilled;
         p[4] = await bridge.tipHash();
         assert.equal(p[4], proof[0]);
 
         const validatorRoot = merkelize(`0x000000000000000000000001${bob.replace('0x', '')}`, ZERO);
         const consensusRoot = merkelize(period.merkleRoot(), ZERO);
 
-        await operator.challengeCas(CAS, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
+        await operator.challengeCas(casBitmap, validatorRoot, consensusRoot, 1, {value: '100000000000000000'});
 
         let challenge = await operator.getChallenge(p[4], 1);
         assert.equal(challenge[0], accounts[0]);
         assert.equal(challenge[2], bob);
 
-        const casRoot = merkelize(CAS, validatorRoot);
+        const casRoot = merkelize(casBitmap, validatorRoot);
         const periodRoot = merkelize(consensusRoot, casRoot);
 
         await operator.timeoutCas(periodRoot, 1).should.be.rejectedWith(EVMRevert);
@@ -279,9 +308,12 @@ contract('PoaOperator', (accounts) => {
       assert.equal(await operator.epochLength(), 2);
 
       // logout the largest slot and try set epoch length again
-      const zero = '0x0000000000000000000000000000000000000000';
-      data = await operator.contract.methods.setSlot(1, zero, zero).encodeABI();
+      let slotBits = await operator.takenSlots();
+      assert.equal(slotBits.toJSON(), 'c000000000000000000000000000000000000000000000000000000000000000');
+      data = await operator.contract.methods.setSlot(1, ZERO_ADDR, ZERO_ADDR).encodeABI();
       await proxy.applyProposal(data, { from: accounts[2] });
+      slotBits = await operator.takenSlots();
+      assert.equal(slotBits.toJSON(), '8000000000000000000000000000000000000000000000000000000000000000');
       await operator.setLastCompleteEpochForTest(2);
       await operator.activate(1);
       data = await operator.contract.methods.setEpochLength(1).encodeABI();

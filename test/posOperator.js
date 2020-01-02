@@ -24,6 +24,7 @@ contract('PosOperator', (accounts) => {
     let nativeToken;
     let operator;
     let vault;
+    const CAS = '0x8000000000000000000000000000000000000000000000000000000000000000';
     const parentBlockInterval = 0;
     const epochLength = 3;
 
@@ -62,13 +63,13 @@ contract('PosOperator', (accounts) => {
       });
       describe('Auction', () => {
         it('should prevent submission by unbonded validators', async () => {
-          await operator.submitPeriodWithCas(0, p[0], '0x01', '0xe0', {from: alice}).should.be.rejectedWith(EVMRevert);
+          await operator.submitPeriodWithCas(0, p[0], '0x01', CAS, {from: alice}).should.be.rejectedWith(EVMRevert);
         });
 
         it('should allow to auction slot and submit block', async () => {
           await nativeToken.approve(operator.address, 1000, { from: alice });
           await operator.bet(0, 100, alice, alice, { from: alice });
-          await operator.submitPeriodWithCas(0, p[0], '0x01', '0xe0', { from: alice }).should.be.fulfilled;
+          await operator.submitPeriodWithCas(0, p[0], '0x01', CAS, { from: alice }).should.be.fulfilled;
           p[1] = await bridge.tipHash();
         });
 
@@ -95,13 +96,13 @@ contract('PosOperator', (accounts) => {
         });
 
         it('should allow submission when slot auctioned in same epoch', async () => {
-          await operator.submitPeriodWithCas(0, p[1], '0x02', '0xe0', {from: alice}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(0, p[1], '0x02', CAS, {from: alice}).should.be.fulfilled;
           p[2] = await bridge.tipHash();
         });
 
         it('should prevent submission by auctioned slot in later epoch', async () => {
-          await operator.submitPeriodWithCas(0, p[2], '0x03', '0xe0', {from: alice}).should.be.rejectedWith(EVMRevert);
-          await operator.submitPeriodWithCas(0, p[2], '0x03', '0xe0', {from: bob}).should.be.rejectedWith(EVMRevert);
+          await operator.submitPeriodWithCas(0, p[2], '0x03', CAS, {from: alice}).should.be.rejectedWith(EVMRevert);
+          await operator.submitPeriodWithCas(0, p[2], '0x03', CAS, {from: bob}).should.be.rejectedWith(EVMRevert);
         });
 
         it('allow to auction another slot', async () => {
@@ -111,20 +112,20 @@ contract('PosOperator', (accounts) => {
 
         it('should allow to activate auctioned slot and submit', async () => {
           // increment Epoch
-          await operator.submitPeriodWithCas(1, p[2], '0x03', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[2], '0x03', CAS, {from: charlie}).should.be.fulfilled;
           p[3] = await bridge.tipHash();
-          await operator.submitPeriodWithCas(1, p[3], '0x04', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[3], '0x04', CAS, {from: charlie}).should.be.fulfilled;
           p[4] = await bridge.tipHash();
-          await operator.submitPeriodWithCas(1, p[4], '0x05', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[4], '0x05', CAS, {from: charlie}).should.be.fulfilled;
           p[5] = await bridge.tipHash();
-          await operator.submitPeriodWithCas(1, p[5], '0x06', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[5], '0x06', CAS, {from: charlie}).should.be.fulfilled;
           p[6] = await bridge.tipHash();
           // activate and submit by bob
           const bal1 = await nativeToken.balanceOf(alice);
           await operator.activate(0);
           const bal2 = await nativeToken.balanceOf(alice);
           assert.equal(bal1.toNumber() + 100, bal2.toNumber());
-          await operator.submitPeriodWithCas(0, p[6], '0x07', '0xe0', {from: bob}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(0, p[6], '0x07', CAS, {from: bob}).should.be.fulfilled;
           p[7] = await bridge.tipHash();
         });
 
@@ -135,19 +136,19 @@ contract('PosOperator', (accounts) => {
 
         it('should prevent submission by logged-out slot in later epoch', async () => {
           // increment epoch
-          await operator.submitPeriodWithCas(1, p[7], '0x08', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[7], '0x08', CAS, {from: charlie}).should.be.fulfilled;
           p[8] = await bridge.tipHash();
           // try to submit when logged out
-          await operator.submitPeriodWithCas(0, p[8], '0x09', '0xe0', {from: bob}).should.be.rejectedWith(EVMRevert);
+          await operator.submitPeriodWithCas(0, p[8], '0x09', CAS, {from: bob}).should.be.rejectedWith(EVMRevert);
         });
 
         it('should allow to withdraw after logout', async () => {
           // increment epoch
-          await operator.submitPeriodWithCas(1, p[8], '0x09', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[8], '0x09', CAS, {from: charlie}).should.be.fulfilled;
           p[9] = await bridge.tipHash();
-          await operator.submitPeriodWithCas(1, p[9], '0x0a', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[9], '0x0a', CAS, {from: charlie}).should.be.fulfilled;
           p[10] = await bridge.tipHash();
-          await operator.submitPeriodWithCas(1, p[10], '0x0b', '0xe0', {from: charlie}).should.be.fulfilled;
+          await operator.submitPeriodWithCas(1, p[10], '0x0b', CAS, {from: charlie}).should.be.fulfilled;
           p[11] = await bridge.tipHash();
           // activate logout
           nativeToken.transfer(operator.address, 2000);
