@@ -310,6 +310,9 @@ contract('PoaOperator', (accounts) => {
       // logout the largest slot and try set epoch length again
       let slotBits = await operator.takenSlots();
       assert.equal(slotBits.toJSON(), 'c000000000000000000000000000000000000000000000000000000000000000');
+      await operator.rebuildTakenSlots();
+      slotBits = await operator.takenSlots();
+      assert.equal(slotBits.toJSON(), 'c000000000000000000000000000000000000000000000000000000000000000');
       data = await operator.contract.methods.setSlot(1, ZERO_ADDR, ZERO_ADDR).encodeABI();
       await proxy.applyProposal(data, { from: accounts[2] });
       slotBits = await operator.takenSlots();
