@@ -46,5 +46,6 @@ module.exports = (deployer) => {
     await minGov.propose(exitHandlerAddr, data);
 
     await minGov.finalize();
+    await operatorImpl.rebuildTakenSlots();
   })
 }

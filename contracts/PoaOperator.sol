@@ -99,7 +99,7 @@ contract PoaOperator is Adminable {
     _setSlot(_slotId, _signerAddr, _tenderAddr);
   }
 
-  function setTakenSlotBitmap(uint256 _before, uint256 _pos, bool isActive) internal pure returns (uint256) {
+  function _setTakenSlotBitmap(uint256 _before, uint256 _pos, bool isActive) internal pure returns (uint256) {
     if (isActive) {
       return _before | (0x01 << (255 - _pos));
     } else {
@@ -121,7 +121,7 @@ contract PoaOperator is Adminable {
       slot.tendermint = _tenderAddr;
       slot.activationEpoch = 0;
       slot.eventCounter++;
-      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, true);
+      takenSlots = _setTakenSlotBitmap(takenSlots, _slotId, true);
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -135,7 +135,7 @@ contract PoaOperator is Adminable {
     if (_signerAddr == address(0) && _tenderAddr == 0) {
       slot.activationEpoch = uint32(lastCompleteEpoch + 3);
       slot.eventCounter++;
-      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, false);
+      takenSlots = _setTakenSlotBitmap(takenSlots, _slotId, false);
       emit ValidatorLogout(
         slot.signer,
         _slotId,
@@ -168,7 +168,7 @@ contract PoaOperator is Adminable {
     slot.newTendermint = 0x0;
     slot.eventCounter++;
     if (slot.signer != address(0)) {
-      takenSlots = setTakenSlotBitmap(takenSlots, _slotId, true);
+      takenSlots = _setTakenSlotBitmap(takenSlots, _slotId, true);
       emit ValidatorJoin(
         slot.signer,
         _slotId,
@@ -332,6 +332,16 @@ contract PoaOperator is Adminable {
   uint16 public heartbeatColor;
   mapping(address => BeatChallenge) public beatChallenges;
   uint256 public takenSlots;
+
+  // this function doesn't need authentication,
+  // as it is only rebuilding the bitmap that is there already
+  function rebuildTakenSlots() public {
+    uint256 newBitmap = 0;
+    for (uint256 i = 0; i < epochLength; i++) {
+      newBitmap = _setTakenSlotBitmap(newBitmap, i, !_isEmpty(slots[i]));
+    }
+    takenSlots = newBitmap;
+  }
   
   // challenger claims that there is no hearbeat included in the previous minimumPulse periods
   // TODO: figure out what happens in slot rotation
