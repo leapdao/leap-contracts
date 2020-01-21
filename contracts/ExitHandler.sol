@@ -326,11 +326,11 @@ contract ExitHandler is IExitHandler, DepositHandler {
   ) public {
     require(msg.sender == challenger, "Wrong challenger");
     uint32 timestamp;
-    (, timestamp,,) = bridge.periods(_prevProof[0]);
-    require(timestamp > 0, "The referenced period was not submitted to bridge");
-
-    (, timestamp,,) = bridge.periods(_proof[0]);
-    require(timestamp > 0, "The referenced period was not submitted to bridge");
+    if (_prevProof.length > 0) {
+      // check period for _prevProof
+      (, timestamp,,) = bridge.periods(_prevProof[0]);
+      require(timestamp > 0, "The referenced period was not submitted to bridge");
+    }
     // validate exiting tx
     uint256 offset = 32 * (_proof.length + 2);
     bytes32 txHash1;
@@ -340,6 +340,9 @@ contract ExitHandler is IExitHandler, DepositHandler {
 
     TxLib.Tx memory txn;
     if (_proof.length > 0) {
+      // check period for _proof
+      (, timestamp,,) = bridge.periods(_proof[0]);
+      require(timestamp > 0, "The referenced period was not submitted to bridge");
       // validate spending tx
       bytes32 txHash;
       (, txHash, txData) = TxLib.validateProof(128, _proof);
