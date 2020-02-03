@@ -395,6 +395,35 @@ contract('ExitHandler', (accounts) => {
         
       });
 
+      it('should not allow to challenge exit from deleted period', async () => {
+        // utxo that will have spend exit utxo
+        const spendTx = Tx.transfer(
+          [new Input(new Outpoint(transferTx.hash(), 0))],
+          [new Output(50, charlie)]
+        ).sign([bobPriv]);
+
+        const period = await submitNewPeriod([ depositTx, transferTx, spendTx]);
+
+        const transferProof = period.proof(transferTx);
+        const spendProof = period.proof(spendTx);
+        const inputProof = period.proof(depositTx);
+
+        // withdraw output
+        const event = await exitHandler.startExit(inputProof, transferProof, 0, 0, { from: bob, value: exitStake });
+        
+        const utxoId = exitUtxoId(event);
+        assert.equal(utxoId, spendTx.inputs[0].prevout.getUtxoId());
+
+        // challenge exit and make sure exit is removed
+        assert.equal((await exitHandler.exits(utxoId))[2], bob);
+        
+        // delete _proof period
+        await bridge.deletePeriod(spendProof[0], {from: accounts[1]});
+
+        // should prevent challenge exit from a deleted period
+        await exitHandler.challengeExit(spendProof, transferProof, 0, 0, alice).should.be.rejectedWith(EVMRevert);
+      });
+
       it('Should allow to challenge exit by spending condition', async () => {
         const spendTx = Tx.spendCond(
           [new Input({
