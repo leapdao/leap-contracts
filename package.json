@@ -48,6 +48,7 @@
     "jsbi": "^2.0.5",
     "leap-core": "0.32.4",
     "regenerator-runtime": "^0.13.2",
+    "solidity-coverage": "0.6.0",
     "solium": "^1.2.4",
     "truffle": "^5.0.0"
   },

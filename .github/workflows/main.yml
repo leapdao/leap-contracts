@@ -1,0 +1,56 @@
+name: CI
+
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '10.x'
+    - uses: bahmutov/npm-install@v1
+    - run: yarn lint
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '10.x'
+    - uses: bahmutov/npm-install@v1
+    - run: yarn test-ci
+  code-coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '10.x'
+    - uses: bahmutov/npm-install@v1
+    - run: yarn coverage
+    - name: upload coverage report
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: '10.x'
+    - uses: bahmutov/npm-install@v1
+    - name: clone leap-sandbox
+      run: git clone --single-branch -b master https://github.com/leapdao/leap-sandbox.git /tmp/tests
+    - name: setup leap-sandbox
+      run: |
+          cat > /tmp/tests/configs/build << EOF
+          node_repo=" --single-branch -b master https://github.com/leapdao/leap-node.git"
+          contracts_repo=" `pwd`"
+          EOF
+    - name: build
+      run: cd /tmp/tests && yarn && yarn build
+    - name: run test
+      run: cd /tmp/tests && yarn test
