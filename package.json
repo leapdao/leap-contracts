@@ -1,8 +1,8 @@
 {
   "name": "leap-contracts",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "LeapDAO bridge contracts (Plasma + PoS)",
-  "main": "truffle-config.js",
+  "main": "",
   "scripts": {
     "test": "truffle compile && scripts/test.sh",
     "clean": "rm -rf build/",
