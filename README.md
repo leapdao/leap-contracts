@@ -1,5 +1,5 @@
 # LeapDAO Bridge implementation
-[![Build Status](https://travis-ci.org/leapdao/leap-contracts.svg?branch=master)](https://travis-ci.org/leapdao/leap-contracts)
+![CI](https://github.com/leapdao/leap-contracts/workflows/CI/badge.svg?branch=master)
 # Development
 
 ## Getting started
