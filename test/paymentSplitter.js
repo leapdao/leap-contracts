@@ -6,6 +6,7 @@
  */
 
 const PaymentSplitter = artifacts.require('PaymentSplitter');
+const { BN } = web3.utils;
 
 contract('PaymentSplitter', (accounts) => {
 
@@ -19,14 +20,15 @@ contract('PaymentSplitter', (accounts) => {
     const balanceBefore = await web3.eth.getBalance(accounts[1]);
     await paymentSplitter.split([accounts[1], accounts[2]], [500, 500], {value: '100000000'});
     const balanceAfter = await web3.eth.getBalance(accounts[1]);
-    assert(balanceAfter !== balanceBefore, "split not performed");
+    assert.equal(new BN(balanceAfter).sub(new BN(balanceBefore)).toNumber(), 50000000, "split not performed");
   });
 
   it('needs no splitting if 1 receiver', async () => {
     const balanceBefore = await web3.eth.getBalance(accounts[1]);
-    await paymentSplitter.split([accounts[1]], [1], {value: '100000000'});
+    // testing big amounts here: 10 ETH
+    await paymentSplitter.split([accounts[1]], [1], {value: web3.utils.toWei('10')});
     const balanceAfter = await web3.eth.getBalance(accounts[1]);
-    assert(balanceAfter !== balanceBefore, "split not performed");
+    assert.equal(new BN(balanceAfter).sub(new BN(balanceBefore)).toString(), web3.utils.toWei('10'), "payment not performed");
   });
 
   it('needs no splitting if no value to split', async () => {
@@ -37,10 +39,16 @@ contract('PaymentSplitter', (accounts) => {
   });
 
   it('is splitable by 3', async () => {
-    const balanceBefore = await web3.eth.getBalance(accounts[1]);
+    const balanceBefore = await web3.eth.getBalance(accounts[3]);
     await paymentSplitter.split([accounts[1], accounts[2], accounts[3]], [6, 6, 5], {value: '100000000'});
-    const balanceAfter = await web3.eth.getBalance(accounts[1]);
-    assert(balanceAfter !== balanceBefore, "split not performed");
+    const balanceAfter = await web3.eth.getBalance(accounts[3]);
+    // (6/17*100000000) = 35294117.6471 => solidity rounds to 35294117
+    // (5/17*100000000) = 29411764.7059 => solidity rounds to 29411764
+    // but we expect 29411766, 2 more wei, which is flushing the rest from the contract
+    assert.equal(new BN(balanceAfter).sub(new BN(balanceBefore)).toNumber(), 29411766, "split not performed");
+    // make sure no ether left in contract
+    const contractBalance = await web3.eth.getBalance(paymentSplitter.address);
+    assert.equal(contractBalance, '0', 'flush failed');
   });
 
 });
