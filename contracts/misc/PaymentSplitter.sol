@@ -9,7 +9,7 @@ pragma solidity 0.5.2;
 contract PaymentSplitter {
 
  /**
-  * Transfers given token to multiple recipients as specified by _recepients and _splits arrays
+  * Transfers ether to multiple recipients as specified by _recepients and _splits arrays
   *
   * @param _recipients Array of payment recipients
   * @param _splits Array of amounts for _tokenAddr ERC20 to transfer to corresponding recipient.
