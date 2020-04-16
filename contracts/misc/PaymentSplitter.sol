@@ -12,7 +12,7 @@ contract PaymentSplitter {
   * Transfers ether to multiple recipients as specified by _recepients and _splits arrays
   *
   * @param _recipients Array of payment recipients
-  * @param _splits Array of amounts for _tokenAddr ERC20 to transfer to corresponding recipient.
+  * @param _splits Array of share amount to transfer to corresponding recipient. Values can be anything as long as ratio is correct — e.g. [5,5,5] will split the value equally. If you want to transfer specific amounts in wei, specify _splits in wei. The splits should sum up to the `msg.value` in this case. The remainder, if any, will be sent to the last recipient
   */
   function split(
     address payable[] memory _recipients,
