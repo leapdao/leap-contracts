@@ -11,7 +11,6 @@ contract PaymentSplitter {
  /**
   * Transfers given token to multiple recipients as specified by _recepients and _splits arrays
   *
-  * @dev This contract should have enough allowance of _tokenAddr from _payerAddr
   * @param _recipients Array of payment recipients
   * @param _splits Array of amounts for _tokenAddr ERC20 to transfer to corresponding recipient.
   */
