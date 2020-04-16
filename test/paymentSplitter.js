@@ -29,7 +29,7 @@ contract('PaymentSplitter', (accounts) => {
     assert(balanceAfter !== balanceBefore, "split not performed");
   });
 
-  it('needs no splitting if no receiver', async () => {
+  it('needs no splitting if no value to split', async () => {
     const balanceBefore = await web3.eth.getBalance(accounts[1]);
     await paymentSplitter.split([accounts[1]], [1], {value: '0'});
     const balanceAfter = await web3.eth.getBalance(accounts[1]);
