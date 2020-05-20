@@ -4,7 +4,7 @@
  * This source code is licensed under the Mozilla Public License, version 2,
  * found in the LICENSE file in the root directory of this source tree.
  */
-pragma solidity 0.5.2;
+pragma solidity ^0.5.12;
 library TxLib {
   uint constant internal WORD_SIZE = 32;
   uint constant internal ONES = ~uint(0);

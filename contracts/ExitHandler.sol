@@ -8,7 +8,7 @@
 
 /* solium-disable security/no-block-members */
 
-pragma solidity 0.5.2;
+pragma solidity ^0.5.12;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/Math.sol";
 

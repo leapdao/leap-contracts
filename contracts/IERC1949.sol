@@ -1,4 +1,4 @@
-pragma solidity 0.5.2;
+pragma solidity ^0.5.12;
 
 /**
  * @dev Interface of the ERC1949 contract.

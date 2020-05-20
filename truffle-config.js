@@ -13,14 +13,14 @@ module.exports = {
   // Configure your compilers
   compilers: {
     solc: {
-      version: '0.5.2',
+      version: '0.5.12',
       settings: {
         optimizer: {
           enabled: true,
           runs: 2,
         },
         // TODO: the code is supposed to work on constantinople EVM but fails if this is switched on
-        evmVersion: 'byzantium',
+        evmVersion: 'istanbul',
       },
     },
   },

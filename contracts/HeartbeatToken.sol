@@ -5,7 +5,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-pragma solidity 0.5.2;
+pragma solidity ^0.5.12;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Full.sol";
 import "../node_modules/openzeppelin-solidity/contracts/access/roles/MinterRole.sol";

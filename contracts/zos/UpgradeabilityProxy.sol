@@ -1,4 +1,4 @@
-pragma solidity 0.5.2;
+pragma solidity ^0.5.12;
 
 //copied from zos-lib due to import fix needed:
 //import "openzeppelin-solidity/contracts/AddressUtils.sol" -> import "openzeppelin-solidity/contracts/utils/Address.sol"
