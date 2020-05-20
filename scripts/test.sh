@@ -28,7 +28,7 @@ start_ganache() {
     --account="0x12340218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4,1000000000000000000000000"
   )
 
-  node_modules/.bin/ganache-cli --gasLimit 9000000 "${accounts[@]}" > /dev/null &
+  node_modules/.bin/ganache-cli --hardfork istanbul --gasLimit 9000000 "${accounts[@]}" > /dev/null &
 
   ganache_pid=$!
 }

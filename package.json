@@ -43,7 +43,7 @@
     "eslint-plugin-promise": "^4.0.1",
     "eslint-plugin-standard": "^4.0.0",
     "ethereumjs-util": "^6.0.0",
-    "ganache-cli": "^6.2.3",
+    "ganache-cli": "^6.9.1",
     "husky": "^1.2.0",
     "jsbi": "^2.0.5",
     "leap-core": "0.32.4",
