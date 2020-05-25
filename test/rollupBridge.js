@@ -33,7 +33,7 @@ contract('Rollup-Bridge', (accounts) => {
     });
 
     describe('Submit Plasma Period', async () => {
-      it('has gas cost of 99560 for single period', async() => {
+      it('has gas cost for single period', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const newPeriodHash = '0x0100000000000000000000000000000000000000000000000000000000000000';
 
@@ -46,7 +46,7 @@ contract('Rollup-Bridge', (accounts) => {
     });
 
     describe('Submit Rollup Period', async () => {
-      it('has gas cost of 102803 for single tx', async() => {
+      it('has gas cost for single tx', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -65,13 +65,13 @@ contract('Rollup-Bridge', (accounts) => {
         );
 
         const rsp = await bridge.submitPeriodWithData(prevPeriodHash, newPeriodHash, block.hex()).should.be.fulfilled;
-        assert.equal(rsp.receipt.gasUsed, 102803);
+        assert.equal(rsp.receipt.gasUsed, 122969);
 
         const newTip = await bridge.tipHash();
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 2 txns', async() => {
+      it('has gas cost for 2 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -98,7 +98,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 5 txns', async() => {
+      it('has gas cost for 5 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -125,7 +125,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 10 txns', async() => {
+      it('has gas cost for 10 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -152,7 +152,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 25 txns', async() => {
+      it('has gas cost for 25 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -179,7 +179,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 50 txns', async() => {
+      it('has gas cost for 50 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -206,7 +206,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 100 txns', async() => {
+      it('has gas cost for 100 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -233,7 +233,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 200 txns', async() => {
+      it('has gas cost for 200 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -260,7 +260,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 738140 for 500 txns', async() => {
+      it('has gas cost for 500 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -287,7 +287,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 1897112 for 1000 txns', async() => {
+      it('has gas cost for 1000 txns', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -313,7 +313,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 120430 for single tx with zk proof playload', async() => {
+      it('has gas cost for single tx with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -343,7 +343,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 2467659 for 2 txns with zk proof playload', async() => {
+      it('has gas cost for 2 txns with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -372,7 +372,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 2467659 for 5 txns with zk proof playload', async() => {
+      it('has gas cost for 5 txns with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -401,7 +401,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 2467659 for 10 txns with zk proof playload', async() => {
+      it('has gas cost for 10 txns with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -430,7 +430,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 2467659 for 25 txns with zk proof playload', async() => {
+      it('has gas cost for 25 txns with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -459,7 +459,7 @@ contract('Rollup-Bridge', (accounts) => {
         newTip.should.be.equal(newPeriodHash);
       });
 
-      it('has gas cost of 2467659 for 50 txns with zk proof playload', async() => {
+      it('has gas cost for 50 txns with zk proof playload', async() => {
         const prevPeriodHash = await bridge.tipHash();
         const outHash = '0x0100000000000000000000000000000000000000000000000000000000000001';
         const newPeriodHash = '0x0200000000000000000000000000000000000000000000000000000000000002';
@@ -509,7 +509,7 @@ contract('Rollup-Bridge', (accounts) => {
         
 
         const rsp = await bridge.submitPeriodWithData(prevPeriodHash, newPeriodHash, block.hex()).should.be.fulfilled;
-        assert.equal(rsp.receipt.gasUsed, 688388);
+        assert.equal(rsp.receipt.gasUsed, 727201);
 
         const newTip = await bridge.tipHash();
         newTip.should.be.equal(newPeriodHash);

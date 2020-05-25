@@ -17,7 +17,20 @@ contract RollupBridge is Bridge {
     bytes32 _root,
     bytes calldata _blockData)
   external onlyOperator returns (uint256 newHeight) {
-    return submitPeriod(_prevHash, _root);
+    newHeight = submitPeriod(_prevHash, _root);
+
+    uint256 blockDataSize = 0;
+    // <4b function sig, 32b prevHash, 32b root, 32b garbage, 32b _blockData length, ...._blockData>
+    assembly {
+      // _blockData.length
+      blockDataSize := calldataload(100)
+      let memPtr := mload(64)
+      calldatacopy(memPtr, 132, blockDataSize)
+      let blockHash := keccak256(memPtr, blockDataSize)
+      let key := 1234
+      sstore(key, blockHash)
+    }
+    require(blockDataSize < 32000, "exceeded max tx size");
   }
 
 }
