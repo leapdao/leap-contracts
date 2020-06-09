@@ -42,6 +42,25 @@ contract BountyPayout is WhitelistedRole {
     leapAddr = _leapAddr;
   }
 
+  modifier refundGasCost() {
+    uint remainingGasStart = gasleft();
+
+    _;
+
+    if (msg.value > 0) {
+      uint remainingGasEnd = gasleft();
+      uint usedGas = remainingGasStart - remainingGasEnd;
+      // Add intrinsic gas and transfer gas. Need to account for gas stipend as well.
+      usedGas += 21000 + 9700;
+      // Possibly need to check max gasprice and usedGas here to limit possibility for abuse.
+      uint gasCost = usedGas * tx.gasprice;
+      // Refund gas cost
+      tx.origin.transfer(gasCost); // solium-disable-line security/no-tx-origin
+      // send the rest back
+      msg.sender.transfer(msg.value - gasCost);
+    }
+  }
+
   /**
   * Pays out a bounty to the different roles of a bounty
   *
@@ -56,7 +75,7 @@ contract BountyPayout is WhitelistedRole {
     bytes32 _worker,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyWhitelisted {
+  ) public payable onlyWhitelisted refundGasCost {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -72,7 +91,7 @@ contract BountyPayout is WhitelistedRole {
     bytes32 _gardener,
     bytes32 _reviewer,
     bytes32 _bountyId
-  ) public onlyWhitelisted {
+  ) public payable onlyWhitelisted refundGasCost {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),
@@ -88,7 +107,7 @@ contract BountyPayout is WhitelistedRole {
     bytes32 _gardener,
     bytes32 _worker,
     bytes32 _bountyId
-  ) public onlyWhitelisted {
+  ) public payable onlyWhitelisted refundGasCost {
     _payout(
       address(bytes20(_gardener)),
       uint96(uint256(_gardener)),

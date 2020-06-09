@@ -7,6 +7,7 @@
 
 const NativeToken = artifacts.require('NativeToken');
 const BountyPayout = artifacts.require('BountyPayout');
+const SafeMock = artifacts.require('SafeMock');
 const Colony = artifacts.require('Colony');
 
 contract('BountyPayout', (accounts) => {
@@ -36,6 +37,30 @@ contract('BountyPayout', (accounts) => {
     assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
     assert.equal((await dai.balanceOf(accounts[2])).toString(10), '65000000000000000000');
     assert.equal((await dai.balanceOf(accounts[3])).toString(10), '20000000000000000000');
+  });
+
+  it('is payable with gas refund', async () => {
+    const safe = await SafeMock.new(dai.address, bountyPayout.address);
+    await dai.transfer(safe.address, amount);
+    await safe.sendTransaction({
+      from: accounts[0],
+      value: '1000000000000000000'
+    });
+    await safe.approve(bountyPayout.address, amount);
+    await bountyPayout.addWhitelisted(safe.address);
+    const balBefore = await web3.eth.getBalance(accounts[0]);
+    await safe.payout(
+      `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
+      `0x${accounts[2].replace('0x', '')}00000003860E639D80640000`, // 65%
+      `0x${accounts[3].replace('0x', '')}00000001158E460913D00000`, // 20%
+      '0x2f6c6561702d636f6e7472616374732f6973737565732f323337' // /leap-contracts/issues/237
+    );
+    assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[2])).toString(10), '65000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[3])).toString(10), '20000000000000000000');
+    const balAfter = await web3.eth.getBalance(accounts[0]);
+    assert(new web3.utils.BN(balAfter).gte(new web3.utils.BN(balBefore)));
+    assert.equal((await web3.eth.getBalance(bountyPayout.address)), '0');
   });
 
   it('is payable with rep only', async () => {
