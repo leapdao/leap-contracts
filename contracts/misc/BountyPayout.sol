@@ -173,7 +173,8 @@ contract BountyPayout is WhitelistedRole {
     // Why is a gardener share required?
     // Later we will hold a stake for gardeners, which will be handled here.
     require(_gardenerDaiAmount > DAI_DECIMALS, "gardener amount too small");
-    uint256 paymentId = _makeColonyPayment(_gardenerAddr, _gardenerDaiAmount);
+    uint256 paymentId = 0x123;
+    //uint256 paymentId = _makeColonyPayment(_gardenerAddr, _gardenerDaiAmount);
     if (!_isRepOnly(_gardenerDaiAmount)) {
       dai.transferFrom(msg.sender, _gardenerAddr, _gardenerDaiAmount);
     }
@@ -182,7 +183,7 @@ contract BountyPayout is WhitelistedRole {
 
     // handle worker
     if (_workerDaiAmount > 0) {
-      paymentId = _makeColonyPayment(_workerAddr, _workerDaiAmount);
+      //paymentId = _makeColonyPayment(_workerAddr, _workerDaiAmount);
       if (!_isRepOnly(_workerDaiAmount)) {
         dai.transferFrom(msg.sender, _workerAddr, _workerDaiAmount);
       }
@@ -192,7 +193,7 @@ contract BountyPayout is WhitelistedRole {
 
     // handle reviewer
     if (_reviewerDaiAmount > 0) {
-      paymentId = _makeColonyPayment(_reviewerAddr, _reviewerDaiAmount);
+      //paymentId = _makeColonyPayment(_reviewerAddr, _reviewerDaiAmount);
       if (!_isRepOnly(_reviewerDaiAmount)) {
         dai.transferFrom(msg.sender, _reviewerAddr, _reviewerDaiAmount);
       }
