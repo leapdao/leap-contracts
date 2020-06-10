@@ -51,7 +51,7 @@ contract BountyPayout is WhitelistedRole {
       uint remainingGasEnd = gasleft();
       uint usedGas = remainingGasStart - remainingGasEnd;
       // Add intrinsic gas and transfer gas. Need to account for gas stipend as well.
-      usedGas += 21000 + 9700;
+      usedGas += 21000 + 9700 + 9700;
       // Possibly need to check max gasprice and usedGas here to limit possibility for abuse.
       uint gasCost = usedGas * tx.gasprice;
       // Refund gas cost
