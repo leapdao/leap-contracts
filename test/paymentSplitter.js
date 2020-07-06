@@ -6,11 +6,17 @@
  */
 
 const PaymentSplitter = artifacts.require('PaymentSplitter');
+const NativeToken = artifacts.require('NativeToken');
 const { BN } = web3.utils;
 
 contract('PaymentSplitter', (accounts) => {
 
   let paymentSplitter;
+  let token;
+
+  before(async () => {
+    token = await NativeToken.new('SIM', 'sim', 18);
+  });
 
   beforeEach(async () => {
     paymentSplitter = await PaymentSplitter.new();
@@ -49,6 +55,15 @@ contract('PaymentSplitter', (accounts) => {
     // make sure no ether left in contract
     const contractBalance = await web3.eth.getBalance(paymentSplitter.address);
     assert.equal(contractBalance, '0', 'flush failed');
+  });
+
+  it('erc20 is splitable', async () => {
+    await token.mint(accounts[0], 1000);
+    await token.approve(paymentSplitter.address, 1000);
+    const balanceBefore = await token.balanceOf(accounts[1]);
+    await paymentSplitter.splitERC20([accounts[1], accounts[2]], [500, 500], token.address);
+    const balanceAfter = await token.balanceOf(accounts[1]);
+    assert.equal(new BN(balanceAfter).sub(new BN(balanceBefore)).toNumber(), 500, "split not performed");
   });
 
 });

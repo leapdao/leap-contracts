@@ -6,6 +6,10 @@
  */
 pragma solidity 0.5.2;
 
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+}
+
 import "../../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract PaymentSplitter {
@@ -34,6 +38,27 @@ contract PaymentSplitter {
     }
     // flush the rest, so that we don't have rounding errors or stuck funds
     _recipients[_recipients.length - 1].transfer(address(this).balance);
+  }
+
+
+ /**
+  * Transfers given token to multiple recipients as specified by _recepients and _splits arrays
+  *
+  * @dev This contract should have enough allowance of _tokenAddr from _payerAddr
+  * @param _recipients Array of payment recipients
+  * @param _splits Array of amounts for _tokenAddr ERC20 to transfer to corresponding recipient.
+  * @param _tokenAddr ERC20 token used for payment unit
+  */
+  function splitERC20(
+    address[] memory _recipients,
+    uint256[] memory _splits,
+    address _tokenAddr
+  ) public {
+    require(_recipients.length == _splits.length, "splits and recipients should be of the same length");
+    IERC20 token = IERC20(_tokenAddr);
+    for (uint i = 0; i < _recipients.length; i++) {
+      token.transferFrom(msg.sender, _recipients[i], _splits[i]);
+    }
   }
 
 }
