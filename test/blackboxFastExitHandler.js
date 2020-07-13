@@ -11,7 +11,7 @@ contract('FastExitHandler', (accounts) => {
         it('should allow to call public functions', async () => {
             const handler = await FastExitHandler.deployed();
             await handler.admin().should.be.fulfilled;
-            await handler.nstTokenCount().should.be.fulfilled; 
+            await handler.nstTokenCount().should.be.fulfilled;
             await handler.exitStake().should.be.fulfilled;
         });
 

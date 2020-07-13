@@ -74,7 +74,7 @@ contract('PoaOperator', (accounts) => {
             const opCont = await PoaOperator.new();
             const inclusionProof = ['0x7a1653a96d7c6cceab5b8187911227997ff1f6aad004433077385ce371786591'];
             const walkProof = ['0x844a3a3211f05dfeaa6d9d7b00e43044afb60c314174171892b19adf9c65afe7'];
-            const soltId = '65899483317127080191777349741061613436377182008172853121548846142867048394456';            
+            const soltId = '65899483317127080191777349741061613436377182008172853121548846142867048394456';
             await opCont.respondBeat(inclusionProof, walkProof, soltId).should.be.rejectedWith(EVMRevert);
         });
 
