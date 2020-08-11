@@ -63,5 +63,8 @@ module.exports = {
       gas: 0xfffffffffffff,
       gasPrice: 0x01,
     },
+  },
+  mocha: {
+    reporter: 'eth-gas-reporter'
   }
 }

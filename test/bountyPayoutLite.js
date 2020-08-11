@@ -1,0 +1,84 @@
+/**
+ * Copyright (c) 2018-present, Leap DAO (leapdao.org)
+ *
+ * This source code is licensed under the Mozilla Public License, version 2,
+ * found in the LICENSE file in the root directory of this source tree.
+ */
+
+const NativeToken = artifacts.require('NativeToken');
+const BountyPayout = artifacts.require('BountyPayoutLite');
+const SafeMock = artifacts.require('SafeMock');
+
+contract('BountyPayoutLite', (accounts) => {
+
+  const amount = '100000000000000000000'; // 100 dai
+  let dai;
+  const leap = { address: accounts[3] };
+  let bountyPayout;
+
+  beforeEach(async () => {
+    dai = await NativeToken.new('DAI', 'dai', 18);
+    await dai.mint(accounts[0], amount);
+    bountyPayout = await BountyPayout.new(dai.address, leap.address);
+    await bountyPayout.addWhitelisted(accounts[0]);
+
+    await dai.approve(bountyPayout.address, amount);
+  });
+
+  it('is payable', async () => {
+    await bountyPayout.payout(
+      `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
+      `0x${accounts[2].replace('0x', '')}00000003860E639D80640000`, // 65%
+      `0x${accounts[3].replace('0x', '')}00000001158E460913D00000`, // 20%
+      '0x2f6c6561702d636f6e7472616374732f6973737565732f323337' // /leap-contracts/issues/237
+    );
+    assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[2])).toString(10), '65000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[3])).toString(10), '20000000000000000000');
+  });
+
+  it('is payable with gas refund', async () => {
+    const safe = await SafeMock.new(dai.address, bountyPayout.address);
+    await dai.transfer(safe.address, amount);
+    await safe.sendTransaction({
+      from: accounts[0],
+      value: '1000000000000000000'
+    });
+    await safe.approve(bountyPayout.address, amount);
+    await bountyPayout.addWhitelisted(safe.address);
+    const balBefore = await web3.eth.getBalance(accounts[0]);
+    await safe.payout(
+      `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
+      `0x${accounts[2].replace('0x', '')}00000003860E639D80640000`, // 65%
+      `0x${accounts[3].replace('0x', '')}00000001158E460913D00000`, // 20%
+      '0x2f6c6561702d636f6e7472616374732f6973737565732f323337' // /leap-contracts/issues/237
+    );
+    assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[2])).toString(10), '65000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[3])).toString(10), '20000000000000000000');
+    const balAfter = await web3.eth.getBalance(accounts[0]);
+    assert(new web3.utils.BN(balAfter).gte(new web3.utils.BN(balBefore)));
+    assert.equal((await web3.eth.getBalance(bountyPayout.address)), '0');
+  });
+
+  it('is payable with rep only', async () => {
+    await bountyPayout.payoutNoReviewer(
+      `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
+      `0x${accounts[2].replace('0x', '')}00000003860E639D80640001`, // 65% repOnly
+      '0x2f6c6561702d636f6e7472616374732f6973737565732f323337' // /leap-contracts/issues/237
+    );
+    assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[2])).toString(10), '0');
+  });
+
+  it('is payable for delivery with review', async () => {
+    await bountyPayout.payoutReviewedDelivery(
+      `0x${accounts[1].replace('0x', '')}00000000D02AB486CEDC0000`, // 15%
+      `0x${accounts[2].replace('0x', '')}00000003860E639D80640000`, // 65% repOnly
+      '0x2f6c6561702d636f6e7472616374732f6973737565732f323337' // /leap-contracts/issues/237
+    );
+    assert.equal((await dai.balanceOf(accounts[1])).toString(10), '15000000000000000000');
+    assert.equal((await dai.balanceOf(accounts[2])).toString(10), '65000000000000000000');
+  });
+
+});
